@@ -1,0 +1,35 @@
+{
+  "name": "groundstate",
+  "version": "0.0.1",
+  "description": "Give your coding agent ground truth about your running app. Dev-only SDK exposing real app state and actions as WebMCP tools.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --sourcemap --clean",
+    "dev": "tsup src/index.ts --format esm --dts --sourcemap --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "webmcp",
+    "mcp",
+    "agents",
+    "devtools",
+    "testing"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}
