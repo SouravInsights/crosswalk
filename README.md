@@ -139,6 +139,59 @@ Or push to `main` — the release workflow opens a "Version Packages" PR automat
 
 ---
 
+## Deployment
+
+### Landing page & docs (site/)
+
+Deploy `site/` to any Next.js host. Vercel and Netlify are both hackathon sponsors, so either works.
+
+**Vercel** (recommended — zero config):
+
+```bash
+# install Vercel CLI if needed
+npm i -g vercel
+
+# from repo root
+cd site && vercel
+```
+
+Or connect the repo on [vercel.com](https://vercel.com) — it auto-detects Next.js.
+
+**Netlify**:
+
+```bash
+npm i -g netlify-cli
+cd site && netlify deploy --build
+```
+
+**Manual / self-hosted**:
+
+```bash
+cd site
+pnpm build
+pnpm start    # serves on :3000
+```
+
+Set these env vars if deploying publicly:
+- `NEXT_PUBLIC_SITE_URL` — canonical URL for metadata (optional but recommended)
+
+### npm packages
+
+```bash
+# bump versions and update changelogs
+pnpm exec changeset version
+
+# commit the version bump, tag, and push
+git add -A && git commit -m "chore: release" && git push --tags
+
+# publish to npm (requires NPM_TOKEN)
+pnpm release
+```
+
+Or push to `main` — the GitHub Actions release workflow opens a "Version Packages" PR automatically. Merge it to publish.
+
+---
+
 ## Security
 
 Groundstate exposes internal state and mutating actions. `init()` refuses to run in production
