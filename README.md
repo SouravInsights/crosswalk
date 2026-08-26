@@ -14,51 +14,144 @@ so the agent you already use can:
 > Chrome DevTools MCP tells the agent what the browser sees.
 > **Groundstate tells it what the app knows.**
 
-## Packages
+---
 
-| Package | What it is |
-|---|---|
-| [`groundstate`](packages/core) | Core SDK: `observe` / `act` / `fixture` / `reset` / `record` (flight recorder) + `getGroundstateHealth`. Zero dependencies, dev/preview only. |
-| [`@groundstate/react`](packages/react) | React hooks + one-line Zustand and TanStack Query auto-derivation (`observeStore`, `observeQueries`). |
-| [`@groundstate/bridge`](packages/bridge) | Local MCP server connecting a running page's tools to Claude Code / Codex / Cursor via CDP. |
-| [`@groundstate/inspector`](packages/inspector) | In-page dev overlay to browse and invoke tools while authoring. |
+## Repository layout
 
-## Quick start
+| Path | npm name | What it is |
+|---|---|---|
+| `packages/core` | `groundstate` | Framework-agnostic runtime: `observe` / `act` / `fixture` / `reset` / `record` / `doctor`, transport adapter, production guard, internal registry. **Zero runtime dependencies.** |
+| `packages/react` | `@groundstate/react` | React hooks (`useObservable`, `useAction`, `useFixture`) plus auto-derived observables: `observeStore` (Zustand) and `observeQueries` (TanStack Query). |
+| `packages/bridge` | `@groundstate/bridge` | Local MCP server (stdio) that connects a running page's Groundstate registry to an MCP client via CDP. |
+| `packages/inspector` | `@groundstate/inspector` | In-page dev overlay (shadow DOM, vanilla TS): browse/invoke registered tools. |
+| `examples/demo-app` | private | Vite + React + Zustand cart/checkout demo app. |
+| `site/` | private | Next.js + Fumadocs landing page and documentation. |
 
-```ts
-// app startup, dev builds only
-import * as groundstate from "groundstate";
-
-if (import.meta.env.DEV) {
-  groundstate.init({ appName: "my-app" });
-  groundstate.observe("checkout", () => store.getState().checkout);
-  groundstate.act("submitCheckoutWithCard", ({ cardToken }) => checkout.submit(cardToken));
-  groundstate.fixture("cart_with_declined_card", () => seedDeclinedCardState());
-}
-```
-
-```bash
-# 1. run your app, and Chrome with a debugging port
-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/groundstate-profile http://localhost:5173
-
-# 2. connect your agent
-claude mcp add groundstate -- npx @groundstate/bridge --page localhost:5173
-```
-
-Your agent now has `getCheckoutState`, `submitCheckoutWithCard`, `loadFixture`, `listFixtures`,
-`getStateHistory`, `getGroundstateHealth`, and `resetToGroundState` — live against the running app.
+---
 
 ## Development
 
 ```bash
 pnpm install
-pnpm build && pnpm test
-pnpm --filter demo-app dev   # example app in examples/demo-app
+pnpm build        # turbo run build (respects dependency graph)
+pnpm test         # turbo run test
+pnpm typecheck
+pnpm lint:fix
 ```
 
-See `groundstate.md` for the product plan and `AGENTS.md` for contributor/agent guidance.
+### Demo app
+
+```bash
+pnpm --filter demo-app dev   # Vite dev server on :5173
+```
+
+### Landing page & docs
+
+```bash
+pnpm --filter site dev       # Next.js dev server on :3000
+```
+
+Or build for production:
+
+```bash
+pnpm --filter site build
+pnpm --filter site start     # serves on :3000
+```
+
+### Full E2E smoke test
+
+```bash
+# 1. start the demo app
+pnpm --filter demo-app dev
+
+# 2. start Chrome with a debugging port (new terminal)
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=9223 --user-data-dir=/tmp/gs-profile \
+  --no-first-run http://localhost:5173
+
+# 3. test the bridge (new terminal)
+node -e "
+import('./packages/bridge/dist/index.js').then(async ({connectToPage}) => {
+  const page = await connectToPage({browserUrl: 'http://127.0.0.1:9223', pageUrlContains: 'localhost:5173'});
+  const tools = await page.listTools();
+  console.log('tools:', tools.map(t => t.name).join(', '));
+  const result = await page.callTool('getCheckoutState', {});
+  console.log('state:', JSON.stringify(result, null, 2));
+  await page.close();
+});
+"
+```
+
+---
+
+## Onboarding for new contributors
+
+### Prerequisites
+
+- Node.js >= 20
+- pnpm >= 10
+- Chrome (for bridge testing)
+
+### Setup
+
+```bash
+git clone <repo-url>
+cd groundstate
+pnpm install
+pnpm build
+```
+
+### Key concepts
+
+1. **Transport adapter order** — `document.modelContext` (spec current) → `navigator.modelContext` (deprecated, Chrome origin trial) → internal registry (bridge via `window.__GROUNDSTATE__`). Feature-detect only; never user-agent sniff.
+
+2. **Production guard** — `init()` throws in production builds. There is no override flag. This is by design: Groundstate exposes internal state and mutating actions.
+
+3. **Bridge is the primary transport today** — no mainstream agent client consumes WebMCP natively yet. The bridge works in any Chromium browser via CDP, no flags required.
+
+4. **Tool naming contract** — observables → `get<Name>State`, actions → your chosen name, fixtures → `loadFixture`/`listFixtures`, recorder → `getStateHistory`, health → `getGroundstateHealth`.
+
+### Making changes
+
+1. Create a changeset: `pnpm exec changeset`
+2. Write tests for new behavior
+3. Update docs in `site/content/docs/` if user-facing
+4. Update `AGENTS.md` if architecture changes
+
+### Publishing
+
+```bash
+pnpm exec changeset version   # bumps versions, updates changelogs
+pnpm release                  # publishes to npm
+```
+
+Or push to `main` — the release workflow opens a "Version Packages" PR automatically.
+
+### Useful commands
+
+| Command | What it does |
+|---|---|
+| `pnpm --filter demo-app dev` | Run the demo app |
+| `pnpm --filter site dev` | Run the landing page + docs |
+| `pnpm --filter groundstate test` | Test core SDK only |
+| `pnpm --filter @groundstate/react test` | Test React adapter only |
+| `pnpm exec biome check --write` | Lint + format |
+
+---
 
 ## Security
 
 Groundstate exposes internal state and mutating actions. `init()` refuses to run in production
 builds — there is deliberately no override. Never ship it enabled to real users.
+
+When testing with the bridge, always use a dedicated Chrome profile (`--user-data-dir`) — the
+debugging port grants control over that browser instance to local processes.
+
+---
+
+## Links
+
+- [groundstate.md](groundstate.md) — product plan and design rationale
+- [AGENTS.md](AGENTS.md) — architecture invariants and contributor guidance
+- [WebMCP](https://developer.chrome.com/docs/ai/webmcp) — the underlying standard
+- [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) — the complementary tool
