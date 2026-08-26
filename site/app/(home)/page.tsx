@@ -1,363 +1,328 @@
-import {
-  Activity,
-  ArrowRight,
-  FileJson,
-  LayoutGrid,
-  RotateCcw,
-  ShieldCheck,
-  Terminal,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { Instrument } from "@/components/instrument";
+import { PageReadout } from "@/components/page-readout";
+import { ResetSection } from "@/components/reset-section";
 
-const TOOLS = [
+/* Before/after with cumulative elapsed time per step, so the totals
+   read as measurements instead of slogans. */
+const BEFORE: Array<[step: string, elapsed: string]> = [
+  ["Agent writes the fix", "0:00"],
+  ["You test it. Still broken", "2:00"],
+  ["You paste a screenshot", "5:00"],
+  ["Agent guesses at the cause", "8:00"],
+  ["You open DevTools and dig yourself", "12:00"],
+];
+
+const AFTER: Array<[step: string, elapsed: string]> = [
+  ["Agent writes the fix", "0:00"],
+  ["You say it's still broken", "0:05"],
+  ["Agent reads the actual store", "0:10"],
+  ["Agent reads the state history", "0:15"],
+  ["Agent fixes the real bug", "0:25"],
+];
+
+/* What the agent sees once those three lines exist. Mirrors the real
+   demo-app contract: same tool names, same descriptions. */
+const CONTRACT: Array<{
+  name: string;
+  kind: "read" | "write";
+  auto?: boolean;
+  description: string;
+}> = [
   {
     name: "getCheckoutState",
-    desc: "The actual store — cart contents, validation errors, payment status. Not what the DOM implies.",
-    icon: FileJson,
-  },
-  {
-    name: "loadFixture",
-    desc: "Teleport the app into a named state in one call. Kills the 20-minute bug-reproduction tax.",
-    icon: RotateCcw,
+    kind: "read",
+    auto: true,
+    description:
+      "Live store: cart contents, total, validation errors, payment status. What the app actually holds, not what the DOM implies.",
   },
   {
     name: "getStateHistory",
-    desc: "Flight recorder: every state transition with the keys that changed. The causal trace, not two snapshots.",
-    icon: Activity,
+    kind: "read",
+    auto: true,
+    description:
+      "Every transition with the keys that changed. The causal trace, not two snapshots to guess between.",
   },
   {
     name: "submitCheckoutWithCard",
-    desc: "Real actions you defined, schema'd and callable — no fragile selectors, no vision round-trips.",
-    icon: Terminal,
+    kind: "write",
+    description:
+      "An action you blessed: schema'd, named, and safe. Not an opaque script injected into your page.",
   },
   {
-    name: "getGroundstateHealth",
-    desc: "Runs every read-only tool and reports what broke. Selectors rot loudly, never silently.",
-    icon: ShieldCheck,
+    name: "loadFixture",
+    kind: "write",
+    description:
+      "Teleport the app into a named scenario in one call. Bug reports stop costing twenty minutes of reproduction.",
   },
   {
-    name: "Inspector overlay",
-    desc: "In-page panel to browse and invoke every tool while you author them.",
-    icon: LayoutGrid,
+    name: "resetToGroundState",
+    kind: "write",
+    description:
+      "Back to a known baseline in one call. No clicking back, no state leaking between experiments.",
   },
 ];
-
-const PACKAGES = [
-  [
-    "groundstate",
-    "Core SDK: observe / act / fixture / reset / record. Zero dependencies, dev-only.",
-  ],
-  ["@groundstate/react", "React hooks + one-line Zustand and TanStack Query auto-derivation."],
-  ["@groundstate/bridge", "Local MCP server: page tools → Claude Code / Codex / Cursor, via CDP."],
-  ["@groundstate/inspector", "In-page overlay to browse and invoke tools while authoring."],
-];
-
-const LOOP_STAGES = [
-  {
-    label: "OBSERVE",
-    desc: "Know what the app actually holds — stores, query cache, form state, validation.",
-  },
-  {
-    label: "ACT",
-    desc: "Let the agent perform developer-blessed operations with schemas, not injected scripts.",
-  },
-  {
-    label: "FIXTURE",
-    desc: "Jump to any named state in one call. No clicking there, no seed scripts.",
-  },
-  {
-    label: "RECORD",
-    desc: "Buffer every transition so failures come with a causal trace, not just a snapshot.",
-  },
-  {
-    label: "CHECK",
-    desc: "Run every read-only tool and report what broke. Selector rot fails loudly.",
-  },
-  { label: "RESET", desc: "Return to a known baseline — the ground state — before the next run." },
-];
-
-const BADGE_TILTS = [
-  "-rotate-2",
-  "rotate-1",
-  "-rotate-1",
-  "rotate-2",
-  "-rotate-[1.5deg]",
-  "rotate-[0.75deg]",
-];
-
-function SectionLabel({
-  index,
-  children,
-  className = "",
-}: {
-  index?: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <p
-      className={`font-mono text-xs tracking-widest uppercase text-muted mb-6 flex items-baseline ${className}`}
-    >
-      {index ? <span className="text-verified font-medium mr-2.5">{index}</span> : null}
-      <span>{children}</span>
-    </p>
-  );
-}
-
-function SectionDivider() {
-  return (
-    <div className="max-w-3xl mx-auto px-6" aria-hidden="true">
-      <div className="flex items-center gap-5 py-1 text-muted/40">
-        <span className="h-px flex-1 bg-rule" />
-        <span className="font-mono text-xs select-none">◆</span>
-        <span className="h-px flex-1 bg-rule" />
-      </div>
-    </div>
-  );
-}
-
-function Highlight({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
-  return (
-    <mark className="mark" style={{ transitionDelay: `${delay}ms` }}>
-      {children}
-    </mark>
-  );
-}
 
 export default function HomePage() {
   return (
-    <main className="flex-1">
-      {/* Grain overlay */}
-      <div className="grain-overlay" aria-hidden="true" />
+    <main className="dark flex-1 bg-baseline text-ink font-sans">
+      {/* Nav */}
+      <header className="absolute inset-x-0 top-0 z-10">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+          <span className="flex items-center gap-2.5 font-mono text-sm tracking-tight text-ink">
+            <span className="inline-block size-2 bg-phosphor" aria-hidden="true" />
+            groundstate
+          </span>
+          <nav className="flex items-center gap-6 font-mono text-[13px] text-dim">
+            <Link
+              href="/docs"
+              className="transition-colors duration-150 hover:text-ink"
+              style={{ transitionTimingFunction: "var(--ease-reading)" }}
+            >
+              docs
+            </Link>
+            <a
+              href="https://github.com/souravinsights/groundstate"
+              className="transition-colors duration-150 hover:text-ink"
+              style={{ transitionTimingFunction: "var(--ease-reading)" }}
+            >
+              github
+            </a>
+          </nav>
+        </div>
+      </header>
 
       {/* Hero */}
-      <section className="max-w-3xl mx-auto px-6 pt-20 pb-16 sm:pt-28 sm:pb-20">
-        <header>
-          <SectionLabel className="hero-enter hero-enter-d1">
-            A dev-only SDK for agentic frontend work
-          </SectionLabel>
+      <section data-observe-section="hero" className="relative border-b border-line">
+        <div className="gs-grid-bg absolute inset-0" aria-hidden="true" />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-6 pb-24 pt-36 sm:pt-44 lg:grid-cols-[1fr_440px] lg:gap-16 lg:pb-28">
+          <div>
+            <h1 className="mb-7 font-display text-[clamp(2.6rem,5.5vw,4.2rem)] font-medium leading-[1.06] tracking-[-0.02em]">
+              Your agent writes your frontend.
+              <br />
+              <span className="text-faint">It can't see inside it.</span>
+            </h1>
 
-          <h1 className="hero-enter hero-enter-d2 text-4xl sm:text-6xl font-semibold leading-[1.05] tracking-tight text-balance mb-6">
-            Give your coding agent <span className="text-verified">ground truth</span> about your
-            running app.
-          </h1>
+            <p className="mb-10 max-w-lg text-[17px] leading-relaxed text-dim">
+              So you spend your day being its eyes: clicking around, describing what's on screen,
+              pasting console output. Groundstate exposes your app's real state and actions as tools
+              the agent calls directly, so it can ask the app instead of guessing.
+            </p>
 
-          <p className="hero-enter hero-enter-d3 text-lg sm:text-xl text-muted leading-relaxed mb-10">
-            Your agent writes your frontend, but it can't see inside it — it guesses from
-            screenshots and DOM dumps, and you burn round-trips correcting it. Groundstate is a
-            dev-only SDK that exposes your app's real state and actions as WebMCP tools, so the
-            agent you already use can{" "}
-            <Highlight delay={300}>ask the app what actually happened</Highlight>.
-          </p>
-
-          <div className="hero-enter hero-enter-d4 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3 max-w-md">
-              <code className="flex-1 font-mono text-sm bg-paper border border-edge px-4 py-3 text-ink">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="border border-line bg-panel px-4 py-3 font-mono text-sm">
+                <span className="select-none text-ghost">$ </span>
                 npm install groundstate
-              </code>
+              </div>
               <Link
                 href="/docs"
-                className="group inline-flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-widest border-2 border-edge bg-paper text-ink px-6 py-3.5 shadow-[3px_3px_0_0_var(--plate)] hover:border-verified hover:text-verified hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] active:border-verified active:text-verified active:shadow-none active:translate-x-[2px] active:translate-y-[2px] transition-all duration-150"
+                className="group inline-flex items-center gap-1.5 font-mono text-sm text-phosphor transition-colors duration-150 hover:text-ink"
+                style={{ transitionTimingFunction: "var(--ease-reading)" }}
               >
-                Read the docs
-                <ArrowRight className="w-3.5 h-3.5 transition-transform duration-150 group-hover:translate-x-1" />
+                five-minute setup
+                <ArrowRight className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" />
               </Link>
             </div>
-
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5 font-mono text-xs text-muted pt-1">
-              <a
-                href="#how-it-works"
-                className="py-2.5 hover:text-ink underline underline-offset-4 decoration-rule transition-colors"
-              >
-                See how it works
-              </a>
-              <span
-                className="text-muted/40 font-mono text-xs select-none px-0.5"
-                aria-hidden="true"
-              >
-                /
-              </span>
-              <a
-                href="https://github.com/souravinsights/groundstate"
-                className="group py-2.5 text-verified hover:text-ink font-medium underline underline-offset-4 decoration-verified/40 transition-colors inline-flex items-center gap-1.5"
-              >
-                View on GitHub
-                <ArrowRight className="w-3.5 h-3.5 transition-transform duration-150 group-hover:translate-x-1" />
-              </a>
-            </div>
           </div>
-        </header>
-      </section>
 
-      <SectionDivider />
-
-      {/* Why */}
-      <section className="max-w-3xl mx-auto px-6 py-16 sm:py-20" id="why">
-        <SectionLabel index="01" className="reveal">
-          Why this exists
-        </SectionLabel>
-        <div className="space-y-5 text-lg leading-relaxed max-w-2xl">
-          <p className="reveal">
-            Most production UI code today is written by agents. The bottleneck has moved to
-            verification: the agent writes code, you click around, something's wrong, the agent
-            guesses from a screenshot, tries again. Every round trip costs minutes and tokens.
-          </p>
-          <p className="reveal reveal-d1">
-            The agent has no way to ask the app{" "}
-            <em>
-              "what is the cart store's actual contents right now, and why did validation reject
-              that input?"
-            </em>{" "}
-            — so it infers. Often wrongly.
-          </p>
-          <p className="reveal reveal-d2 text-ink text-xl leading-relaxed border-l-2 border-mark py-3 pr-3 pl-4 -ml-4 sm:pl-5 sm:-ml-5">
-            Chrome DevTools MCP tells the agent what the browser sees.{" "}
-            <Highlight delay={200}>Groundstate tells it what the app knows.</Highlight>
-          </p>
+          {/* A working miniature of the product, not a mockup. */}
+          <div className="w-full lg:justify-self-end">
+            <Instrument />
+          </div>
         </div>
       </section>
 
-      {/* Loop */}
-      <section id="how-it-works" className="section-band max-w-full py-16 sm:py-20">
-        <div className="max-w-3xl mx-auto px-6">
-          <SectionLabel index="02" className="reveal">
-            How it works
-          </SectionLabel>
-          <h2 className="reveal reveal-d1 text-2xl sm:text-3xl font-semibold mb-4">
-            Six primitives, one loop.
+      {/* One bug, fixed twice */}
+      <section data-observe-section="loop" className="border-b border-line">
+        <div className="mx-auto max-w-6xl px-6 py-20 sm:py-28">
+          <h2 className="mb-3 font-display text-[clamp(1.7rem,3vw,2.3rem)] font-medium tracking-[-0.015em]">
+            One bug, fixed twice.
           </h2>
-          <p className="reveal reveal-d2 text-lg text-muted leading-relaxed max-w-xl mb-10">
-            Observe, act, fixture, record, check, reset. The agent gets ground truth at every stage
-            — and you get evidence, not screenshots.
+          <p className="mb-12 max-w-lg text-dim">
+            A checkout total that won't update, with and without ground truth. The shape is the same
+            for any flow in any app.
           </p>
 
-          <ol className="grid sm:grid-cols-2 gap-x-12 gap-y-10 mt-6">
-            {LOOP_STAGES.map((stage, index) => (
-              <li
-                key={stage.label}
-                className={`group flex gap-4 cursor-default select-none transition-transform duration-150 active:scale-[0.98] reveal ${index % 2 === 0 ? "reveal-d1" : "reveal-d2"}`}
-              >
-                <span
-                  className={`flex h-8 w-8 items-center justify-center rounded-full border border-edge bg-paper font-mono text-xs shrink-0 mt-0.5 shadow-[1.5px_1.5px_0_0_var(--plate)] transition-all duration-150 group-hover:bg-ink group-hover:text-paper group-hover:shadow-none group-hover:rotate-0 ${BADGE_TILTS[index % BADGE_TILTS.length]}`}
-                >
-                  {index + 1}
-                </span>
-                <div>
-                  <p className="font-mono text-xs tracking-widest uppercase text-verified mb-1 transition-colors group-hover:text-ink">
-                    {stage.label}
-                  </p>
-                  <p className="text-sm text-muted leading-relaxed pr-2">{stage.desc}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* Code sample */}
-      <section className="max-w-3xl mx-auto px-6 py-16 sm:py-20">
-        <SectionLabel index="03" className="reveal">
-          The contract
-        </SectionLabel>
-        <h2 className="reveal reveal-d1 text-2xl sm:text-3xl font-semibold mb-4">
-          Your app, as tools your agent can call.
-        </h2>
-        <p className="reveal reveal-d2 text-lg text-muted leading-relaxed max-w-xl mb-8">
-          A dev-only SDK built on WebMCP. You decide what state and actions matter; any MCP agent —
-          Claude Code, Codex, Cursor — gets them as first-class tools against the live, running app.
-        </p>
-        <pre className="reveal reveal-d3 font-mono text-[13.5px] leading-relaxed bg-paper border border-edge p-5 overflow-x-auto shadow-[4px_4px_0_0_var(--plate)]">
-          <code>{`// dev builds only — init() refuses to run in production
-groundstate.init({ appName: "my-app" });
-
-// one line per Zustand store: live getCheckoutState + flight recorder
-observeStore("checkout", useCheckoutStore);
-
-// a developer-blessed action the agent may perform
-groundstate.act("submitCheckoutWithCard", ({ cardToken }) => checkout.submit(cardToken));
-
-// one-call jump to any app state — no clicking there
-groundstate.fixture("cart_with_declined_card", async () => { /* seed it */ });`}</code>
-        </pre>
-      </section>
-
-      {/* Tool grid */}
-      <section className="max-w-3xl mx-auto px-6 py-16 sm:py-20">
-        <SectionLabel index="04" className="reveal">
-          What the agent gets
-        </SectionLabel>
-        <div className="grid sm:grid-cols-2 gap-6">
-          {TOOLS.map((t, i) => (
-            <div
-              key={t.name}
-              className={`reveal ${i % 2 === 0 ? "reveal-d1" : "reveal-d2"} group border border-edge bg-paper p-5 shadow-[2px_2px_0_0_var(--plate-soft)] hover:shadow-[2px_2px_0_0_var(--plate)] transition-all duration-150 hover:-translate-y-0.5`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <t.icon className="w-4 h-4 text-verified" />
-                <h3 className="font-mono text-sm font-semibold text-ink">{t.name}</h3>
-              </div>
-              <p className="text-sm text-muted leading-relaxed">{t.desc}</p>
+          <div className="grid gap-px border border-line bg-line sm:grid-cols-2">
+            <div className="bg-baseline p-7">
+              <p className="mb-6 font-mono text-[11px] uppercase tracking-[0.2em] text-faint">
+                without groundstate
+              </p>
+              <ol className="divide-y divide-line/60">
+                {BEFORE.map(([step, elapsed], i) => (
+                  <li key={step} className="flex items-baseline gap-4 py-3 text-[15px]">
+                    <span className="w-4 shrink-0 text-right font-mono text-xs text-ghost">
+                      {i + 1}
+                    </span>
+                    <span className="leading-relaxed text-faint">{step}</span>
+                    <span className="ml-auto shrink-0 pl-4 font-mono text-xs tabular-nums text-ghost">
+                      {elapsed}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-6 flex items-baseline justify-between border-t border-line pt-5 font-mono">
+                <span className="text-[11px] uppercase tracking-[0.2em] text-faint">total</span>
+                <span className="text-sm tabular-nums text-dim">15:00 · 4 round trips</span>
+              </p>
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* Packages */}
-      <section className="section-band max-w-full py-16 sm:py-20">
-        <div className="max-w-3xl mx-auto px-6">
-          <SectionLabel index="05" className="reveal">
-            Packages
-          </SectionLabel>
-          <div className="space-y-0 border border-edge bg-paper">
-            {PACKAGES.map(([name, desc], i) => (
-              <div
-                key={name}
-                className={`flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-6 px-5 py-4 border-b border-rule last:border-b-0 reveal ${i % 2 === 0 ? "reveal-d1" : "reveal-d2"}`}
-              >
-                <code className="font-mono text-sm text-verified shrink-0 sm:w-56">{name}</code>
-                <span className="text-sm text-muted">{desc}</span>
-              </div>
-            ))}
+            <div className="bg-panel p-7">
+              <p className="mb-6 font-mono text-[11px] uppercase tracking-[0.2em] text-phosphor-dim">
+                with groundstate
+              </p>
+              <ol className="divide-y divide-line/60">
+                {AFTER.map(([step, elapsed], i) => (
+                  <li key={step} className="flex items-baseline gap-4 py-3 text-[15px]">
+                    <span className="w-4 shrink-0 text-right font-mono text-xs text-phosphor-dim/70">
+                      {i + 1}
+                    </span>
+                    <span className="leading-relaxed text-ink">{step}</span>
+                    <span className="ml-auto shrink-0 pl-4 font-mono text-xs tabular-nums text-phosphor-dim">
+                      {elapsed}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-6 flex items-baseline justify-between border-t border-phosphor/25 pt-5 font-mono">
+                <span className="text-[11px] uppercase tracking-[0.2em] text-phosphor-dim">
+                  total
+                </span>
+                <span className="text-sm tabular-nums text-phosphor">0:30 · 0 round trips</span>
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Security */}
-      <section className="max-w-3xl mx-auto px-6 py-16 sm:py-20">
-        <SectionLabel index="06" className="reveal">
-          Security
-        </SectionLabel>
-        <div className="reveal reveal-d1 border border-edge bg-paper p-6 shadow-[3px_3px_0_0_var(--plate)]">
-          <h2 className="text-xl font-semibold mb-3">Dev-only, by construction.</h2>
-          <p className="text-muted leading-relaxed">
-            Groundstate exposes internal state and mutating actions — powerful by design, so it is
-            dev/preview only. <code className="font-mono text-sm text-ink">init()</code> detects
-            production builds and refuses to start. There is deliberately no override flag. Your
-            users never see it.
+      {/* What you write, what the agent sees */}
+      <section data-observe-section="contract" className="border-b border-line">
+        <div className="mx-auto max-w-6xl px-6 py-20 sm:py-28">
+          <h2 className="mb-4 font-display text-[clamp(1.7rem,3vw,2.3rem)] font-medium tracking-[-0.015em]">
+            Three lines in your dev build.
+          </h2>
+          <p className="mb-4 max-w-2xl leading-relaxed text-dim">
+            Any MCP-capable agent (Claude Code, Cursor, Codex) gets the tools automatically through
+            the bridge. Zustand and TanStack Query observables derive from what you already have;
+            curation is the upgrade path, not the entry fee.
           </p>
+          <p className="mb-12 max-w-2xl leading-relaxed text-dim">
+            <code className="font-mono text-sm text-phosphor-dim">init()</code> refuses to run in
+            production builds. There is no override flag. Your users never see it.
+          </p>
+
+          <div className="grid items-start gap-10 lg:grid-cols-2">
+            <div>
+              <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.2em] text-faint">
+                what you write
+              </p>
+              <div className="border border-line bg-panel">
+                <div className="border-b border-line px-4 py-2.5 font-mono text-[11px] text-faint">
+                  instrumentation.ts
+                </div>
+                <pre className="overflow-x-auto p-5 font-mono text-[13px] leading-[1.9] text-dim">
+                  <code>{`import { init, act, fixture } from "groundstate";
+import { observeStore } from "@groundstate/react";
+
+init({ appName: "checkout" });
+
+observeStore("checkout", useCheckoutStore);
+act("submitCheckoutWithCard", submitWithCard);
+fixture("cart_with_declined_card", seedDeclined);
+
+// init() throws in production. No override flag.`}</code>
+                </pre>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.2em] text-faint">
+                what the agent sees
+              </p>
+              <ul className="divide-y divide-line/70 border-y border-line">
+                {CONTRACT.map((tool) => (
+                  <li key={tool.name} className="py-4">
+                    <div className="flex items-baseline gap-3 font-mono text-[13px]">
+                      <span className={tool.kind === "read" ? "text-phosphor" : "text-signal"}>
+                        {tool.name}
+                      </span>
+                      {tool.auto ? (
+                        <span className="ml-auto text-[11px] text-ghost">auto-derived</span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1.5 text-[14px] leading-relaxed text-dim">
+                      {tool.description}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
       </section>
 
-      <SectionDivider />
+      {/* The honest objection */}
+      <section data-observe-section="alongside" className="border-b border-line">
+        <div className="mx-auto max-w-6xl px-6 py-20 sm:py-28">
+          <div className="max-w-3xl">
+            <h2 className="mb-6 font-display text-[clamp(1.7rem,3vw,2.3rem)] font-medium tracking-[-0.015em]">
+              "I already have Chrome DevTools MCP."
+            </h2>
+            <p className="mb-5 leading-relaxed text-dim">
+              Keep it. DevTools MCP shows the agent what the browser sees (console errors, network
+              requests, DOM snapshots) and does it well, with zero setup.
+            </p>
+            <p className="mb-12 leading-relaxed text-dim">
+              Groundstate adds what it structurally cannot: your app's internal state, actions
+              you've blessed, and one-call fixtures. Use both.
+            </p>
+            {/* The positioning line, restored from the product doc. */}
+            <p className="font-display text-[clamp(1.4rem,2.6vw,1.9rem)] font-medium leading-snug tracking-[-0.01em]">
+              DevTools MCP tells the agent what the browser sees.
+              <br />
+              <span className="text-phosphor">Groundstate tells it what the app knows.</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* The namesake */}
+      <section data-observe-section="baseline" className="border-b border-line">
+        <div className="mx-auto max-w-6xl px-6 py-20 sm:py-28">
+          <div className="max-w-3xl">
+            <h2 className="mb-6 font-display text-[clamp(1.7rem,3vw,2.3rem)] font-medium tracking-[-0.015em]">
+              Every app has a ground state.
+              <br />
+              <span className="text-faint">This page has one too.</span>
+            </h2>
+            <p className="mb-10 max-w-xl leading-relaxed text-dim">
+              In physics, the ground state is the known baseline a system returns to. Groundstate
+              gives your app the same thing: one call, and the cart is empty, the flags are default,
+              the experiment never happened. The demo store at the top of this page works the same
+              way.
+            </p>
+            <ResetSection />
+          </div>
+        </div>
+      </section>
 
       {/* Footer */}
-      <footer className="max-w-3xl mx-auto px-6 py-12 text-center text-sm text-muted">
-        <p>
-          Built on the{" "}
-          <a
-            href="https://developer.chrome.com/docs/ai/webmcp"
-            className="text-verified hover:text-ink underline underline-offset-4 decoration-rule transition-colors"
-          >
-            WebMCP
-          </a>{" "}
-          open standard ·{" "}
-          <a
-            href="https://github.com/souravinsights/groundstate"
-            className="text-verified hover:text-ink underline underline-offset-4 decoration-rule transition-colors"
-          >
-            Source on GitHub
-          </a>
-        </p>
+      <footer data-observe-section="footer">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 sm:flex-row sm:items-center sm:justify-between">
+          <span className="font-mono text-xs text-faint">groundstate · dev-only sdk</span>
+          <PageReadout />
+          <span className="font-mono text-xs text-faint">
+            built on{" "}
+            <a
+              href="https://developer.chrome.com/docs/ai/webmcp"
+              className="text-dim transition-colors duration-150 hover:text-ink"
+              style={{ transitionTimingFunction: "var(--ease-reading)" }}
+            >
+              WebMCP
+            </a>
+          </span>
+        </div>
       </footer>
     </main>
   );

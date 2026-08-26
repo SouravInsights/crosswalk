@@ -16,7 +16,7 @@ observeStore("checkout", useCheckoutStore);
 
 One line per Zustand store gets you:
 
-- a live `getCheckoutState` observable — action functions stripped automatically
+- a live `getCheckoutState` observable, with action functions stripped automatically
 - flight recording of every transition into `getStateHistory`
 
 Curate the exposed shape with `select`:
@@ -28,7 +28,7 @@ observeStore("checkout", useCheckoutStore, {
 });
 ```
 
-`observeStore` is structurally typed — anything shaped like `{ getState, subscribe }` works.
+`observeStore` is structurally typed: anything shaped like `{ getState, subscribe }` works.
 There is no dependency on zustand itself.
 
 ## observeQueries
@@ -40,7 +40,7 @@ observeQueries(queryClient);
 ```
 
 Exposes `getQueriesState`: every TanStack Query cache entry's key, status, fetch status, last
-update time, and error message — the app's real server-state picture, without parsing network
+update time, and error message. The app's real server-state picture, without parsing network
 logs.
 
 ## Hooks
@@ -58,7 +58,7 @@ function CheckoutForm() {
 }
 ```
 
-Hooks register on mount, unregister on unmount, and always execute the freshest closure — no
+Hooks register on mount, unregister on unmount, and always execute the freshest closure. No
 stale props, no re-registration churn.
 
 ## Next.js (App Router) [#nextjs-app-router]
@@ -84,5 +84,5 @@ Render `<GroundstateProvider />` once in your root layout. `init()` refusing to 
 production is the second line of defense; the env-gated dynamic import is the first.
 
 **Scope note:** Groundstate observes client state. In RSC-heavy apps most state lives
-server-side — `observeQueries` covers the data-fetching layer, and client stores work as
+server-side. `observeQueries` covers the data-fetching layer, and client stores work as
 usual, but there is no server-state instrumentation yet.

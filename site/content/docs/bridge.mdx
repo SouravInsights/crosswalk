@@ -1,6 +1,6 @@
 ---
 title: Bridge
-description: Connect the running page's tools to Claude Code, Codex, or Cursor — today.
+description: Connect the running page's tools to Claude Code, Codex, or Cursor today.
 ---
 
 No mainstream agent client consumes WebMCP natively yet. `@groundstate/bridge` is how
@@ -44,7 +44,7 @@ The agent now sees every tool the page registered, live.
 ## How it works
 
 The bridge evaluates against the page's Groundstate registry (`window.__GROUNDSTATE__`) via
-CDP `Runtime.evaluate` — it does not depend on native WebMCP support, so it works in any
+CDP `Runtime.evaluate`. It does not depend on native WebMCP support, so it works in any
 Chromium browser with no flags. Tool lists are fetched live on every request; registrations
 that come and go with navigation just work. Errors from your tools pass through as MCP tool
 errors with their original messages.

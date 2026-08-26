@@ -2,198 +2,114 @@
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
 
-@custom-variant dark (&:is(.dark *));
+/* ────────────────────────────────────────────────────────────────
+   Groundstate landing: "bench instrument" design system.
 
-/* ── Design tokens ──
-   Paper/ink/verified palette, authored in OKLCH so hue/lightness
-   relationships stay visible. Both schemes reference these. */
-:root {
-  color-scheme: light;
-  --paper: oklch(0.967 0.007 97.4);
-  --ink: oklch(0.263 0.023 259.3);
-  --muted-text: oklch(0.521 0.028 267.7);
-  --verified: oklch(0.494 0.072 158.3);
-  --flag: oklch(0.542 0.152 39.9);
-  --mark: oklch(0.9045 0.1526 95.1616);
-  --rule: oklch(0.870 0.017 91.6);
-  --edge: var(--ink);
-  --plate: var(--ink);
-  --plate-soft: var(--rule);
-  --tile: rgb(255 255 255 / 0.5);
-  --field: rgb(255 255 255 / 0.5);
-  --band: color-mix(in srgb, var(--rule) 28%, transparent);
-}
+   Metaphor: the page is a measuring instrument (oscilloscope /
+   state analyzer) reading a live system, and "ground state" is the
+   baseline every reading returns to. Token names come from that
+   metaphor, not from Tailwind's defaults: baseline (page), panel
+   (instrument housing), line (hairlines), signal (mutations),
+   ink/dim/faint (text hierarchy).
 
-.dark {
-  color-scheme: dark;
-  --paper: oklch(0.210 0.029 266.1);
-  --ink: oklch(0.930 0.015 264.5);
-  --muted-text: oklch(0.785 0.028 267.5);
-  --verified: oklch(0.779 0.150 151.9);
-  --flag: oklch(0.784 0.121 44.5);
-  --mark: oklch(0.851 0.151 151.9);
-  --rule: oklch(0.463 0.028 264.3);
-  --edge: oklch(0.610 0.029 266.5);
-  --plate: oklch(0.129 0.015 266.4);
-  --plate-soft: oklch(0.165 0.020 269.9);
-  --tile: rgb(255 255 255 / 0.04);
-  --field: rgb(0 0 0 / 0.22);
-  --band: oklch(0.244 0.028 266.4);
-}
+   Accent hues were authored in OKLCH, then converted to sRGB:
+   - phosphor  oklch(0.85 0.175 160) = #41f0a5, 13.1:1 on baseline.
+     Chosen over Tailwind emerald-400 (#34d399, 10.1:1): more
+     luminous, reads as a lit trace on a dark screen, and it is
+     not the stock value every dark dev-tool page ships with.
+   - signal    oklch(0.84 0.125 88) = #ecc663, 11.8:1 on baseline.
+     Amber is reserved for mutations (act / fixture). Green means
+     read, amber means write. Semantic split, not decoration.
+   ──────────────────────────────────────────────────────────────── */
 
 @theme inline {
-  --color-paper: var(--paper);
-  --color-ink: var(--ink);
-  --color-muted: var(--muted-text);
-  --color-verified: var(--verified);
-  --color-flag: var(--flag);
-  --color-mark: var(--mark);
-  --color-rule: var(--rule);
-  --color-edge: var(--edge);
-  --color-plate: var(--plate);
-  --color-plate-soft: var(--plate-soft);
-  --color-tile: var(--tile);
-  --color-field: var(--field);
-  --font-serif: var(--font-spectral);
-  --font-mono: var(--font-plex-mono);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-inter), sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@theme {
+  --color-baseline: #0b0e0c;
+  --color-panel: #0e1310;
+  --color-panel-raised: #111714;
+  --color-line: #1d2622;
+  --color-gridline: rgba(120, 200, 165, 0.055);
+  --color-gridline-major: rgba(120, 200, 165, 0.1);
+  --color-ink: #e6ece8;
+  --color-dim: #9aa9a0;
+  --color-faint: #68756e;
+  --color-ghost: #454f4a;
+  --color-phosphor: #41f0a5;
+  --color-phosphor-dim: #4ad496;
+  --color-signal: #ecc663;
+  --color-signal-dim: #d5b360;
+  /* fault: oklch(0.72 0.15 28) = 7.3:1 on baseline. Error states only
+     (declined payments, validation errors), never decoration. */
+  --color-fault: #f47c6e;
+
+  /* One easing identity for the whole page: fast attack, long
+     settle, like a needle registering a reading. Used for hovers
+     and the reading pulse. Stock ease/ease-in-out and Tailwind
+     duration-300 are deliberately unused here. */
+  --ease-reading: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html {
   scroll-behavior: smooth;
-  background-color: var(--paper);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 body {
-  background-color: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-serif, Georgia, serif);
   -webkit-font-smoothing: antialiased;
-  position: relative;
-}
-
-/* ── Grain overlay ──
-   Film grain over the whole page: slightly scaled-up fractal noise,
-   black speck on multiply so it only ever deepens the surface underneath.
-   Rendered as a composited layer so nothing re-rasterizes on scroll. */
-.grain-overlay {
-  content: "";
-  position: fixed;
-  inset: -100%;
-  pointer-events: none;
-  z-index: 100;
-  will-change: transform;
-  opacity: 0.16;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.7 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-.dark .grain-overlay {
-  mix-blend-mode: screen;
-  opacity: 0.11;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.65 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background-color: var(--verified);
-  color: var(--paper);
+  background-color: var(--color-phosphor);
+  color: var(--color-baseline);
 }
 
-/* ── Highlight mark ──
-   Editorial highlighter with dual-gradient marker stroke and in-view
-   draw animation. */
-mark.mark {
-  background: none;
+:focus-visible {
+  outline: 1px solid var(--color-phosphor);
+  outline-offset: 3px;
+}
+
+/* Instrument grid.
+   Oscilloscope graticule behind the hero: minor divisions every
+   28px, major every 140px, faded at the edges so it reads as
+   instrumentation, not graph paper. Static CSS: zero runtime
+   cost, and intact under reduced motion. */
+.gs-grid-bg {
   background-image:
-    linear-gradient(
-      100deg,
-      color-mix(in srgb, var(--mark) 28%, transparent) 0.9%,
-      var(--mark) 2.4%,
-      color-mix(in srgb, var(--mark) 65%, transparent) 5.8%,
-      color-mix(in srgb, var(--mark) 60%, transparent) 93%,
-      var(--mark) 96%,
-      color-mix(in srgb, var(--mark) 0%, transparent) 98%
-    ),
-    linear-gradient(
-      transparent 0%,
-      color-mix(in srgb, var(--mark) 35%, transparent) 7.9%,
-      color-mix(in srgb, var(--mark) 20%, transparent) 15%
-    );
-  background-repeat: no-repeat;
-  background-size: 0% 62%;
-  background-position: 0 84%;
-  color: inherit;
-  padding: 0 0.1em;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-  display: inline;
-  transition: background-size 1.2s cubic-bezier(0.25, 1, 0.5, 1), filter 0.2s ease-in-out;
+    linear-gradient(to right, var(--color-gridline-major) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-gridline-major) 1px, transparent 1px),
+    linear-gradient(to right, var(--color-gridline) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-gridline) 1px, transparent 1px);
+  background-size:
+    140px 140px,
+    140px 140px,
+    28px 28px,
+    28px 28px;
+  mask-image: radial-gradient(ellipse 100% 90% at 50% 0%, black 25%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse 100% 90% at 50% 0%, black 25%, transparent 78%);
 }
 
-mark.mark.highlight-active {
-  background-size: 100% 62%;
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
-
-mark.mark:hover {
-  background-size: 100% 68%;
-  filter: brightness(1.04);
+::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-.dark mark.mark {
-  color: var(--paper);
-  background-image:
-    linear-gradient(
-      100deg,
-      color-mix(in srgb, var(--mark) 85%, transparent) 0.9%,
-      var(--mark) 2.4%,
-      color-mix(in srgb, var(--mark) 92%, transparent) 5.8%,
-      color-mix(in srgb, var(--mark) 88%, transparent) 93%,
-      var(--mark) 96%,
-      color-mix(in srgb, var(--mark) 0%, transparent) 98%
-    ),
-    linear-gradient(
-      transparent 0%,
-      color-mix(in srgb, var(--mark) 45%, transparent) 7.9%,
-      color-mix(in srgb, var(--mark) 30%, transparent) 15%
-    );
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
 }
-
-/* ── Section band ──
-   Alternating spread background so a long page breaks into readable
-   "spreads" instead of one undifferentiated scroll. */
-.section-band {
-  background-color: var(--band);
-  position: relative;
-}
-
-/* ── Reveal animations ── */
-@keyframes reveal-rise {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .hero-enter {
-    animation: reveal-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-  .hero-enter-d1 { animation-delay: 0.1s; }
-  .hero-enter-d2 { animation-delay: 0.2s; }
-  .hero-enter-d3 { animation-delay: 0.3s; }
-  .hero-enter-d4 { animation-delay: 0.45s; }
-
-  @supports (animation-timeline: view()) {
-    .reveal {
-      animation: reveal-rise 0.75s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-      animation-timeline: view();
-      animation-range: entry 0% entry 42%;
-    }
-    .reveal-d1 { animation-range: entry 8% entry 50%; }
-    .reveal-d2 { animation-range: entry 16% entry 58%; }
-    .reveal-d3 { animation-range: entry 24% entry 66%; }
-  }
+::-webkit-scrollbar-thumb:hover {
+  background: #2c3732;
 }

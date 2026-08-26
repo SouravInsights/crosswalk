@@ -3,7 +3,7 @@ title: Security
 description: Why Groundstate is dev-only, and the threat model it's built against.
 ---
 
-Groundstate exposes internal app state and **mutating actions** to agents. That's the point —
+Groundstate exposes internal app state and **mutating actions** to agents. That's the point,
 and it's only acceptable in environments you control.
 
 ## Production guard
@@ -25,15 +25,15 @@ The dynamic import behind a statically-known flag lets bundlers drop the code co
 
 ## The threat model
 
-The canonical WebMCP risk: a **prompt-injected agent** calling a mutating tool it shouldn't —
-`submitCheckout` against a real account. Groundstate's mitigations:
+The canonical WebMCP risk: a **prompt-injected agent** calling a mutating tool it shouldn't,
+like `submitCheckout` against a real account. Groundstate's mitigations:
 
 - **Dev/preview only.** The guard plus bundle exclusion keep tools away from real users and
   real data.
-- **Explicit, small actions.** You register named operations with schemas — never a generic
+- **Explicit, small actions.** You register named operations with schemas, never a generic
   "evaluate arbitrary code" surface. What an agent can mutate is exactly the list you wrote.
 - **Read/mutate annotations.** Every tool carries a `readOnly` flag, surfaced to MCP clients
-  as `readOnlyHint` — agents and harnesses can require confirmation for mutating calls.
+  as `readOnlyHint`. Agents and harnesses can require confirmation for mutating calls.
 
 ## The debugging port
 

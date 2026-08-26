@@ -1,7 +1,7 @@
 {
   "name": "groundstate",
   "version": "0.0.1",
-  "description": "Give your coding agent ground truth about your running app. Dev-only SDK exposing real app state and actions as WebMCP tools.",
+  "description": "Dev-only SDK that lets your coding agent see inside your running app — real state reads, developer-approved actions, one-call fixtures, and a replayable state history. Built on WebMCP; works with Claude Code, Codex, and Cursor today.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
