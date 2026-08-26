@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Groundstate — give your coding agent ground truth about your running app</title>
+<meta name="description" content="Dev-only SDK that exposes your web app's real state and actions as WebMCP tools, so your coding agent stops guessing from screenshots." />
+<style>
+  :root {
+    --bg: #0a0e14; --panel: #10161f; --border: #1e2733;
+    --text: #e6edf3; --muted: #8b98a8; --green: #7ee787; --blue: #79c0ff; --orange: #ffa657;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 16px/1.65 system-ui, -apple-system, sans-serif; }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+  header { padding: 96px 0 64px; text-align: center; }
+  .logo { color: var(--green); font-weight: 700; letter-spacing: .04em; font-size: 14px; text-transform: uppercase; }
+  h1 { font-size: clamp(32px, 5.5vw, 52px); line-height: 1.15; margin: 16px 0; letter-spacing: -.02em; }
+  h1 em { color: var(--green); font-style: normal; }
+  .sub { color: var(--muted); font-size: 19px; max-width: 640px; margin: 0 auto 32px; }
+  .cta { display: inline-block; background: var(--green); color: #04140a; font-weight: 600;
+         padding: 12px 28px; border-radius: 8px; text-decoration: none; margin: 4px; }
+  .cta.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .position { text-align: center; color: var(--muted); padding: 8px 0 56px; font-size: 17px; }
+  .position strong { color: var(--text); }
+  section { padding: 48px 0; border-top: 1px solid var(--border); }
+  h2 { font-size: 26px; margin-bottom: 20px; letter-spacing: -.01em; }
+  p.lead { color: var(--muted); max-width: 680px; }
+  pre { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+        padding: 20px; overflow-x: auto; font-size: 13.5px; line-height: 1.6; margin: 24px 0; }
+  .c-kw { color: #ff7b72; } .c-fn { color: var(--blue); } .c-str { color: #a5d6ff; } .c-cm { color: #6a737d; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-top: 28px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .card h3 { font-size: 16px; margin-bottom: 8px; }
+  .card h3 code { color: var(--blue); font-size: 14px; }
+  .card p { color: var(--muted); font-size: 14px; }
+  .steps { counter-reset: step; margin-top: 24px; }
+  .step { display: flex; gap: 16px; margin: 20px 0; }
+  .step::before { counter-increment: step; content: counter(step);
+    flex: 0 0 32px; height: 32px; border-radius: 16px; background: var(--panel);
+    border: 1px solid var(--border); color: var(--green); font-weight: 700;
+    display: flex; align-items: center; justify-content: center; }
+  .step div { min-width: 0; flex: 1; }
+  .step pre { margin: 8px 0 0; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  td code { color: var(--blue); }
+  footer { padding: 48px 0 64px; color: var(--muted); font-size: 14px; text-align: center; border-top: 1px solid var(--border); }
+  a { color: var(--blue); }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <div class="logo">Groundstate</div>
+  <h1>Give your coding agent <em>ground truth</em> about your running app</h1>
+  <p class="sub">Your agent writes your frontend, but it can't see inside it — it guesses from
+  screenshots and DOM dumps, and you burn round-trips correcting it. Groundstate ends the guessing.</p>
+  <a class="cta" href="#quickstart">Get started</a>
+  <a class="cta ghost" href="https://github.com/souravinsights/groundstate">GitHub</a>
+</header>
+
+<div class="position wrap">
+  Chrome DevTools MCP tells the agent what the browser sees.<br />
+  <strong>Groundstate tells it what the app knows.</strong>
+</div>
+
+<section class="wrap">
+  <h2>Your app, as tools your agent can call</h2>
+  <p class="lead">A dev-only SDK built on <a href="https://developer.chrome.com/docs/ai/webmcp">WebMCP</a>:
+  you decide what state and actions matter, and any MCP agent — Claude Code, Codex, Cursor — gets them
+  as first-class tools against the live, running app.</p>
+<pre><code><span class="c-cm">// dev builds only — init() refuses to run in production</span>
+groundstate.<span class="c-fn">init</span>({ appName: <span class="c-str">"my-app"</span> });
+
+<span class="c-cm">// one line per Zustand store: live getCheckoutState + flight recorder</span>
+<span class="c-fn">observeStore</span>(<span class="c-str">"checkout"</span>, useCheckoutStore);
+
+<span class="c-cm">// a developer-blessed action the agent may perform</span>
+groundstate.<span class="c-fn">act</span>(<span class="c-str">"submitCheckoutWithCard"</span>, ({ cardToken }) =&gt; checkout.<span class="c-fn">submit</span>(cardToken));
+
+<span class="c-cm">// one-call jump to any app state — no clicking there</span>
+groundstate.<span class="c-fn">fixture</span>(<span class="c-str">"cart_with_declined_card"</span>, <span class="c-kw">async</span> () =&gt; { <span class="c-cm">/* seed it */</span> });</code></pre>
+</section>
+
+<section class="wrap">
+  <h2>What the agent gets</h2>
+  <div class="grid">
+    <div class="card"><h3><code>getCheckoutState</code></h3>
+      <p>The actual store — cart contents, validation errors, payment status. Not what the DOM implies.</p></div>
+    <div class="card"><h3><code>loadFixture</code></h3>
+      <p>Teleport the app into a named state in one call. Kills the 20-minute bug-reproduction tax.</p></div>
+    <div class="card"><h3><code>getStateHistory</code></h3>
+      <p>Flight recorder: every state transition with the keys that changed. The causal trace, not two snapshots.</p></div>
+    <div class="card"><h3><code>submitCheckoutWithCard</code></h3>
+      <p>Real actions you defined, schema'd and callable — no fragile selectors, no vision round-trips.</p></div>
+    <div class="card"><h3><code>getGroundstateHealth</code></h3>
+      <p>Runs every read-only tool and reports what broke. Selectors rot loudly, never silently.</p></div>
+    <div class="card"><h3>Inspector overlay</h3>
+      <p>In-page panel to browse and invoke every tool while you author them.</p></div>
+  </div>
+</section>
+
+<section class="wrap" id="quickstart">
+  <h2>Quickstart</h2>
+  <div class="steps">
+    <div class="step"><div>Instrument your app (dev builds only)
+      <pre><code>npm install groundstate @groundstate/react</code></pre></div></div>
+    <div class="step"><div>Run Chrome with a debugging port
+      <pre><code>chrome --remote-debugging-port=9222 \
+  --user-data-dir=/tmp/gs http://localhost:3000</code></pre></div></div>
+    <div class="step"><div>Connect the agent you already use
+      <pre><code>claude mcp add groundstate -- npx @groundstate/bridge --page localhost:3000</code></pre></div></div>
+  </div>
+  <p class="lead" style="margin-top:24px">That's it — your agent now reads real state, performs real
+  actions, and jumps to real fixtures against the running app. Works in any Chromium browser today;
+  the same registrations light up automatically when native WebMCP agents ship.</p>
+</section>
+
+<section class="wrap">
+  <h2>Packages</h2>
+  <table>
+    <tr><th>Package</th><th>What it is</th></tr>
+    <tr><td><code>groundstate</code></td><td>Core SDK: observe / act / fixture / reset / record. Zero dependencies, dev-only.</td></tr>
+    <tr><td><code>@groundstate/react</code></td><td>React hooks + one-line Zustand and TanStack Query auto-derivation.</td></tr>
+    <tr><td><code>@groundstate/bridge</code></td><td>Local MCP server: page tools → Claude Code / Codex / Cursor, via CDP.</td></tr>
+    <tr><td><code>@groundstate/inspector</code></td><td>In-page overlay to browse and invoke tools while authoring.</td></tr>
+  </table>
+</section>
+
+<section class="wrap">
+  <h2>Security, by construction</h2>
+  <p class="lead">Groundstate exposes internal state and mutating actions — powerful by design, so it is
+  dev/preview only. <code>init()</code> detects production builds and refuses to start; there is
+  deliberately no override flag. Your users never see it.</p>
+</section>
+
+<footer>
+  <div class="wrap">
+    Built on the <a href="https://developer.chrome.com/docs/ai/webmcp">WebMCP</a> open standard
+    (W3C, Chrome origin trial) · <a href="https://github.com/souravinsights/groundstate">Source on GitHub</a>
+  </div>
+</footer>
+
+</body>
+</html>

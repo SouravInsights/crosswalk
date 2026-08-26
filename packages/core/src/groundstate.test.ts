@@ -18,7 +18,7 @@ describe("init", () => {
     const binding = window.__GROUNDSTATE__;
     expect(binding).toBeDefined();
     expect(binding?.appName).toBe("demo");
-    expect(binding?.list()).toEqual([]);
+    expect(binding?.list().map((t) => t.name)).toEqual(["getGroundstateHealth"]);
     const result = await binding?.call("nope");
     expect(result).toEqual({ ok: false, error: expect.stringContaining('Unknown tool "nope"') });
   });
@@ -54,7 +54,7 @@ describe("observe", () => {
     const unregister = observe("auth", () => ({ user: null }));
     expect(listTools().find((t) => t.name === "getAuthState")?.readOnly).toBe(true);
     unregister();
-    expect(listTools()).toEqual([]);
+    expect(listTools().find((t) => t.name === "getAuthState")).toBeUndefined();
   });
 });
 

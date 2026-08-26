@@ -18,13 +18,16 @@ Groundstate tells it what the app knows.** We never rebuild what DevTools MCP al
 
 | Path | npm name | What it is |
 |---|---|---|
-| `packages/core` | `groundstate` | Framework-agnostic runtime: `observe` / `act` / `fixture` / `reset`, transport adapter, production guard, internal registry. **Zero runtime dependencies — this ships inside people's apps.** |
-| `packages/react` | `@groundstate/react` | React hooks (`useObservable`, `useAction`, `useFixture`). Auto-derived observables (Zustand, TanStack Query) are on the roadmap. |
+| `packages/core` | `groundstate` | Framework-agnostic runtime: `observe` / `act` / `fixture` / `reset` / `record` (flight recorder) / `doctor` (health check), transport adapter, production guard, internal registry. **Zero runtime dependencies — this ships inside people's apps.** |
+| `packages/react` | `@groundstate/react` | React hooks (`useObservable`, `useAction`, `useFixture`) plus auto-derived observables: `observeStore` (Zustand-shaped stores, with auto flight-recording) and `observeQueries` (TanStack Query). Structural typing — no dependency on zustand/@tanstack. |
 | `packages/bridge` | `@groundstate/bridge` | Local MCP server (stdio) that connects a running page's Groundstate registry to an MCP client via CDP. The v1 centerpiece. |
+| `packages/inspector` | `@groundstate/inspector` | In-page dev overlay (shadow DOM, vanilla TS, no framework deps): browse/invoke registered tools. |
 | `examples/demo-app` | private | Vite + React + Zustand cart/checkout app used to develop and demo the loop. |
+| `site/` | — | Static landing page (plain HTML, no build step). |
 
-Planned, not yet scaffolded: `@groundstate/inspector` (tool-browsing web UI), `@groundstate/ci`
-(scenario runner + GitHub Action). Do not create them without being asked.
+Planned, not yet scaffolded: `@groundstate/ci` (scenario runner + GitHub Action). Do not
+create it without being asked. Current ecosystem scope is React/Next.js — do not add other
+framework adapters unprompted.
 
 ## Architecture invariants
 
@@ -39,7 +42,9 @@ Planned, not yet scaffolded: `@groundstate/inspector` (tool-browsing web UI), `@
    natively yet (as of Aug 2026). Native registration is the standards bet, not the product.
 5. **Tool naming is part of the API contract:** observables register `get<Name>State`,
    actions register their given name, fixtures are served through the single `loadFixture`
-   tool (plus `listFixtures`), reset through `resetToGroundState`.
+   tool (plus `listFixtures`), reset through `resetToGroundState`, the flight recorder
+   through `getStateHistory`, and the health check through `getGroundstateHealth`
+   (always registered at init).
 6. **Deterministic verdicts.** Anything CI-facing asserts mechanical predicates over JSON
    state snapshots. Never make pass/fail depend on an LLM judgment.
 7. **Naming:** every package, binary, and public API derives from "groundstate". No off-brand

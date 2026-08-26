@@ -1,3 +1,4 @@
+import { observeStore } from "@groundstate/react";
 import * as groundstate from "groundstate";
 import { cartTotal, useCheckoutStore } from "./store";
 
@@ -8,23 +9,19 @@ import { cartTotal, useCheckoutStore } from "./store";
 export function setupGroundstate(): void {
   groundstate.init({ appName: "groundstate-demo" });
 
-  groundstate.observe(
-    "checkout",
-    () => {
-      const s = useCheckoutStore.getState();
-      return {
-        cartItems: s.items,
-        cartTotal: cartTotal(s.items),
-        email: s.email,
-        validationErrors: s.validationErrors,
-        paymentStatus: s.paymentStatus,
-      };
-    },
-    {
-      description:
-        "Returns live checkout state: cart contents and total, email, validation errors, payment status. Ground truth from the store, not the DOM.",
-    },
-  );
+  // One line: live getCheckoutState observable + flight-recorded transitions
+  // (getStateHistory), auto-derived from the Zustand store.
+  observeStore("checkout", useCheckoutStore, {
+    select: (s) => ({
+      cartItems: s.items,
+      cartTotal: cartTotal(s.items),
+      email: s.email,
+      validationErrors: s.validationErrors,
+      paymentStatus: s.paymentStatus,
+    }),
+    description:
+      "Returns live checkout state: cart contents and total, email, validation errors, payment status. Ground truth from the store, not the DOM.",
+  });
 
   groundstate.act(
     "submitCheckoutWithCard",

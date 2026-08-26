@@ -32,6 +32,9 @@ importers:
 
   examples/demo-app:
     dependencies:
+      '@groundstate/inspector':
+        specifier: workspace:*
+        version: link:../../packages/inspector
       '@groundstate/react':
         specifier: workspace:*
         version: link:../../packages/react
@@ -81,6 +84,12 @@ importers:
         version: 0.34.0
 
   packages/core: {}
+
+  packages/inspector:
+    dependencies:
+      groundstate:
+        specifier: workspace:*
+        version: link:../core
 
   packages/react:
     dependencies:

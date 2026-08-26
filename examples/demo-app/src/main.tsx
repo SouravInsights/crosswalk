@@ -5,6 +5,7 @@ import { setupGroundstate } from "./groundstate-setup";
 
 if (import.meta.env.DEV) {
   setupGroundstate();
+  import("@groundstate/inspector").then(({ mountInspector }) => mountInspector());
 }
 
 const rootEl = document.getElementById("root");

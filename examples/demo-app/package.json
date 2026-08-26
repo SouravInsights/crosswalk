@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@groundstate/inspector": "workspace:*",
     "@groundstate/react": "workspace:*",
     "groundstate": "workspace:*",
     "react": "^19.0.0",

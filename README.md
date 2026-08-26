@@ -18,9 +18,10 @@ so the agent you already use can:
 
 | Package | What it is |
 |---|---|
-| [`groundstate`](packages/core) | Core SDK: `observe` / `act` / `fixture` / `reset`. Zero dependencies, dev/preview only. |
-| [`@groundstate/react`](packages/react) | React hooks: `useObservable`, `useAction`, `useFixture`. |
+| [`groundstate`](packages/core) | Core SDK: `observe` / `act` / `fixture` / `reset` / `record` (flight recorder) + `getGroundstateHealth`. Zero dependencies, dev/preview only. |
+| [`@groundstate/react`](packages/react) | React hooks + one-line Zustand and TanStack Query auto-derivation (`observeStore`, `observeQueries`). |
 | [`@groundstate/bridge`](packages/bridge) | Local MCP server connecting a running page's tools to Claude Code / Codex / Cursor via CDP. |
+| [`@groundstate/inspector`](packages/inspector) | In-page dev overlay to browse and invoke tools while authoring. |
 
 ## Quick start
 
@@ -45,7 +46,7 @@ claude mcp add groundstate -- npx @groundstate/bridge --page localhost:5173
 ```
 
 Your agent now has `getCheckoutState`, `submitCheckoutWithCard`, `loadFixture`, `listFixtures`,
-and `resetToGroundState` — live against the running app.
+`getStateHistory`, `getGroundstateHealth`, and `resetToGroundState` — live against the running app.
 
 ## Development
 

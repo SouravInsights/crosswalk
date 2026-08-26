@@ -1,4 +1,6 @@
 import { GroundstateProductionError, isProductionEnvironment } from "./guard.js";
+import { type HealthReport, runHealthCheck } from "./health.js";
+import { FlightRecorder, type RecordSource } from "./recorder.js";
 import { ToolRegistry } from "./registry.js";
 import { registerNative } from "./transport.js";
 import type { GroundstateOptions, InputSchema, ToolDefinition, Unregister } from "./types.js";
@@ -12,10 +14,12 @@ interface FixtureEntry {
 
 const registry = new ToolRegistry();
 const fixtures = new Map<string, FixtureEntry>();
+const recorder = new FlightRecorder();
 
 let initialized = false;
 let options: GroundstateOptions = {};
 let fixtureToolsRegistered = false;
+let historyToolRegistered = false;
 
 /**
  * Initialize Groundstate. Call once, from dev/preview builds only —
@@ -37,6 +41,14 @@ export function init(opts: GroundstateOptions = {}): void {
       call: (name, args) => registry.call(name, args ?? {}),
     };
   }
+
+  registerEverywhere({
+    name: "getGroundstateHealth",
+    description:
+      "Runs every read-only Groundstate tool and reports which ones still work — catches selectors broken by refactors. Also lists fixtures and recorded sources.",
+    readOnly: true,
+    execute: () => doctor(),
+  });
 }
 
 function assertInitialized(method: string): void {
@@ -199,6 +211,63 @@ export function reset(fn: () => unknown | Promise<unknown>): Unregister {
   });
 }
 
+export interface RecordOptions {
+  /** Keep at most this many entries across all sources (default 200). */
+  limit?: number;
+}
+
+/**
+ * Start flight-recording a state source: every change is buffered as a
+ * timestamped snapshot with the shallow keys that changed. Exposed to agents
+ * as `getStateHistory` — the causal trace of what happened, not just the
+ * current state.
+ */
+export function record(name: string, source: RecordSource, _opts: RecordOptions = {}): Unregister {
+  assertInitialized("record");
+  ensureHistoryTool();
+  recorder.push(name, source.snapshot());
+  const unsubscribe = source.subscribe(() => {
+    recorder.push(name, source.snapshot());
+  });
+  return unsubscribe;
+}
+
+function ensureHistoryTool(): void {
+  if (historyToolRegistered) return;
+  historyToolRegistered = true;
+  registerEverywhere({
+    name: "getStateHistory",
+    description:
+      "Returns the recorded sequence of state transitions (flight recorder): timestamp, which keys changed, and the full snapshot after each change. Use it to trace HOW the app got into its current state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        source: { type: "string", description: "Only entries from this recorded source." },
+        limit: { type: "number", description: "Only the most recent N entries." },
+      },
+    },
+    readOnly: true,
+    execute: (args) =>
+      recorder.history({
+        source: typeof args.source === "string" ? args.source : undefined,
+        limit: typeof args.limit === "number" ? args.limit : undefined,
+      }),
+  });
+}
+
+/**
+ * Health check ("doctor"): executes every read-only tool and reports which
+ * ones still work. Callable in code and exposed as `getGroundstateHealth`.
+ */
+export function doctor(): Promise<HealthReport> {
+  return runHealthCheck(registry, {
+    version: VERSION,
+    appName: options.appName,
+    fixtures: [...fixtures.keys()],
+    recordedSources: recorder.sources(),
+  });
+}
+
 /** Currently registered tools — used by the inspector and in tests. */
 export function listTools() {
   return registry.list();
@@ -208,8 +277,10 @@ export function listTools() {
 export function __resetForTests(): void {
   registry.clear();
   fixtures.clear();
+  recorder.clear();
   initialized = false;
   fixtureToolsRegistered = false;
+  historyToolRegistered = false;
   options = {};
   if (typeof window !== "undefined") {
     window.__GROUNDSTATE__ = undefined;
