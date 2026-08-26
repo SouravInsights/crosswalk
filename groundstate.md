@@ -1,134 +1,141 @@
 # Groundstate
 
-A dev-mode layer you drop into your web app that exposes its real internal state (component props, form validation, cart contents, auth state, keyboard focus, a11y tree) as WebMCP tools, so a reviewing agent can *ask the running app what actually happened* instead of guessing from screenshots or the DOM.
+A dev-mode layer you drop into your web app that exposes its real internal state (stores, form validation, cart contents, auth state) and safe actions as WebMCP tools — so the agent you're already coding with can **ask the running app what actually happened**, and **put the app into any state in one call**, instead of guessing from screenshots or clicking its way there.
+
+The name is the metaphor: in physics, the ground state is the system's known baseline. Groundstate gives an agent the app's true state at any moment — and fixtures to return it to a known one.
 
 ---
 
-## 0. What WebMCP actually is (since we're starting from scratch on this)
+## 0. What WebMCP actually is — corrected, as of Aug 2026
 
-WebMCP is a proposed web standard (currently shipping behind a flag in Chrome, also usable via a JS polyfill in other browsers) that adds a new browser API: `navigator.modelContext`. It lets **a webpage itself register tools that an AI agent running alongside the browser can call** — the same way an MCP server exposes tools to Claude today, except the "server" is the live page you're looking at, running in your browser, with access to that page's actual JavaScript state.
+WebMCP is a proposed web standard (Microsoft proposed it Aug 2025, Google co-authored the explainer; now a W3C effort with Mozilla and Apple in the working group). It adds a browser API that lets **a webpage itself register tools an AI agent can call** — the same way an MCP server exposes tools, except the "server" is the live page, with access to the page's actual JavaScript state.
 
-Concretely, on any page, JS code can do:
+Current reality, which earlier drafts of this doc had wrong or missing:
+
+- **The API is `document.modelContext`, not `navigator.modelContext`.** The July 2026 spec draft moved it (tools belong to a page, not the browser), and Chrome 150 deprecates the `navigator` location. Most tutorials online still show the old form. Groundstate must ship an adapter that handles both plus a polyfill fallback — day one.
+- **Chrome is past "behind a flag."** A public origin trial runs from Chrome 149 through 156 (announced at Google I/O, May 2026), meaning sites can expose tools on real traffic with a trial token. Edge 147 has experimental support behind a flag. Firefox and Safari are in the spec discussions with no committed timelines.
+- **No mainstream agent client consumes WebMCP tools natively yet.** As of the most recent independent audit, Claude, ChatGPT Agent, Perplexity, and Gemini all still read pages the old way. Gemini-in-Chrome is announced as the first consumer but hasn't shipped.
+
+That last point is the most important design input. It means the **bridge/polyfill path is the real transport today**: a small local process (or extension) that connects the page's registered tools to an MCP client — Claude Code, Codex, Cursor, anything. It works in any browser, no flags, right now. Native `document.modelContext` is the future-proofing story and the standards alignment, not the thing that makes Groundstate work this year.
 
 ```js
-navigator.modelContext.registerTool({
+// Registration looks like this (with the API-location adapter handled by the SDK):
+modelContext.registerTool({
   name: "getCartState",
   description: "Returns the current shopping cart contents and total",
-  execute: async () => ({
-    items: store.cart.items,
-    total: store.cart.total,
-  }),
+  execute: async () => ({ items: store.cart.items, total: store.cart.total }),
 });
 ```
 
-Once registered, an agent that's connected to that browser tab (via the WebMCP transport) can call `getCartState()` and get back the real, live JavaScript state — not a screenshot it has to interpret, not a DOM node it has to parse. It's a direct, structured channel between "what the agent wants to know" and "what the app actually knows about itself."
-
-This is the opposite direction of most agent-browser tooling so far (Playwright, browser-use, computer-use), which drives the browser *from the outside* — clicking, reading pixels, parsing accessibility trees, inferring what happened. WebMCP lets the app tell the agent directly, because the person who built the app wrote the tool.
-
-That's the whole premise Groundstate is built on.
-
----
+Once registered, a connected agent calls `getCartState()` and gets real, live JavaScript state — not a screenshot to interpret, not a DOM tree to parse. This is the opposite direction of Playwright/computer-use tooling, which drives the browser from the outside and infers. WebMCP lets the app *tell* the agent, because the person who built the app wrote the tool. That's still the whole premise.
 
 ## 1. The problem, concretely
 
-When someone (or some agent) opens a PR that touches UI, review happens one of three ways today:
+Most production UI code today is written by agents (Claude Code, Codex, Cursor). The bottleneck has moved entirely to **verification**, and the pain shows up in two places:
 
-1. **Code-only review.** The reviewer reads the diff and imagines what it does. Nobody actually clicks the checkout flow with a declined card and an empty cart at the same time — that edge case ships broken and gets found by a real user weeks later.
-2. **Manual click-through.** The reviewer pulls the branch, runs it locally, and manually exercises the flow. This is slow (10–30 min per non-trivial PR), doesn't scale, and gets skipped under deadline pressure — especially for edge cases.
-3. **Visual regression tooling (Percy, Chromatic, Applitools).** These catch *pixel diffs* — "this button moved 4px" — but they don't know whether the button is still *functionally* correct. A modal that no longer closes on ESC, or a form that submits with an invalid email, can look pixel-identical in a screenshot while being completely broken.
+**The inner loop (worst, and the primary target).** Agent writes code → dev clicks around → "the cart total is wrong" → agent guesses from a screenshot or DOM dump → tries again → repeat. Every round trip costs minutes and tokens. The agent has no way to ask the app "what is the cart store's actual contents right now, and why did validation reject that input" — so it infers, often wrongly.
 
-The result: UI bugs about **behavior and state**, not pixels, routinely slip through review and get discovered by users instead. Every one of those costs a reproduction tax — a user reports it vaguely, and an engineer spends 20–30 minutes just getting back to the broken state before they can even start fixing it.
+**Review time (secondary).** PRs that touch UI get reviewed by reading the diff, by a slow manual click-through, or by pixel-diff tools that can't see behavioral bugs. A modal that no longer closes on ESC looks pixel-identical to a working one. Behavior-and-state bugs ship, get found by users, and each one costs a reproduction tax: 20–30 minutes of an engineer clicking the app back into the broken state before the fix can even start.
 
-That tax has gotten more expensive, not less, now that most UI code is written and shipped by agents (Claude Code, Codex, Cursor, and similar). Agents can produce a PR in minutes. The bottleneck has moved entirely to *verifying what got shipped actually behaves correctly* — and that verification step is still manual, still slow, and still mostly skipped for anything beyond "does it look right."
+Groundstate attacks both, in that order: give the coding agent ground truth *while it works*, and only then automate review on top of the same primitives.
 
-## 2. What exists today, and why it doesn't fully solve this
+## 2. The landscape — what exists, honestly
 
-| Tool | What it does | Why it's not this |
+| Tool | What it does | Relationship to Groundstate |
 |---|---|---|
-| **Playwright / Playwright MCP** | Scripts real browser interactions; Playwright MCP lets an agent drive a page via accessibility-tree snapshots and clicks. | The agent is still *guessing its way through the UI* the same way a human tester would — clicking things, waiting, hoping selectors don't change. It has no privileged access to the app's actual internal state (e.g. "is the cart store really empty," not "does the DOM say 'empty cart'"). |
-| **Percy / Chromatic / Applitools** | Visual regression — screenshot diffing across builds/branches. | Catches pixel drift, not behavioral bugs. A component can be visually identical and functionally broken (wrong validation logic, broken keyboard trap, stale state after a mutation). |
-| **Storybook + interaction tests** | Isolated component testing with scripted interactions. | Tests components in isolation, not the live, integrated app with real routing/state/API responses. Someone has to write and maintain these stories, and they don't reflect what's actually running in a given branch/deployment. |
-| **browser-use / computer-use style agents** | General-purpose agents that control a browser via vision + DOM. | Same fundamental limitation as Playwright MCP — inference from pixels/DOM, not ground-truth state. Slower and less deterministic too. |
-| **Manual QA / human reviewer** | Ground truth, but slow, inconsistent, and doesn't scale with how fast agents now produce PRs. | This is the tedious part we want to reduce, not replace entirely — a human should still make the final call, just with much better evidence in front of them. |
+| **Chrome DevTools MCP** (Google, shipping now) | Gives any MCP-capable coding agent a live Chrome: console messages w/ source-mapped stacks, full network logs, a11y snapshots, screenshots, performance traces, `evaluate_script`, and connection to your existing browser session (Chrome 144+ auto-connect). Zero app changes. | **The most important tool in this space, and it's free.** It commoditizes everything generic: console errors, network logs, a11y trees. Groundstate must not rebuild any of that — it builds the layer DevTools MCP *cannot* have: developer-authored semantic state and actions. Designed to be used **alongside** it. |
+| **Playwright / Playwright MCP** | Scripts real browser interactions via a11y-tree snapshots and clicks. | Outside-in: the agent still guesses its way through the UI. No access to internal state ("is the cart store really empty" vs "does the DOM say empty"). |
+| **Percy / Chromatic / Applitools / UI Verify** | Visual regression (some now with AI judges and MCP surfaces). | Pixel drift, not behavior. Visually identical ≠ functionally correct. |
+| **Autonoma & similar agentic-E2E platforms** | AI agent exercises every PR's preview deployment in a real browser, comments on the PR with video/screenshot evidence. | Proof the "agent reviews your PR" lane is already occupied — and it's all vision/DOM-based. Groundstate's differentiation is the state channel, not the reviewer. |
+| **Storybook interaction tests** | Scripted component tests in isolation. | Artificial environment, maintenance burden, doesn't reflect the integrated app. |
 
-**The gap:** every existing tool either (a) infers app state indirectly (screenshots, DOM, accessibility tree), or (b) tests in an artificial, isolated environment (Storybook). None of them let a reviewing agent ask the **actual live app**, in its real integrated state, structured questions like *"what's in the cart right now,"* *"did the form validation actually reject this input and why,"* or *"is focus trapped inside this modal."*
+### The `evaluate_script` question — the substitute Groundstate has to beat
 
-## 3. What WebMCP uniquely enables here
+DevTools MCP's `evaluate_script` means a dev can already do the cheap version today: stick `window.__appState = { cart, checkout, auth }` in dev builds, add one line to CLAUDE.md, done. Groundstate has to be clearly better than that hack, and it is, on five axes:
 
-Because WebMCP tools are **authored by the developer who built the component**, the assertions a reviewing agent can make aren't reverse-engineered from pixels — they're exactly the checks the developer knows matter. A checkout form can register:
+1. **Discoverability** — tools self-describe with names, descriptions, and schemas; the agent finds them without repo archaeology.
+2. **Curation** — the developer decided what matters, so the agent reads a stable semantic contract, not a raw store dump that changes shape every refactor.
+3. **Actions** — `submitCheckoutWithCard("declined_test_card")` is a first-class, schema'd call, not an injected script string.
+4. **State injection** — see §4; `evaluate_script` *could* mutate state, but only by knowing app internals; Groundstate makes it a named, safe, documented operation.
+5. **Standards trajectory** — the same registrations work with native WebMCP consumers (Gemini-in-Chrome and whatever follows) with zero changes.
 
-```js
-navigator.modelContext.registerTool({
-  name: "getCheckoutState",
-  description: "Returns current checkout form state: cart contents, validation errors, payment status",
-  execute: async () => ({
-    cartItems: store.cart.items,
-    cartTotal: store.cart.total,
-    validationErrors: form.errors,
-    paymentStatus: store.payment.status,
-  }),
-});
+**Positioning in one line: DevTools MCP tells the agent what the browser sees; Groundstate tells it what the app knows.** Complement, not competitor — the recommended setup is both, and Groundstate's cross-check feature (§4) actively consumes the DOM/a11y view to reconcile it against app state.
 
-navigator.modelContext.registerTool({
-  name: "submitCheckoutWithCard",
-  description: "Simulates submitting checkout with a given test card token",
-  inputSchema: { cardToken: "string" },
-  execute: async ({ cardToken }) => checkoutController.submit(cardToken),
-});
-```
+## 3. What's actually left to build, given DevTools MCP exists
 
-A reviewing agent can now directly call `submitCheckoutWithCard({cardToken: "declined_test_card"})` and then `getCheckoutState()` and get back real internal state. This is faster, cheaper (fewer tokens, no vision-model round-trips), and more reliable than DOM/vision-based automation — and it tests real integrated behavior, not an isolated mock.
+Only the things that require being *inside* the app — which happens to be everything defensible:
 
-## 4. Assumptions this whole idea rests on
+1. **Observables** — curated, reactive, schema'd reads of real app state (`getCheckoutState`).
+2. **Actions** — developer-blessed operations the agent may perform (`submitCheckoutWithCard`).
+3. **State injection / fixtures** — teleport the app into a named state in one call (`loadFixture("checkout_declined_card")`). Outside-in tooling *cannot* do this; Playwright has to click its way there every run. This is the single most direct attack on the reproduction tax, and it makes agent verification fast and deterministic: inject → exercise one transition → assert.
+4. **Flight recorder** — buffer state transitions (action → store diff) and expose `getStateHistory()`, so a failing agent gets the causal trace, not two snapshots to guess between.
+5. **Cross-check** — reconcile app state against the rendered DOM/a11y tree ("store says 0 items, a11y tree shows 3 — flag it"). This catches the class of bugs that live *between* the store and the screen, which neither a pure state channel nor any outside-in tool can catch. See assumption 3 below.
+6. **The bridge** — the local MCP server that makes all of the above callable from Claude Code/Codex/Cursor *today*, native WebMCP or not.
 
-Being explicit about these because the value of Groundstate lives or dies on whether they hold up in practice — this is exactly what building it for real, against beenthere.page, should test:
+Explicitly **not** building: console-error tools, network-log tools, generic a11y snapshots, screenshots, focus/keyboard introspection. DevTools MCP does all of it, better, with zero app changes. (Earlier versions of this doc listed these as "built-in tools every app gets free" — cut.)
 
-1. **Developers (or their coding agents) are willing to write a small amount of WebMCP registration code per component/flow.** This is not automatic — Groundstate can provide ergonomic helpers, but *someone* has to decide "this is the state worth exposing" and "this is the action worth exposing," and write a few lines to do it. This is the single biggest assumption. If it feels like meaningful extra work with no immediate payoff, people won't do it.
-   - Mitigating factor: this is exactly the kind of small, mechanical, well-specified task coding agents (Claude Code, Codex) are good at. The realistic expectation is: a developer says "expose the checkout flow's state and actions to Groundstate," and their coding agent writes the `registerTool` calls — the human doesn't hand-write this from scratch.
-2. **The state/actions exposed need to be genuinely representative of what matters**, not just whatever's easiest to expose. A `getCheckoutState` that omits the one field that actually breaks is worse than useless — it's false confidence. This means tool authorship needs at least a little intentionality, not blind auto-generation.
-3. **This only works in dev/preview builds, never production.** Exposing internal app state and mutating actions to an external agent is a real security surface. The assumption is that teams already have a preview/staging deployment step (Vercel, Netlify, Render previews, or a local dev server) where this is safe to enable, and that it can be strictly and reliably excluded from production bundles.
-4. **WebMCP tooling (browser support, the polyfill, the agent-side connection) is stable enough to build on.** It's an emerging standard behind a flag in Chrome today. Part of building Groundstate for real is finding out how much friction that adds right now, and whether the MCP-B-style polyfill is good enough to not care.
-5. **A single-page app / SPA-style architecture is the common case.** The state-exposure model (JS store, reactive re-registration of tools) assumes a client-side app with meaningful in-memory state — which fits beenthere.page and most modern frontend stacks, but is worth stating explicitly since it doesn't map cleanly onto, say, a mostly-server-rendered app with little client state.
-6. **A human is still the one deciding what "correct" means**, at least at first. Groundstate produces evidence (structured state snapshots, pass/fail against a scenario) — it doesn't itself decide the PR is good to merge. Whether that changes over time (more autonomous gating) is a later question, not a starting assumption.
+## 4. The pieces — naming derived from Groundstate
 
-## 5. What we're actually building
+One npm scope, one CLI. No off-brand names.
 
-Three pieces:
+### `groundstate` (core SDK)
+The framework-agnostic runtime you add to your app. Dev/preview builds only, env-gated, hard-excluded from production bundles.
+- `groundstate.observe(name, selectorFn)` — registers a reactive `get<Name>State` observable; re-registers on store change.
+- `groundstate.act(name, fn, schema)` — registers a callable action.
+- `groundstate.fixture(name, setupFn)` — registers a named state-injection tool; `groundstate.reset()` returns the app to its baseline. (The app's *ground state* — the metaphor doing real work.)
+- Flight recorder: opt-in `groundstate.record(store)` → `getStateHistory` tool.
+- Transport adapter: `document.modelContext` → `navigator.modelContext` fallback → bridge polyfill, feature-detected. Origin-trial token support for preview deployments.
+- Refuses to initialize, loudly and at build time, in production environments; bridge transport requires an auth token so a public preview URL is not an open mutation surface.
 
-### 5.1 `reviewer-kit` — a small SDK you add to your app
-- A thin wrapper around `navigator.modelContext` (with a polyfill for browsers that don't support it natively yet) that's active only in dev/preview builds, gated by an explicit env flag, and hard-excluded from production bundles.
-- Ergonomic helpers so you're not hand-writing raw `registerTool` calls for common patterns:
-  - `exposeState(name, selectorFn)` — reactively re-registers a `get<Name>State` tool whenever the underlying store/state changes.
-  - `exposeAction(name, fn, schema)` — registers a callable action.
-  - Built-in tools every app gets for free with no extra work: `getA11ySnapshot` (from the accessibility tree), `getFocusedElement`, `getKeyboardTrapStatus`, `getCurrentRoute`, `getConsoleErrors`, `getNetworkRequestLog` (recent API calls + status codes).
-- Framework adapters for React first (hook: `useExposedTool`), since that's what beenthere.page is likely built on; other frameworks later if useful.
+### `@groundstate/react`
+Framework adapter. `useObservable` / `useAction` hooks, plus the adoption killer-feature: **auto-derived observables** from what's already introspectable — Zustand/Redux stores, TanStack Query cache, react-hook-form state, router state. `npm install` alone yields real read-only tools before anyone writes a line of curation. Curated `observe`/`act`/`fixture` calls are the upgrade path, not the entry fee. Other frameworks later if it earns it.
 
-### 5.2 `reviewer-agent` — the agent that actually runs reviews
-- A CLI (`npx reviewer run <preview-url> --scenario checkout.md`) that:
-  1. Opens a given preview/dev deployment in a Chrome instance with WebMCP enabled.
-  2. Discovers every tool the page has registered via `navigator.modelContext`.
-  3. Takes a plain-English review scenario (e.g., "Verify the checkout flow handles a declined card and an empty cart at the same time") and uses an LLM (Claude, via the Anthropic API) to plan and execute a sequence of tool calls testing it.
-  4. Produces a structured report — which checks passed/failed, with the actual state snapshots as evidence, not screenshots.
-- Two integration surfaces to build, in order of what unblocks real usage fastest:
-  1. **A local/CLI mode** you or a coding agent can invoke directly during development — "run the reviewer against the checkout scenario before I open this PR."
-  2. **A GitHub Action** that runs automatically on PR open/update against the preview deployment and posts the structured report as a PR comment.
+### `@groundstate/bridge`
+The v1 centerpiece. `npx groundstate bridge <url>` runs a local MCP server that connects the running page's registered tools to whatever MCP client the developer already uses (Claude Code, Codex, Cursor, Gemini CLI). No new agent, no new API bill, no CI prerequisite — install-to-value in under five minutes. Also hosts the cross-check tool (it can see both the page's WebMCP tools and the DOM via CDP, so it's the natural place to reconcile them).
 
-### 5.3 `reviewer-inspector` — a small web UI (build only once the core loop works)
-- Given a preview URL, lists every WebMCP tool currently registered on the page and lets you manually invoke them and see live results. Useful while authoring `exposeState`/`exposeAction` calls, and useful for debugging why a scenario didn't behave as expected.
+### `@groundstate/inspector`
+Small web UI: point it at a page, see every registered tool, invoke them manually, watch observables update live. Built once the core loop works — it's the authoring/debugging aid, not the product.
 
-## 6. How I plan to validate this — using it on beenthere.page
+### `@groundstate/ci` (later — v3)
+The scenario runner and GitHub Action: run scenario files against a preview deployment on PR open/update, post a structured evidence report as a comment. Built on the same primitives, only after the inner loop is proven. Scenario verdicts must be **deterministic**: the LLM plans and drives, but pass/fail is mechanical predicates over JSON state snapshots (`cart.items.length === 0`), never LLM-judged. A flaky CI gate gets muted within weeks; that's how tools like this die in teams.
 
-Once a usable slice of `reviewer-kit` + `reviewer-agent` (CLI mode) exists, the plan is to actually instrument beenthere.page with it and use it for real review work, not just a synthetic demo app. That's the actual test of whether the assumptions in section 4 hold:
+## 5. Assumptions — updated audit
 
-- Pick one real, meaningful flow in beenthere.page (something with actual state and edge cases — a trip-planning or itinerary-building flow is a natural candidate) and instrument it with `exposeState`/`exposeAction`.
-- Write a small scenario file for it in plain English, covering the edge cases that are easy to forget (empty state, invalid input, concurrent actions).
-- Run `reviewer-agent` against it before merging a real change to that flow, and see whether it actually catches something a normal review pass would've missed — or whether it's just noise.
-- Track how much manual instrumentation work it took, and whether a coding agent could do most of that work given a short instruction, per assumption #1 above.
+1. **Developers (or their agents) will write registration code.** Still the biggest, but the risk was misdiagnosed before: *writing* the code is easy (it's exactly the mechanical task coding agents are good at). The real risks are **maintenance** — `observe` selectors rot like tests rot; a store refactor makes a tool silently return garbage — and **trust**. Mitigations: tools fail loudly at dev-build time when a selector throws; `groundstate doctor` health-checks registrations; auto-derived observables shrink the hand-written surface.
+2. **Self-grading (the epistemological core).** When the same coding agent writes both the feature and the tools that verify it, a wrong mental model gets faithfully encoded into both — and the verification passes against its own misunderstanding. Mitigations: auto-derive observables from framework internals rather than hand-picked fields where possible; cross-check against the DOM; treat human-reviewed tool definitions as the contract that changes rarely, separate from feature PRs.
+3. **The store is NOT fully the ground truth.** A whole class of frontend bugs lives between the store and the screen — store says the cart is empty, a stale render shows three items. A pure state channel is blind to exactly those. This is why cross-check is a first-class feature, and why the pitch is **"state + DOM, reconciled"** — never "no screenshots needed."
+4. **Dev/preview only — with teeth.** The origin trial explicitly allows WebMCP on production traffic, so "someone will enable it in prod" is a when, not an if. The production build-time refusal must be genuinely hard to bypass, the bridge transport must be authenticated (preview URLs are public-by-obscurity and these tools *mutate*), and the threat model gets written down: a prompt-injected agent calling `submitCheckout` against a real account is the canonical WebMCP attack; Chrome publishes security guidance for exactly this.
+5. **WebMCP churn is absorbable.** The API already moved once (`navigator` → `document`); the upstream MCP spec is mid-RC. Groundstate controls both ends (SDK + bridge), so churn hides behind the transport adapter. But the bridge — not native WebMCP — is what makes it work *today*.
+6. **SPA-centric, stated honestly.** RSC/App Router push state server-side; the trendline is against pure client state. Scope v1: client-heavy apps. The server-state story (server-action visibility, network-level observables) is an open question, not a promise.
+7. **A human still decides "correct."** Groundstate produces evidence; it doesn't gate merges. Unchanged.
 
-If it doesn't hold up under that real use, that's exactly the kind of thing worth finding out early rather than after investing in the GitHub Action / CI integration.
+## 6. Build plan
 
-## 7. Open questions / risks to resolve before building more
+### Phase 1 — the WebMCP Challenge (10 days)
+The hackathon judges "an app that becomes meaningfully better when people and their agents can use it together" — which is precisely the inner-loop demo. Sponsors include Google Chrome, Netlify, Vercel, Render: the preview-deployment story lands with this audience.
 
-- **Security surface:** exposing internal state/actions via WebMCP tools is powerful by design, which means it must be strictly dev/preview-only. `reviewer-kit` should refuse to initialize (loudly, at build time) if it detects a production environment.
-- **Browser support:** WebMCP is currently behind a flag in Chrome, so `reviewer-agent` needs to either rely on a polyfill or a Chrome build with the flag enabled. Worth confirming this is stable enough to depend on before building much more on top of it.
-- **Scenario format:** plain English is the friendliest starting point but least deterministic — a lightweight structured format (a few fields per scenario) might be worth adding as a fallback for scenarios where non-LLM-graded, reproducible pass/fail matters more than flexibility.
+Scope, in order:
+1. `groundstate` core: `observe` / `act` / `fixture`, the transport adapter, prod-refusal.
+2. `@groundstate/bridge`: page ↔ MCP client, auth token, works in stock Chrome via polyfill and in Chrome 149+ natively.
+3. `@groundstate/react`: hooks + auto-derived observables for at least Zustand or TanStack Query (whichever beenthere.page uses).
+4. **The demo**: one real beenthere.page flow (itinerary building — real state, real edge cases) instrumented; a live session where Claude Code, connected through the bridge, reproduces a reported bug via `fixture`, diagnoses it via observables + `getStateHistory`, fixes it, and verifies via deterministic assertions — with a side-by-side of the same task over screenshots/DOM for contrast (rounds, tokens, wall-clock).
+5. `@groundstate/inspector`, only if time remains.
+
+Judging-day one-liner: *your app, working with your agent — DevTools MCP tells it what the browser sees; Groundstate tells it what the app knows.*
+
+### Phase 2 — post-hackathon: prove it on real work (2–4 weeks)
+- Use it daily on beenthere.page development. Instrument a second flow. Track honestly: instrumentation cost, how much a coding agent could self-instrument from a one-line instruction, and how often the tools drift.
+- Flight recorder and cross-check land here (cross-check is the feature most likely to catch a real bug nothing else would).
+- **Kill criterion, written down now:** if, after instrumenting one real flow, the curated tools don't catch anything — or save meaningful round-trips — that DevTools MCP + `evaluate_script` wouldn't have, the premise fails. Better to know in week two than month three.
+
+### Phase 3 — only if Phase 2 holds
+- `@groundstate/ci`: scenario files (deterministic predicates over state snapshots), GitHub Action against preview deployments, structured evidence reports as PR comments.
+- More framework adapters, guided by demand.
+- Track native WebMCP consumers (Gemini-in-Chrome first); when they ship, Groundstate-instrumented apps work with them for free — that's the standards bet paying out.
+
+## 7. Open questions / risks
+
+- **Spec churn:** origin trial closes around Chrome 156 / late-2026 projected stable enablement; the upstream MCP RC could ripple into WebMCP primitives. The adapter absorbs it, but pin and track.
+- **Server-state apps:** what does Groundstate mean for an RSC-heavy app? Punted from v1, but the answer decides the ceiling of the market.
+- **Auto-derivation quality:** raw Zustand dumps may be too noisy to be useful without curation — Phase 2 tells us where the floor is.
+- **Bridge security:** the exact auth scheme (token in URL fragment? paired handshake?) needs design before anyone points it at a shared preview URL.
