@@ -1,8 +1,16 @@
 # Groundstate
 
-A dev-mode layer you drop into your web app that exposes its real internal state (stores, form validation, cart contents, auth state) and safe actions as WebMCP tools — so the agent you're already coding with can **ask the running app what actually happened**, and **put the app into any state in one call**, instead of guessing from screenshots or clicking its way there.
+**Give your coding agent ground truth about your running app.**
 
-The name is the metaphor: in physics, the ground state is the system's known baseline. Groundstate gives an agent the app's true state at any moment — and fixtures to return it to a known one.
+Your agent writes your frontend, but it can't see inside it — it guesses from screenshots and DOM dumps, and you burn round-trips correcting it. Groundstate is a dev-only SDK that exposes your app's real state and actions as tools (via WebMCP), so the agent you already use can:
+
+- **Read the truth** — `getCheckoutState()` returns the actual store, not what the DOM implies.
+- **Do real things** — `submitCheckoutWithCard("declined_test_card")`, defined by you, callable by it.
+- **Jump to any state** — `loadFixture("cart_with_declined_card")` in one call, no clicking there.
+
+`npm install groundstate`, connect your agent through the bridge, and the guessing stops.
+
+*(The name is the metaphor: in physics, the ground state is a system's known baseline — Groundstate gives an agent the app's true state, and a way back to a known one.)*
 
 ---
 
