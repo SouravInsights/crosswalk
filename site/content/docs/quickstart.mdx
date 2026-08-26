@@ -63,7 +63,7 @@ Using Next.js? See the [Next.js setup](/docs/react#nextjs-app-router).
 ```bash
 # macOS
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --remote-debugging-port=9222 --user-data-dir=/tmp/gs http://localhost:3000
+  --remote-debugging-port=9222 --user-data-dir=/tmp/gs http://localhost:5173
 ```
 
 Use a throwaway profile (`--user-data-dir`) — see [Security](/docs/security).
@@ -72,10 +72,10 @@ Use a throwaway profile (`--user-data-dir`) — see [Security](/docs/security).
 
 ```bash
 # Claude Code
-claude mcp add groundstate -- npx @groundstate/bridge --page localhost:3000
+claude mcp add groundstate -- npx @groundstate/bridge --page localhost:5173
 
 # Codex
-codex mcp add groundstate -- npx @groundstate/bridge --page localhost:3000
+codex mcp add groundstate -- npx @groundstate/bridge --page localhost:5173
 ```
 
 ## 5. Use it

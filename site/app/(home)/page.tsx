@@ -118,11 +118,11 @@ groundstate.fixture("cart_with_declined_card", async () => { /* seed it */ });`}
             ["Instrument your app (dev builds only)", "npm install groundstate @groundstate/react"],
             [
               "Run Chrome with a debugging port",
-              "chrome --remote-debugging-port=9222 \\\n  --user-data-dir=/tmp/gs http://localhost:3000",
+              "chrome --remote-debugging-port=9222 \\\n  --user-data-dir=/tmp/gs http://localhost:5173",
             ],
             [
               "Connect the agent you already use",
-              "claude mcp add groundstate -- npx @groundstate/bridge --page localhost:3000",
+              "claude mcp add groundstate -- npx @groundstate/bridge --page localhost:5173",
             ],
           ].map(([label, cmd], i) => (
             <li key={label} className="flex gap-4">

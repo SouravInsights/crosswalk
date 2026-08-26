@@ -16,17 +16,17 @@ DevTools Protocol and serves its registered tools over MCP stdio.
 ```bash
 # macOS
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --remote-debugging-port=9222 --user-data-dir=/tmp/groundstate-profile http://localhost:3000
+  --remote-debugging-port=9222 --user-data-dir=/tmp/groundstate-profile http://localhost:5173
 ```
 
 3. Connect your agent:
 
 ```bash
 # Claude Code
-claude mcp add groundstate -- npx @groundstate/bridge --page localhost:3000
+claude mcp add groundstate -- npx @groundstate/bridge --page localhost:5173
 
 # Codex
-codex mcp add groundstate -- npx @groundstate/bridge --page localhost:3000
+codex mcp add groundstate -- npx @groundstate/bridge --page localhost:5173
 ```
 
 Your agent now sees every tool the page registered — `getCheckoutState`, `loadFixture`,

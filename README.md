@@ -48,14 +48,14 @@ pnpm --filter demo-app dev   # Vite dev server on :5173
 ### Landing page & docs
 
 ```bash
-pnpm --filter site dev       # Next.js dev server on :3000
+pnpm --filter site dev       # Next.js dev server on :3001
 ```
 
 Or build for production:
 
 ```bash
 pnpm --filter site build
-pnpm --filter site start     # serves on :3000
+pnpm --filter site start     # serves on :3001
 ```
 
 ### Full E2E smoke test
@@ -169,7 +169,7 @@ cd site && netlify deploy --build
 ```bash
 cd site
 pnpm build
-pnpm start    # serves on :3000
+pnpm start    # serves on :3001
 ```
 
 Set these env vars if deploying publicly:
