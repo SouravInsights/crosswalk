@@ -1,0 +1,91 @@
+---
+title: Quickstart
+description: From npm install to an agent reading real app state, in five minutes.
+---
+
+## 1. Install
+
+```bash
+npm install groundstate @groundstate/react
+```
+
+## 2. Instrument your app (dev builds only)
+
+```ts title="src/groundstate-setup.ts"
+import * as groundstate from "groundstate";
+import { observeStore } from "@groundstate/react";
+import { useCheckoutStore } from "./store";
+
+export function setupGroundstate() {
+  groundstate.init({ appName: "my-app" });
+
+  // One line: live getCheckoutState + flight-recorded transitions
+  observeStore("checkout", useCheckoutStore);
+
+  // A developer-blessed action the agent may perform
+  groundstate.act(
+    "submitCheckoutWithCard",
+    ({ cardToken }) => useCheckoutStore.getState().submit(String(cardToken)),
+    {
+      description: 'Submit checkout with a test card. "declined_test_card" simulates a decline.',
+      inputSchema: {
+        type: "object",
+        properties: { cardToken: { type: "string" } },
+        required: ["cardToken"],
+      },
+    },
+  );
+
+  // One-call jump to a known app state
+  groundstate.fixture("cart_with_declined_card", async () => {
+    const s = useCheckoutStore.getState();
+    s.reset();
+    s.addItem({ id: "item-1", title: "Test item", price: 49 });
+    await s.submit("declined_test_card");
+  });
+
+  groundstate.reset(() => useCheckoutStore.getState().reset());
+}
+```
+
+Gate it so it never ships to production:
+
+```ts title="src/main.tsx (Vite)"
+if (import.meta.env.DEV) {
+  import("./groundstate-setup").then((m) => m.setupGroundstate());
+}
+```
+
+Using Next.js? See the [Next.js setup](/docs/react#nextjs-app-router).
+
+## 3. Run Chrome with a debugging port
+
+```bash
+# macOS
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=9222 --user-data-dir=/tmp/gs http://localhost:3000
+```
+
+Use a throwaway profile (`--user-data-dir`) — see [Security](/docs/security).
+
+## 4. Connect your agent
+
+```bash
+# Claude Code
+claude mcp add groundstate -- npx @groundstate/bridge --page localhost:3000
+
+# Codex
+codex mcp add groundstate -- npx @groundstate/bridge --page localhost:3000
+```
+
+## 5. Use it
+
+Ask your agent things it previously had to guess:
+
+- *"What's actually in the cart store right now?"* → `getCheckoutState`
+- *"Reproduce the declined-card bug"* → `loadFixture("cart_with_declined_card")`
+- *"How did the app get into this state?"* → `getStateHistory`
+- *"Are the Groundstate tools still healthy?"* → `getGroundstateHealth`
+
+While authoring, mount the [inspector overlay](/docs/inspector) to browse and invoke every
+tool from inside the page.

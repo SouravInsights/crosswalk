@@ -1,0 +1,88 @@
+---
+title: React & Next.js
+description: Hooks, Zustand and TanStack Query auto-derivation, and Next.js setup.
+---
+
+`@groundstate/react` is the React-ecosystem adapter: one-line auto-derived observables for the
+stores you already use, plus hooks for component-scoped tools.
+
+## observeStore
+
+```ts
+import { observeStore } from "@groundstate/react";
+
+observeStore("checkout", useCheckoutStore);
+```
+
+One line per Zustand store gets you:
+
+- a live `getCheckoutState` observable — action functions stripped automatically
+- flight recording of every transition into `getStateHistory`
+
+Curate the exposed shape with `select`:
+
+```ts
+observeStore("checkout", useCheckoutStore, {
+  select: (s) => ({ items: s.items, paymentStatus: s.paymentStatus }),
+  record: false, // opt out of flight recording
+});
+```
+
+`observeStore` is structurally typed — anything shaped like `{ getState, subscribe }` works.
+There is no dependency on zustand itself.
+
+## observeQueries
+
+```ts
+import { observeQueries } from "@groundstate/react";
+
+observeQueries(queryClient);
+```
+
+Exposes `getQueriesState`: every TanStack Query cache entry's key, status, fetch status, last
+update time, and error message — the app's real server-state picture, without parsing network
+logs.
+
+## Hooks
+
+For tools that should only exist while a component is mounted:
+
+```tsx
+import { useObservable, useAction, useFixture } from "@groundstate/react";
+
+function CheckoutForm() {
+  useObservable("checkoutForm", () => ({ errors: form.errors, dirty: form.dirty }));
+  useAction("fillCheckoutForm", (args) => form.setValues(args));
+  useFixture("form_with_invalid_email", () => form.setValues({ email: "not-an-email" }));
+  // ...
+}
+```
+
+Hooks register on mount, unregister on unmount, and always execute the freshest closure — no
+stale props, no re-registration churn.
+
+## Next.js (App Router) [#nextjs-app-router]
+
+Initialize from a client component, gated to development, with a dynamic import so
+Groundstate never enters production bundles:
+
+```tsx title="app/groundstate-provider.tsx"
+"use client";
+import { useEffect } from "react";
+
+export function GroundstateProvider() {
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      import("./groundstate-setup").then((m) => m.setupGroundstate());
+    }
+  }, []);
+  return null;
+}
+```
+
+Render `<GroundstateProvider />` once in your root layout. `init()` refusing to run in
+production is the second line of defense; the env-gated dynamic import is the first.
+
+**Scope note:** Groundstate observes client state. In RSC-heavy apps most state lives
+server-side — `observeQueries` covers the data-fetching layer, and client stores work as
+usual, but there is no server-state instrumentation yet.

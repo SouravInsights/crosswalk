@@ -1,0 +1,59 @@
+---
+title: Bridge
+description: Connect the running page's tools to Claude Code, Codex, or Cursor — today.
+---
+
+No mainstream agent client consumes WebMCP natively yet. `@groundstate/bridge` is how
+Groundstate works **today**: a local MCP server that finds your page over the Chrome DevTools
+Protocol and serves its registered tools over MCP stdio to any MCP client.
+
+## Setup
+
+**1.** Run your app with Groundstate initialized.
+
+**2.** Start Chrome with a debugging port and a throwaway profile:
+
+```bash
+# macOS
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=9222 --user-data-dir=/tmp/groundstate-profile http://localhost:3000
+
+# Linux
+google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/groundstate-profile http://localhost:3000
+```
+
+**3.** Connect your agent:
+
+```bash
+# Claude Code
+claude mcp add groundstate -- npx @groundstate/bridge --page localhost:3000
+
+# Codex
+codex mcp add groundstate -- npx @groundstate/bridge --page localhost:3000
+```
+
+The agent now sees every tool the page registered, live.
+
+## Options
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--browser-url` | `http://127.0.0.1:9222` | CDP endpoint of the running Chromium |
+| `--page` | first Groundstate page | Pick the target page by URL substring |
+
+## How it works
+
+The bridge evaluates against the page's Groundstate registry (`window.__GROUNDSTATE__`) via
+CDP `Runtime.evaluate` — it does not depend on native WebMCP support, so it works in any
+Chromium browser with no flags. Tool lists are fetched live on every request; registrations
+that come and go with navigation just work. Errors from your tools pass through as MCP tool
+errors with their original messages.
+
+## Alongside Chrome DevTools MCP
+
+Run both. DevTools MCP gives the agent console logs, network requests, screenshots, and
+scripted interaction; Groundstate gives it your app's internal truth. They answer different
+questions:
+
+- *"What error did the browser log?"* → DevTools MCP
+- *"What does the app think is in the cart?"* → Groundstate

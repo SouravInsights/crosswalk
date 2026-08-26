@@ -1,0 +1,54 @@
+---
+title: Security
+description: Why Groundstate is dev-only, and the threat model it's built against.
+---
+
+Groundstate exposes internal app state and **mutating actions** to agents. That's the point —
+and it's only acceptable in environments you control.
+
+## Production guard
+
+`init()` detects production builds (`import.meta.env.PROD`, `MODE === "production"`, or
+`NODE_ENV === "production"`) and throws `GroundstateProductionError`. There is deliberately
+no override flag.
+
+Treat the guard as the second line of defense. The first is keeping Groundstate out of
+production bundles entirely:
+
+```ts
+if (import.meta.env.DEV) {
+  import("./groundstate-setup").then((m) => m.setupGroundstate());
+}
+```
+
+The dynamic import behind a statically-known flag lets bundlers drop the code completely.
+
+## The threat model
+
+The canonical WebMCP risk: a **prompt-injected agent** calling a mutating tool it shouldn't —
+`submitCheckout` against a real account. Groundstate's mitigations:
+
+- **Dev/preview only.** The guard plus bundle exclusion keep tools away from real users and
+  real data.
+- **Explicit, small actions.** You register named operations with schemas — never a generic
+  "evaluate arbitrary code" surface. What an agent can mutate is exactly the list you wrote.
+- **Read/mutate annotations.** Every tool carries a `readOnly` flag, surfaced to MCP clients
+  as `readOnlyHint` — agents and harnesses can require confirmation for mutating calls.
+
+## The debugging port
+
+The bridge connects over CDP, and a Chrome debugging port grants control of that browser
+instance to local processes. Always use a dedicated throwaway profile:
+
+```bash
+chrome --remote-debugging-port=9222 --user-data-dir=/tmp/groundstate-profile
+```
+
+Don't browse sensitive sites in that profile.
+
+## Shared preview deployments
+
+Preview URLs are often public-by-obscurity, and Groundstate tools mutate. The bridge is
+currently built for locally-controlled browsers; an authenticated transport for shared
+preview deployments is on the roadmap and must land before pointing agents at previews you
+don't control.

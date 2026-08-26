@@ -1,0 +1,47 @@
+---
+title: Introduction
+description: What Groundstate is, and why your coding agent needs it.
+---
+
+## The problem
+
+Most production UI code today is written by coding agents — Claude Code, Codex, Cursor. The
+bottleneck has moved to **verification**: the agent writes code, you click around, something's
+wrong, the agent guesses from a screenshot or a DOM dump, tries again. Every round trip costs
+minutes and tokens.
+
+The agent has no way to ask the app *"what is the cart store's actual contents right now, and
+why did validation reject that input?"* — so it infers. Often wrongly.
+
+## What Groundstate does
+
+Groundstate is a dev-only SDK that exposes your app's **real state and actions** as
+[WebMCP](https://developer.chrome.com/docs/ai/webmcp) tools. You decide what matters; any MCP
+agent gets it as first-class tools against the live, running app:
+
+- **Read the truth** — `getCheckoutState()` returns the actual store, not what the DOM implies.
+- **Do real things** — `submitCheckoutWithCard("declined_test_card")`, defined by you, callable by it.
+- **Jump to any state** — `loadFixture("cart_with_declined_card")` in one call, no clicking there.
+- **Trace causality** — `getStateHistory()` shows every transition and which keys changed.
+
+> Chrome DevTools MCP tells the agent what the browser sees.
+> **Groundstate tells it what the app knows.**
+
+The two are complements: DevTools MCP gives any agent console logs, network requests, and
+screenshots with zero app changes. Groundstate adds the layer only you can provide — the
+developer-authored semantic contract between your app and any agent.
+
+## How it connects
+
+No mainstream agent client consumes WebMCP natively yet, so
+[`@groundstate/bridge`](/docs/bridge) makes it work **today**: a local MCP server that finds
+your page over the Chrome DevTools Protocol and serves its registered tools to Claude Code,
+Codex, or Cursor. When native WebMCP consumers ship, the same registrations work with zero
+changes — Groundstate registers on `document.modelContext` whenever it's present.
+
+## Dev-only, by construction
+
+Groundstate exposes internal state and mutating actions, so `init()` detects production builds
+and refuses to start. There is deliberately no override flag. See [Security](/docs/security).
+
+Ready? Head to the [Quickstart](/docs/quickstart).

@@ -1,0 +1,117 @@
+---
+title: Core API
+description: The groundstate package — observe, act, fixture, reset, record, doctor.
+---
+
+The `groundstate` package is the framework-agnostic runtime. Zero runtime dependencies;
+dev/preview builds only.
+
+## init
+
+```ts
+groundstate.init({ appName: "my-app" });
+```
+
+Call once at app startup. Sets up the tool registry, binds `window.__GROUNDSTATE__` (what the
+bridge talks to), registers on native WebMCP (`document.modelContext`) when present, and
+registers the built-in `getGroundstateHealth` tool.
+
+**Throws `GroundstateProductionError` in production builds.** There is no override flag.
+
+## observe
+
+```ts
+groundstate.observe("checkout", () => ({
+  items: store.cart.items,
+  paymentStatus: store.payment.status,
+}));
+```
+
+Registers a read-only observable, exposed as `get<Name>State` (here: `getCheckoutState`).
+The selector runs at call time, so results are always live. Returns an unregister function.
+
+Selectors must return JSON-serializable data — anything else fails with an actionable error
+at call time (and shows up in `getGroundstateHealth`).
+
+## act
+
+```ts
+groundstate.act("submitCheckoutWithCard", ({ cardToken }) => checkout.submit(cardToken), {
+  description: "Submit checkout with a test card token.",
+  inputSchema: {
+    type: "object",
+    properties: { cardToken: { type: "string" } },
+    required: ["cardToken"],
+  },
+});
+```
+
+Registers a mutating action under exactly the name you give. Keep actions **small and
+explicit** — a named operation with a schema, not a generic "run anything" surface.
+
+## fixture
+
+```ts
+groundstate.fixture("cart_with_declined_card", async () => {
+  store.reset();
+  store.addItem(testItem);
+  await checkout.submit("declined_test_card");
+});
+```
+
+Registers a named app state. All fixtures are served through two shared tools:
+
+- `listFixtures` — names + descriptions
+- `loadFixture` — runs the setup, teleporting the app there in one call
+
+This is the feature outside-in tools can't replicate: Playwright has to click its way to a
+state every run; an agent with fixtures jumps there instantly and deterministically.
+
+## reset
+
+```ts
+groundstate.reset(() => store.reset());
+```
+
+Registers `resetToGroundState` — the app's way back to its known baseline.
+
+## record
+
+```ts
+groundstate.record("checkout", {
+  subscribe: (fn) => store.subscribe(fn),
+  snapshot: () => store.getState(),
+});
+```
+
+Flight recorder: buffers every state transition (up to 200 entries) with a timestamp and the
+shallow keys that changed. Exposed as `getStateHistory`, filterable by `source` and `limit`.
+When something goes wrong, the agent gets the causal trace — not two snapshots to guess
+between.
+
+Using Zustand? [`observeStore`](/docs/react#observestore) wires observation *and* recording in
+one line.
+
+## doctor
+
+```ts
+const report = await groundstate.doctor();
+```
+
+Executes every read-only tool and reports which ones still work — the answer to selector rot:
+a store refactor that breaks an observable fails **loudly** here instead of silently feeding
+an agent garbage. Mutating tools are presence-checked, never executed.
+
+Also exposed to agents as `getGroundstateHealth`, so an agent can self-check before trusting
+the tools.
+
+## Registered tool names
+
+| Tool | From | Kind |
+|---|---|---|
+| `get<Name>State` | `observe(name, fn)` | read |
+| *(your name)* | `act(name, fn, opts)` | mutate |
+| `listFixtures` / `loadFixture` | `fixture(name, fn)` | read / mutate |
+| `resetToGroundState` | `reset(fn)` | mutate |
+| `getStateHistory` | `record(name, source)` | read |
+| `getGroundstateHealth` | always | read |
