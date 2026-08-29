@@ -1,4 +1,4 @@
-# Groundstate Codegen — Design Document
+# webmcp-codegen — Design Document
 
 > Generate high-quality, safe, well-typed WebMCP tools from the backend you already have — without magic, without hiding what the tool does, and without taking control away from the developer.
 
@@ -25,7 +25,7 @@ The toolkit generates real, readable TypeScript/JavaScript files into the develo
 Everything else in this doc pulls *against* simplicity — more adapters, more emitters, more safety rules, more plugins all sound good in isolation and add up to a project nobody wants to learn. Concretely, simplicity means:
 
 - **Few concepts to learn.** A developer should hold the entire mental model in their head: sources → tools → review → register. Not a dozen package names.
-- **Zero-config works for the common case.** `groundstate-codegen init && groundstate-codegen generate` should produce something correct for a typical project without the developer writing a config file first. Config exists for the 20% that need it, not as a prerequisite for the 80% that don't.
+- **Zero-config works for the common case.** `webmcp-codegen init && webmcp-codegen generate` should produce something correct for a typical project without the developer writing a config file first. Config exists for the 20% that need it, not as a prerequisite for the 80% that don't.
 - **One blessed path.** Where there are five plausible ways to do something, ship one good default and document it well, rather than exposing every option day one. Options can be added later when someone actually needs them; they're very hard to remove once shipped.
 - **Small CLI surface.** A handful of commands whose names alone tell you what they do, not a command per feature. (See the command table in §6.2.)
 - **Resist premature infrastructure.** The plugin SDK, the multi-package split, telemetry — real, but deferred to later phases specifically *because* building them before there's a proven need is how projects accumulate complexity nobody asked for.
@@ -49,7 +49,7 @@ A team should be able to generate one tool for one endpoint on a Tuesday afterno
 The IR (intermediate representation) and generation engine know nothing about React, Next.js, or Express. Everything framework-specific — a Next.js route scanner, a React hook binding, a Rails generator — is a small, replaceable adapter. Same shape as better-auth's core + framework-adapter split. ("Thin adapters" means small in *scope*, not necessarily separate npm packages — see §10.)
 
 ### 2.8 The CLI is a first-class product
-`npx groundstate-codegen init`, `groundstate-codegen generate` — as polished as `drizzle-kit` or `better-auth`'s CLI, and few enough commands that a developer learns the whole CLI by using it once. Good error messages, good defaults, plain-English output over flags and options.
+`npx webmcp-codegen init`, `webmcp-codegen generate` — as polished as `drizzle-kit` or `better-auth`'s CLI, and few enough commands that a developer learns the whole CLI by using it once. Good error messages, good defaults, plain-English output over flags and options.
 
 ---
 
@@ -146,7 +146,7 @@ Turn `ReviewedTool[]` into actual files:
 Emitters use a **merge marker** strategy (like `graphql-codegen` or Rails scaffolding) so regeneration doesn't clobber manual edits:
 
 ```ts
-// ─── groundstate-codegen: generated — do not edit above this line ───
+// ─── webmcp-codegen: generated — do not edit above this line ───
 export const getOrderStatusTool = {
   name: "get-order-status",
   description: "Returns the current status and tracking info for an order by ID.",
@@ -154,7 +154,7 @@ export const getOrderStatusTool = {
   destructiveHint: false,
   readOnlyHint: true,
 } satisfies ToolDefinition<typeof GetOrderStatusInput>;
-// ─── groundstate-codegen: end generated block ───
+// ─── webmcp-codegen: end generated block ───
 
 // Your code below is preserved across regenerations.
 export async function executeGetOrderStatus(input: GetOrderStatusInput) {
@@ -182,7 +182,7 @@ Heuristics, all overridable:
 A field-name + type heuristic pass (extensible via plugin) flags likely-sensitive fields — `password`, `ssn`, `token`, `secret`, `apiKey`, `email`, `dob`, credit-card-shaped strings — in both inputs *and outputs*. Flagged output fields are excluded from the generated response by default, with a loud comment explaining why and how to override:
 
 ```ts
-// ⚠️  groundstate-codegen flagged `user.email` and `user.phone` as likely PII.
+// ⚠️  webmcp-codegen flagged `user.email` and `user.phone` as likely PII.
 // They are excluded from this tool's output by default.
 // If the agent genuinely needs them, uncomment deliberately:
 // email: user.email,
@@ -198,10 +198,10 @@ Because tool descriptions are literally part of the prompt an agent reasons over
 If a source route requires authentication/authorization and the generated tool doesn't have an obvious server-side session check wired in, the audit pass fails with a specific, actionable error — not a generic warning.
 
 ### 5.5 The audit pass — a security lint, like `npm audit`
-Audit checks run **inside `generate` by default** (not a separate step to remember; `--skip-audit` to bypass), and as a standalone `groundstate-codegen audit` command from Phase 1 onward for CI use without regeneration:
+Audit checks run **inside `generate` by default** (not a separate step to remember; `--skip-audit` to bypass), and as a standalone `webmcp-codegen audit` command from Phase 1 onward for CI use without regeneration:
 
 ```
-$ groundstate-codegen generate
+$ webmcp-codegen generate
 
   ✖ 2 tools missing destructiveHint despite DELETE-verb source route
   ⚠ 1 tool exposes `user.ssn` in output — excluded by default, flagged for review
@@ -223,15 +223,15 @@ A companion module ships accessible, framework-specific components implementing 
 
 ### 6.1 Zero-config start
 ```bash
-npx groundstate-codegen init
+npx webmcp-codegen init
 ```
 Detects the project's framework and existing API layer (looks for an OpenAPI file, a tRPC router, Prisma schema, etc.), proposes a source adapter, and scaffolds config:
 
 ```ts
 // codegen.config.ts
-import { defineConfig } from "@groundstate/codegen";
-import { openapi } from "@groundstate/codegen/openapi";
-import { imperative } from "@groundstate/codegen/emitters";
+import { defineConfig } from "webmcp-codegen";
+import { openapi } from "webmcp-codegen/openapi";
+import { imperative } from "webmcp-codegen/emitters";
 
 export default defineConfig({
   sources: [openapi({ spec: "./openapi.yaml" })],
@@ -248,9 +248,9 @@ The MVP surface is deliberately three commands. Audit checks run automatically a
 
 | Command | Purpose |
 |---|---|
-| `groundstate-codegen init` | scaffold config (or detect + skip config entirely for the common case), detect sources |
-| `groundstate-codegen generate` | run the pipeline, write/update files, run the audit checks from §5.5 by default (`--skip-audit` to bypass, `--dry-run` to preview without writing) |
-| `groundstate-codegen generate --watch` | regenerate on source changes during local dev |
+| `webmcp-codegen init` | scaffold config (or detect + skip config entirely for the common case), detect sources |
+| `webmcp-codegen generate` | run the pipeline, write/update files, run the audit checks from §5.5 by default (`--skip-audit` to bypass, `--dry-run` to preview without writing) |
+| `webmcp-codegen generate --watch` | regenerate on source changes during local dev |
 
 *Deferred, added only if real usage shows they're needed as distinct commands:* `audit` (standalone, for CI without regeneration — Phase 1), `diff` (standalone diff outside `--dry-run`), `snapshot` (schema-drift CI check — Phase 2, with the test module), `doctor` (diagnostics beyond what `init`/`generate` already report inline).
 
@@ -261,7 +261,7 @@ When the source is tRPC or Zod, the generated `inputSchema` (JSON Schema) is der
 A test module provides a mock agent for unit/integration tests:
 
 ```ts
-import { mockAgent } from "@groundstate/codegen/test";
+import { mockAgent } from "webmcp-codegen/test";
 
 test("get-order-status returns tracking info", async () => {
   const agent = mockAgent(tools);
@@ -333,7 +333,7 @@ One package; sources and emitters ship as subpath exports, not a dozen npm packa
 
 ```
 packages/
-  codegen/                # @groundstate/codegen — IR, pipeline, config loader, CLI bin
+  codegen/                # webmcp-codegen — IR, pipeline, config loader, CLI bin
     src/
       sources/            # openapi, trpc, zod (prisma, graphql in phase 2)
       emitters/           # imperative, declarative, react, manifest
@@ -351,7 +351,7 @@ docs/                     # section of the existing site, not a second site
 ## 11. Phased roadmap
 
 **Phase 0 — prove the core loop (MVP)**
-- `@groundstate/codegen` core + CLI
+- `webmcp-codegen` core + CLI
 - One source adapter: OpenAPI (highest reach, lowest integration cost)
 - One emitter: imperative `registerTool()`
 - Basic safety layer: risk classification from HTTP verb, `destructiveHint`/`readOnlyHint` generation, PII field heuristics
@@ -386,7 +386,11 @@ docs/                     # section of the existing site, not a second site
 
 ## 12. Naming
 
-Package `@groundstate/codegen`, binary `groundstate-codegen`. Tagline: *"Generate the tool. Review the tool. You own the tool."*
+**`webmcp-codegen`** — package, binary, and product share one name. Says exactly what it does; searchable; indexes cleanly. Availability checked 2026-08-29: npm name unclaimed, zero GitHub repos with the name, `webmcp-codegen.dev` / `.com` not resolving (confirm at a registrar before relying on the domains — DNS absence isn't proof of availability).
+
+Namespace note: the `@groundstate` npm scope is owned by an unrelated project (`@groundstate/react` is published by user `ninjawolff`, repo `SmashJaw/groundstate`), and unscoped `groundstate` is taken too. Unscoped names are the practical path for everything this repo ships unless that scope is transferred — this affects the core SDK packages (`@groundstate/core`, …) as much as this one.
+
+Tagline: *"Generate the tool. Review the tool. You own the tool."*
 
 ---
 
