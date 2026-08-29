@@ -22,7 +22,7 @@ The toolkit generates real, readable TypeScript/JavaScript files into the develo
 **Non-negotiable:** nothing generated is executed against a live agent until a human has looked at it. Generation and registration are always separate steps.
 
 ### 2.2 Simplicity is a constraint, not a nice-to-have
-Everything else in this doc pulls *against* simplicity — more adapters, more emitters, more safety rules, more plugins all sound good in isolation and add up to a project nobody wants to learn. Concretely, simplicity means:
+Everything else in this doc pulls *against* simplicity — more sources, more generators, more safety rules, more plugins all sound good in isolation and add up to a project nobody wants to learn. Concretely, simplicity means:
 
 - **Few concepts to learn.** A developer should hold the entire mental model in their head: sources → tools → review → register. Not a dozen package names.
 - **Zero-config works for the common case.** `webmcp-codegen init && webmcp-codegen generate` should produce something correct for a typical project without the developer writing a config file first. Config exists for the 20% that need it, not as a prerequisite for the 80% that don't.
@@ -30,6 +30,7 @@ Everything else in this doc pulls *against* simplicity — more adapters, more e
 - **Small CLI surface.** A handful of commands whose names alone tell you what they do, not a command per feature. (See the command table in §6.2.)
 - **Resist premature infrastructure.** The plugin SDK, the multi-package split, telemetry — real, but deferred to later phases specifically *because* building them before there's a proven need is how projects accumulate complexity nobody asked for.
 - **Boring, predictable output.** Generated code should look like code a competent developer would have written by hand — no clever abstractions, no framework-specific ceremony.
+- **Names say what the thing is.** `sources`, `generate`, `js`, `react`, `manifest` — not "emitters", not "IR". This applies to internals (directories, types, files) as much as to the public CLI and config.
 
 When a proposed feature and simplicity conflict, simplicity wins by default; the feature has to earn its way in with real evidence of need, not hypothetical completeness.
 
@@ -46,7 +47,7 @@ A developer should have to *opt out* of safety, not opt in. Every generated tool
 A team should be able to generate one tool for one endpoint on a Tuesday afternoon and see it work, with zero build-system changes. The full pipeline (plugins, CI checks, observability) should be additive, never a prerequisite.
 
 ### 2.7 Framework-agnostic core, thin adapters everywhere
-The IR (intermediate representation) and generation engine know nothing about React, Next.js, or Express. Everything framework-specific — a Next.js route scanner, a React hook binding, a Rails generator — is a small, replaceable adapter. Same shape as better-auth's core + framework-adapter split. ("Thin adapters" means small in *scope*, not necessarily separate npm packages — see §10.)
+The pipeline core and the generation engine know nothing about React, Next.js, or Express. Everything framework-specific — a Next.js route scanner, a React hook binding, a Rails generator — is a small, replaceable adapter. Same shape as better-auth's core + framework-adapter split. ("Thin adapters" means small in *scope*, not necessarily separate npm packages — see §10.)
 
 ### 2.8 The CLI is a first-class product
 `npx webmcp-codegen init`, `webmcp-codegen generate` — as polished as `drizzle-kit` or `better-auth`'s CLI, and few enough commands that a developer learns the whole CLI by using it once. Good error messages, good defaults, plain-English output over flags and options.
@@ -70,8 +71,8 @@ The IR (intermediate representation) and generation engine know nothing about Re
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌───────────────┐     ┌──────────────┐
-│   Sources   │ --> │  IR Builder  │ --> │  Safety Layer  │ --> │   Emitters   │
-│ (adapters)  │     │ (normalize)  │     │ (classify/lint)│     │ (codegen out)│
+│   Sources   │ --> │  Normalize   │ --> │  Safety Layer  │ --> │  Generators  │
+│ (adapters)  │     │ (one format) │     │ (classify/lint)│     │ (codegen out)│
 └─────────────┘     └──────────────┘     └───────────────┘     └──────────────┘
       │                                                                 │
       │                                                                 ▼
@@ -86,18 +87,18 @@ The IR (intermediate representation) and generation engine know nothing about Re
  manual YAML tool spec
 ```
 
-### 4.1 Sources (input adapters)
-Pluggable parsers that turn *something the developer already has* into the IR. Ship with a small number of excellent adapters rather than many mediocre ones:
+### 4.1 Sources
+Pluggable parsers that turn *something the developer already has* into one shared format. Ship a small number of excellent sources rather than many mediocre ones:
 
-- **OpenAPI** — parses an OpenAPI 3.x spec (the highest-reach adapter; most backend frameworks can already emit one)
+- **OpenAPI** — parses an OpenAPI 3.x spec (the highest-reach source; most backend frameworks can already emit one)
 - **tRPC** — introspects a tRPC router, reusing existing Zod input/output schemas directly (no schema translation needed — huge type-safety win)
 - **Zod-annotated functions** — for teams who just want to hand-annotate plain functions with a Zod schema and a doc comment
 - **Prisma** *(later)* — generate read/list tools directly from a Prisma schema, with safe defaults (no raw `delete` tool without explicit opt-in)
 - **GraphQL** *(later)* — SDL + selected operations → tools
 
-Each adapter's only job is to produce a list of `CandidateTool` objects in the IR shape below. It does **not** decide what's safe or write any output — that's the safety layer's and emitter's job, kept deliberately separate so adapters stay simple and the safety rules stay consistent across every source.
+Each source's only job is to produce a list of `CandidateTool` objects in the shared shape below. It does **not** decide what's safe or write any output — that's the safety layer's and the generators' job, kept deliberately separate so sources stay simple and the safety rules stay consistent everywhere.
 
-### 4.2 The Intermediate Representation (IR)
+### 4.2 The intermediate format — `CandidateTool`
 
 ```ts
 interface CandidateTool {
@@ -126,7 +127,7 @@ interface CandidateTool {
 }
 ```
 
-The IR is the seam that lets sources, safety rules, and emitters evolve independently — the same kind of internal boundary that made Babel's plugin ecosystem or ESLint's rule system easy for third parties to extend.
+This one shared shape is the seam that lets sources, safety rules, and generators evolve independently — the same kind of internal boundary that made Babel's plugin ecosystem or ESLint's rule system easy for third parties to extend.
 
 ### 4.3 Safety layer
 Takes `CandidateTool[]`, applies a rules pipeline, and produces `ReviewedTool[]` with:
@@ -135,15 +136,15 @@ Takes `CandidateTool[]`, applies a rules pipeline, and produces `ReviewedTool[]`
 - flags and human-readable warnings (see §5) attached but **never auto-fixed silently** — the CLI surfaces them, the developer decides
 - suggested `exposedTo` scoping based on auth requirements (e.g., a tool wrapping an authenticated endpoint should default to not being exposed to `native-agent` until the developer confirms session handling is correct)
 
-### 4.4 Emitters (output adapters)
-Turn `ReviewedTool[]` into actual files:
+### 4.4 Generators
+Turn `ReviewedTool[]` into actual files. Each generator is named after what lands in your repo:
 
-- **Imperative** — generates `registerTool()` call sites, one file per source file/route, colocated near the source (`orders/route.ts` → `orders/route.webmcp.ts`)
-- **Declarative** — for simple form-backed actions, generates the HTML declarative attributes instead of JS
-- **React** — wraps the above with the `useWebMcpTool` hook pattern for React apps
-- **Manifest** — emits a `/.well-known/webmcp.json` static manifest for discovery/registries, generated from the same IR so it can never drift from the actual tools
+- **`js`** — generates `registerTool()` call sites (the spec's "imperative" style), one file per source file/route, colocated near the source (`orders/route.ts` → `orders/route.webmcp.ts`)
+- **`html`** — for simple form-backed actions, generates the spec's "declarative" HTML attributes instead of JS
+- **`react`** — wraps the above with the `useWebMcpTool` hook pattern for React apps
+- **`manifest`** — emits a `/.well-known/webmcp.json` static manifest for discovery/registries, generated from the same pipeline so it can never drift from the actual tools
 
-Emitters use a **merge marker** strategy (like `graphql-codegen` or Rails scaffolding) so regeneration doesn't clobber manual edits:
+Generators use a **merge marker** strategy (like `graphql-codegen` or Rails scaffolding) so regeneration doesn't clobber manual edits:
 
 ```ts
 // ─── webmcp-codegen: generated — do not edit above this line ───
@@ -176,7 +177,7 @@ This is where the project should invest the most design effort — it's the thin
 Heuristics, all overridable:
 - HTTP method → default side-effect (`GET`/`HEAD` → read, `DELETE` → destructive, `POST`/`PUT`/`PATCH` → write, pending inspection)
 - Route/field naming heuristics flag likely-destructive actions even on nominally "safe" verbs (`POST /orders/{id}/cancel`)
-- Anything classified `write` or `destructive` defaults to requiring an elicitation/confirmation step in the generated code — the emitter scaffolds a `requestUserConfirmation()` call rather than executing immediately
+- Anything classified `write` or `destructive` defaults to requiring an elicitation/confirmation step in the generated code — the generator scaffolds a `requestUserConfirmation()` call rather than executing immediately
 
 ### 5.2 PII & secret field detection
 A field-name + type heuristic pass (extensible via plugin) flags likely-sensitive fields — `password`, `ssn`, `token`, `secret`, `apiKey`, `email`, `dob`, credit-card-shaped strings — in both inputs *and outputs*. Flagged output fields are excluded from the generated response by default, with a loud comment explaining why and how to override:
@@ -190,7 +191,7 @@ A field-name + type heuristic pass (extensible via plugin) flags likely-sensitiv
 
 ### 5.3 Description linting
 Because tool descriptions are literally part of the prompt an agent reasons over, they're a real injection surface. The audit pass lints descriptions for:
-- vagueness relative to what the code actually does (cross-checked against the IR's side-effect classification — e.g. a description that doesn't mention "irreversible" or "cannot be undone" for a `destructive` tool gets flagged)
+- vagueness relative to what the code actually does (cross-checked against the candidate's side-effect classification — e.g. a description that doesn't mention "irreversible" or "cannot be undone" for a `destructive` tool gets flagged)
 - suspicious imperative phrasing that looks like it's trying to instruct the *agent* rather than describe the tool (a known WebMCP manifest-poisoning pattern)
 - length/format budget guidance in line with published browser guidance on tool description size
 
@@ -225,17 +226,17 @@ A companion module ships accessible, framework-specific components implementing 
 ```bash
 npx webmcp-codegen init
 ```
-Detects the project's framework and existing API layer (looks for an OpenAPI file, a tRPC router, Prisma schema, etc.), proposes a source adapter, and scaffolds config:
+Detects the project's framework and existing API layer (looks for an OpenAPI file, a tRPC router, Prisma schema, etc.), proposes a source, and scaffolds config:
 
 ```ts
 // codegen.config.ts
 import { defineConfig } from "webmcp-codegen";
-import { openapi } from "webmcp-codegen/openapi";
-import { imperative } from "webmcp-codegen/emitters";
+import { openapi } from "webmcp-codegen/sources";
+import { js } from "webmcp-codegen/generators";
 
 export default defineConfig({
   sources: [openapi({ spec: "./openapi.yaml" })],
-  emit: [imperative({ outDir: "./src/webmcp" })],
+  generate: [js({ outDir: "./src/webmcp" })],
   safety: {
     piiFields: ["ssn", "creditCard"], // extend the default heuristics
     requireConfirmationFor: ["write", "destructive"],
@@ -279,7 +280,7 @@ A documentation site with a live in-browser playground (generate from a sample O
 
 ## 7. Extensibility / plugin system (designed now, built in Phase 2)
 
-*This section is a design sketch to keep the IR seams honest. Building the plugin SDK before there's proven need is exactly the premature infrastructure §2.2 warns against.*
+*This section is a design sketch to keep the pipeline seams honest. Building the plugin SDK before there's proven need is exactly the premature infrastructure §2.2 warns against.*
 
 Modeled directly on better-auth's plugin shape: a plugin can hook into any stage of the pipeline.
 
@@ -288,7 +289,7 @@ interface CodegenPlugin {
   name: string;
   onCandidateTools?(tools: CandidateTool[]): CandidateTool[] | Promise<CandidateTool[]>;
   safetyRules?: SafetyRule[];
-  emitters?: Emitter[];
+  generators?: ToolGenerator[];
 }
 ```
 
@@ -304,11 +305,11 @@ A plugin registry/marketplace (even a simple curated list on the docs site to st
 
 ## 8. Natural extensions: observability (phase 2, not phase 0)
 
-Since the IR already knows each tool's risk tier, source route, and PII exposure, it's a small step to correlate that with runtime call logs:
+Since the pipeline already knows each tool's risk tier, source route, and PII exposure, it's a small step to correlate that with runtime call logs:
 
 - a thin telemetry client emitting OpenTelemetry spans around tool discovery and execution (tool name, caller origin, latency, success/failure, risk tier)
 - self-hostable dashboard (open-core) answering: which tools are agents actually calling in production, which ones fail schema validation most often, what fraction of "conversions" are agent-assisted
-- explicitly **not** phase 0 — it reuses the same IR/metadata rather than being a separate system bolted on later
+- explicitly **not** phase 0 — it reuses the same tool metadata rather than being a separate system bolted on later
 
 ---
 
@@ -318,8 +319,8 @@ Since the IR already knows each tool's risk tier, source route, and PII exposure
 |---|---|---|
 | `GoogleChromeLabs/webmcp-tools` (Evals CLI) | Contract-tests tool definitions against expected agent behavior | The codegen generates the tools in the first place; the test harness (§6.4) is complementary |
 | `basgr/cf-webmcp` (Cloudflare Worker) | Publishes discovery manifests, stamps declarative form attributes, and injects a registration bootstrap at the edge — from one TOML, no origin code changes | The no-code/edge lane for content sites and simple forms; this toolkit targets teams with real backend logic who need typed, reviewed tool code in their own repo |
-| `@webmcp-registry/kit` (webmcp-registry.dev) | `defineTool` (Zod → JSON Schema), React registration hooks, `webmcp sync` CLI that pushes schemas to their registry | A definition + publishing kit: tools are still hand-authored, no derivation from OpenAPI/tRPC/Prisma, no safety classification. Our manifest emitter can publish *to* it |
-| `use-webmcp-tool` (React hook) | Thin registration hook | The same pattern ships here as one small emitter target |
+| `@webmcp-registry/kit` (webmcp-registry.dev) | `defineTool` (Zod → JSON Schema), React registration hooks, `webmcp sync` CLI that pushes schemas to their registry | A definition + publishing kit: tools are still hand-authored, no derivation from OpenAPI/tRPC/Prisma, no safety classification. Our `manifest` generator can publish *to* it |
+| `use-webmcp-tool` (React hook) | Thin registration hook | The same pattern ships here as one small generator |
 | Directories/registries (webmcp.com, webmcpregistry.org) | Discovery/indexing of sites and tools | The codegen is a producer that can *publish to* these, not a competing directory |
 | DevTools WebMCP panel / inspector extension | Local debugging of already-registered tools | Complementary — the codegen generates the tools they inspect |
 
@@ -329,14 +330,14 @@ The honest positioning: **the codegen sits upstream of everything else in the ec
 
 ## 10. Suggested project structure (inside the existing Groundstate monorepo)
 
-One package; sources and emitters ship as subpath exports, not a dozen npm packages. The multi-package split from earlier drafts is deferred per §2.2 — do it only if external contributors start publishing adapters.
+One package; sources and generators ship as subpath exports, not a dozen npm packages. The multi-package split from earlier drafts is deferred per §2.2 — do it only if external contributors start publishing their own sources or generators.
 
 ```
 packages/
-  codegen/                # webmcp-codegen — IR, pipeline, config loader, CLI bin
+  codegen/                # webmcp-codegen — pipeline, config loader, CLI bin
     src/
       sources/            # openapi, trpc, zod (prisma, graphql in phase 2)
-      emitters/           # imperative, declarative, react, manifest
+      generators/         # js, html, react, manifest
       safety/             # default rule set
       test/               # mock agent + snapshot testing (phase 2)
 examples/
@@ -352,15 +353,15 @@ docs/                     # section of the existing site, not a second site
 
 **Phase 0 — prove the core loop (MVP)**
 - `webmcp-codegen` core + CLI
-- One source adapter: OpenAPI (highest reach, lowest integration cost)
-- One emitter: imperative `registerTool()`
+- One source: OpenAPI (highest reach, lowest integration cost)
+- One generator: `js` (imperative `registerTool()` call sites)
 - Basic safety layer: risk classification from HTTP verb, `destructiveHint`/`readOnlyHint` generation, PII field heuristics
 - `init` / `generate` / `generate --dry-run`
 - Goal: a developer with an existing OpenAPI spec goes from zero to reviewed, working WebMCP tools in under 10 minutes
 
 **Phase 1 — real DX**
 - tRPC source (the type-safety showcase feature)
-- React emitter
+- `react` generator
 - Standalone `audit` command with real CI exit codes
 - `diff` / merge-marker regeneration
 - Docs section + playground
@@ -380,7 +381,7 @@ docs/                     # section of the existing site, not a second site
 **Phase 4 — frontier**
 - Multi-agent identity/delegation helpers (as the spec's open questions around agent identity mature)
 - Prototype "skills" (multi-tool orchestration) support ahead of spec standardization
-- Cross-browser polyfill-aware emitters, once non-Chrome support materializes
+- Cross-browser polyfill-aware generators, once non-Chrome support materializes
 
 ---
 
