@@ -4,15 +4,40 @@ import { LiveDemo } from "@/components/live-demo";
 
 const COMMAND = "npx webmcp-codegen generate";
 
-/* What happens on each re-run, as a ledger. The question everyone has
-   after seeing codegen is "will it eat my code?" — these rows are the
-   answer, stated as behavior. */
+/* Why now, as three plain statements: what agents can do once your app
+   exposes tools. Each is an outcome for the app, not a feature of the CLI. */
+
+const UNLOCKS: Array<{ title: string; body: string }> = [
+  {
+    title: "Agents finish tasks, not just read pages",
+    body: '"Rebook my flight", "export my data", "add this to my cart". With tools, a user\'s agent can actually do these inside your app, with the user\'s session.',
+  },
+  {
+    title: "Agents prefer apps that have tools",
+    body: "Given a choice between clicking around a DOM and calling a well-described tool, agents pick the tool. Every time. Apps without tools get driven clumsily, or skipped.",
+  },
+  {
+    title: "Your spec is already the hard part",
+    body: "Names, types, descriptions: the information agents need is information you already maintain. The missing piece was getting it into the browser. That piece is a command now.",
+  },
+];
+
+/* The codegen objection, answered as behavior. */
 
 const RULES: Array<[string, string]> = [
   ["an endpoint is added", "a new file appears, with space for your code"],
   ["the spec changed", "only the part generated from the spec updates"],
   ["nothing changed", "nothing gets rewritten, and your git history stays quiet"],
   ["you edited the generated part", "your version wins; the update waits in a separate file"],
+];
+
+/* How it's built. Facts, not claims; developers draw their own conclusion. */
+
+const PRINCIPLES: Array<[string, string]> = [
+  ["plain TypeScript out", "read the files before you commit them. They read like you wrote them"],
+  ["no runtime dependency", "generated files never import the package, and nothing ships to your users"],
+  ["no account, no telemetry", "it reads your spec and writes files. That's the whole network policy"],
+  ["dry-run first", "the first look writes nothing. You review the plan before it touches disk"],
 ];
 
 export default function HomePage() {
@@ -57,8 +82,9 @@ export default function HomePage() {
               Turn your API into tools AI agents can call.
             </h1>
             <p className="mx-auto mb-10 max-w-xl text-[16px] leading-relaxed text-dim sm:text-[17px]">
-              WebMCP lets agents use your app through tools. webmcp-codegen reads the spec
-              you already have and writes them for you. Typed, checked, and yours to keep.
+              One command reads your OpenAPI spec and writes a WebMCP tool for every
+              endpoint: typed, checked for safety, and committed to your repo as code you
+              own.
             </p>
             <div className="flex flex-col items-center gap-4">
               <CopyCommand command={COMMAND} />
@@ -79,7 +105,33 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* The one worry codegen always raises, answered as behavior. */}
+      {/* Why now: the eventual goal. What tools unlock for your app. */}
+      <section className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
+          <h2 className="mb-3 font-display text-[clamp(1.5rem,3vw,2.1rem)] font-medium tracking-[-0.015em]">
+            What happens when the user is an agent?
+          </h2>
+          <p className="mb-10 max-w-xl text-[15px] leading-relaxed text-dim sm:mb-14">
+            Today, an agent that wants to use your app does it the hard way: it reads the
+            screen and simulates clicks. WebMCP, now shipping in Chrome, gives agents a
+            better path. Your app exposes tools; agents call them. The question stops being
+            whether your app works for agents and starts being whether it has anything for
+            them to call.
+          </p>
+          <div className="grid gap-10 sm:grid-cols-3 sm:gap-8">
+            {UNLOCKS.map((unlock) => (
+              <div key={unlock.title} className="border-l-2 border-accent/40 pl-5">
+                <h3 className="mb-2 text-[15.5px] font-medium leading-snug text-ink">
+                  {unlock.title}
+                </h3>
+                <p className="text-[13.5px] leading-relaxed text-dim">{unlock.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* The objection: "won't codegen eat my code?" Answered as behavior. */}
       <section className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
           <h2 className="mb-3 font-display text-[clamp(1.5rem,3vw,2.1rem)] font-medium tracking-[-0.015em]">
@@ -106,15 +158,27 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-
-          <p className="mt-8 max-w-xl text-[14.5px] leading-relaxed text-dim">
-            The files are plain TypeScript and don't depend on the tool. Stop using it
-            tomorrow and everything you generated keeps working.
-          </p>
         </div>
       </section>
 
-      {/* CTA */}
+      {/* How it's built. Facts; no adjectives about ourselves. */}
+      <section className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
+          <h2 className="mb-10 font-display text-[clamp(1.5rem,3vw,2.1rem)] font-medium tracking-[-0.015em] sm:mb-14">
+            Boring, on purpose
+          </h2>
+          <div className="grid gap-x-8 gap-y-8 sm:grid-cols-2">
+            {PRINCIPLES.map(([fact, detail]) => (
+              <div key={fact}>
+                <p className="mb-1.5 font-mono text-[13px] text-accent">{fact}</p>
+                <p className="text-[14px] leading-relaxed text-dim">{detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA: repeat the one action, with the risk removed. */}
       <section className="relative overflow-hidden border-t border-line">
         <div
           className="absolute bottom-[-280px] left-1/2 size-[640px] -translate-x-1/2 rounded-full bg-accent/[0.05] blur-[120px]"
