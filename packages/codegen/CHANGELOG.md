@@ -1,5 +1,11 @@
 # webmcp-codegen
 
+## 0.3.1
+
+### Patch Changes
+
+- Fix: use spec's servers URL for API calls
+
 ## 0.3.0
 
 ### Minor Changes
