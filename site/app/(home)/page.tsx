@@ -106,10 +106,6 @@ export default function HomePage() {
               a real spec, really generated. click around
             </p>
             <LiveDemo />
-            <p className="mt-4 text-center text-[13px] leading-relaxed text-faint">
-              Deleting an album is labeled destructive. Creating a user gets flagged for
-              touching personal data. The check catches both before anything ships.
-            </p>
           </div>
         </div>
       </section>

@@ -41,6 +41,9 @@ const tools = report.tools.map((tool) => {
     sideEffect: tool.sideEffect,
     fileName: `${tool.name}.webmcp.ts`,
     fileCode: contents,
+    findings: report.findings
+      .filter((f) => f.tool === tool.name)
+      .map((f) => ({ severity: f.level, message: f.message })),
   };
 });
 
@@ -55,6 +58,7 @@ export interface DemoTool {
   sideEffect: "read" | "write" | "destructive";
   fileName: string;
   fileCode: string;
+  findings: Array<{ severity: "warning" | "error"; message: string }>;
 }
 
 export const DEMO_SOURCE = {

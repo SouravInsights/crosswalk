@@ -125,6 +125,28 @@ export function LiveDemo() {
           </pre>
         </div>
       </div>
+
+      {/* Audit strip: the check's verdict on the selected tool, in the
+          idiom of an editor's problems pane. */}
+      <div className="border-t border-line">
+        {tool.findings.length === 0 ? (
+          <p className="flex items-center gap-2 px-4 py-2.5 font-mono text-[11px] text-ghost">
+            <span className="text-accent">✓</span> audit clean
+          </p>
+        ) : (
+          tool.findings.map((finding, i) => (
+            <p
+              key={i}
+              className={`flex items-baseline gap-2 px-4 py-2.5 font-mono text-[11px] leading-relaxed ${
+                i > 0 ? "border-t border-line" : ""
+              } ${finding.severity === "error" ? "text-fault" : "text-signal"}`}
+            >
+              <span aria-hidden="true">{finding.severity === "error" ? "✖" : "⚠"}</span>
+              <span>{finding.message}</span>
+            </p>
+          ))
+        )}
+      </div>
     </div>
   );
 }
