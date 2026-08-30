@@ -31,13 +31,23 @@ const RULES: Array<[string, string]> = [
   ["you edited the generated part", "your version wins; the update waits in a separate file"],
 ];
 
-/* How it's built. Facts, not claims; developers draw their own conclusion. */
+/* "What's the catch?" — answered as a checklist of the usual ones
+   that aren't here. The engineering story, told as what you never
+   have to think about. */
 
-const PRINCIPLES: Array<[string, string]> = [
-  ["plain TypeScript out", "read the files before you commit them. They read like you wrote them"],
-  ["no runtime dependency", "generated files never import the package, and nothing ships to your users"],
-  ["no account, no telemetry", "it reads your spec and writes files. That's the whole network policy"],
-  ["dry-run first", "the first look writes nothing. You review the plan before it touches disk"],
+const GUARANTEES: Array<[string, string]> = [
+  [
+    "The files are yours",
+    "Plain TypeScript in your repo. Read them, diff them, edit them. They never import this package, so uninstalling it changes nothing.",
+  ],
+  [
+    "It never phones home",
+    "No account, no telemetry, no uploads. It reads a local file and writes local files.",
+  ],
+  [
+    "You review before anything is written",
+    "The first run shows every file and every warning, and writes nothing.",
+  ],
 ];
 
 export default function HomePage() {
@@ -161,17 +171,30 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How it's built. Facts; no adjectives about ourselves. */}
+      {/* "What's the catch?" as a checklist. */}
       <section className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
-          <h2 className="mb-10 font-display text-[clamp(1.5rem,3vw,2.1rem)] font-medium tracking-[-0.015em] sm:mb-14">
-            Boring, on purpose
+          <h2 className="mb-3 font-display text-[clamp(1.5rem,3vw,2.1rem)] font-medium tracking-[-0.015em]">
+            What's the catch?
           </h2>
-          <div className="grid gap-x-8 gap-y-8 sm:grid-cols-2">
-            {PRINCIPLES.map(([fact, detail]) => (
-              <div key={fact}>
-                <p className="mb-1.5 font-mono text-[13px] text-accent">{fact}</p>
-                <p className="text-[14px] leading-relaxed text-dim">{detail}</p>
+          <p className="mb-10 max-w-xl text-[15px] leading-relaxed text-dim sm:mb-14">
+            The usual ones aren't here.
+          </p>
+
+          <div className="max-w-3xl border border-line bg-panel">
+            {GUARANTEES.map(([claim, detail], i) => (
+              <div
+                key={claim}
+                className={`flex gap-3.5 px-5 py-4 sm:px-6 sm:py-5 ${
+                  i > 0 ? "border-t border-line" : ""
+                }`}
+              >
+                <span className="mt-0.5 font-mono text-[13px] text-accent" aria-hidden="true">
+                  ✓
+                </span>
+                <p className="text-[14.5px] leading-relaxed text-dim">
+                  <span className="font-medium text-ink">{claim}.</span> {detail}
+                </p>
               </div>
             ))}
           </div>
