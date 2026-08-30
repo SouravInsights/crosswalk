@@ -62,9 +62,9 @@ export function PageReadout() {
   return (
     <p className="font-mono text-xs text-ghost tabular-nums" aria-live="off">
       <span className="text-faint">this page:</span> {"{ "}
-      section: <span className="text-phosphor-dim">"{section}"</span>, scroll:{" "}
-      <span className="text-phosphor-dim">"{scroll}"</span>, t+:{" "}
-      <span className="text-phosphor-dim">"{elapsed}"</span>
+      section: <span className="text-accent-dim">"{section}"</span>, scroll:{" "}
+      <span className="text-accent-dim">"{scroll}"</span>, t+:{" "}
+      <span className="text-accent-dim">"{elapsed}"</span>
       {" }"}
     </p>
   );

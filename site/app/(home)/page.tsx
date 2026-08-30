@@ -30,25 +30,27 @@ const RULES: Array<[string, string]> = [
   ["you edited the generated part", "your version wins; the update waits in a separate file"],
 ];
 
-const FACTS = [
-  "no install",
-  "no config",
-  "no runtime dependency",
-  "dry-run first",
-  "watch mode",
-  "CI-friendly",
-  "node 20+",
-  "MIT",
+/* The spec sheet: label over value, like package metadata. */
+
+const FACTS: Array<[string, string]> = [
+  ["install", "none. runs with npx"],
+  ["config", "optional. finds your spec"],
+  ["runtime deps", "zero. files stand alone"],
+  ["preview", "dry-run shows every file"],
+  ["watch", "regenerates on spec change"],
+  ["ci", "fails the build on errors"],
+  ["node", ">= 20"],
+  ["license", "MIT"],
 ];
 
 export default function HomePage() {
   return (
-    <main className="dark flex-1 bg-baseline font-sans text-ink">
+    <main className="dark flex-1 overflow-x-clip bg-baseline font-sans text-ink">
       {/* Nav */}
       <header className="absolute inset-x-0 top-0 z-10">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-6">
           <span className="flex items-center gap-2.5 font-mono text-sm tracking-tight text-ink">
-            <span className="inline-block size-2 bg-phosphor" aria-hidden="true" />
+            <span className="inline-block size-2 bg-accent" aria-hidden="true" />
             webmcp-codegen
           </span>
           <nav className="flex items-center gap-5 font-mono text-[13px] text-dim sm:gap-6">
@@ -72,9 +74,9 @@ export default function HomePage() {
 
       {/* Hero: the pitch, the command, and the proof. */}
       <section className="relative overflow-hidden">
-        <div className="gs-grid-bg absolute inset-0" aria-hidden="true" />
+        <div className="grid-bg absolute inset-0" aria-hidden="true" />
         <div
-          className="absolute left-1/2 top-[-260px] size-[720px] -translate-x-1/2 rounded-full bg-phosphor/[0.07] blur-[130px]"
+          className="absolute left-1/2 top-[-260px] size-[720px] -translate-x-1/2 rounded-full bg-accent/[0.07] blur-[130px]"
           aria-hidden="true"
         />
         <div className="relative mx-auto max-w-6xl px-5 pb-16 pt-36 sm:px-6 sm:pb-24 sm:pt-44">
@@ -118,7 +120,7 @@ export default function HomePage() {
           <div className="grid gap-12 sm:grid-cols-3 sm:gap-8">
             {POINTS.map((point, i) => (
               <div key={point.title}>
-                <p className="mb-4 font-display text-[2.6rem] font-medium leading-none text-line">
+                <p className="mb-4 font-display text-[2.6rem] font-medium leading-none text-transparent [-webkit-text-stroke:1px_#2a3040]">
                   {String(i + 1).padStart(2, "0")}
                 </p>
                 <h3 className="mb-2 text-[16px] font-medium text-ink">{point.title}</h3>
@@ -164,26 +166,40 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Facts: one quiet strip. */}
+      {/* Spec sheet + status. */}
       <section className="border-t border-line">
-        <div className="mx-auto max-w-6xl px-5 py-10 sm:px-6">
-          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2.5 font-mono text-[12px] text-faint">
-            {FACTS.map((fact) => (
-              <span key={fact}>{fact}</span>
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
+          <h2 className="mb-10 font-mono text-[11px] uppercase tracking-[0.25em] text-faint sm:mb-12">
+            spec sheet
+          </h2>
+          <dl className="grid grid-cols-2 gap-px border border-line bg-line sm:grid-cols-4">
+            {FACTS.map(([label, value]) => (
+              <div key={label} className="bg-baseline p-5 sm:p-6">
+                <dt className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.18em] text-ghost">
+                  {label}
+                </dt>
+                <dd className="text-[13.5px] leading-relaxed text-ink">{value}</dd>
+              </div>
             ))}
+          </dl>
+
+          <div className="mt-6 border border-line bg-panel px-5 py-4 sm:px-6">
+            <p className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.18em] text-signal">
+              status
+            </p>
+            <p className="max-w-2xl text-[13.5px] leading-relaxed text-dim">
+              WebMCP itself is still early: the tools run today in Chrome behind a flag, or
+              anywhere with a small polyfill. OpenAPI is supported now; tRPC, Zod, and
+              Prisma are on the roadmap.
+            </p>
           </div>
-          <p className="mx-auto mt-8 max-w-xl text-center text-[13px] leading-relaxed text-faint">
-            One honest note: WebMCP itself is still early. The tools run today in Chrome
-            behind a flag, or anywhere with a small polyfill. OpenAPI is supported now;
-            tRPC, Zod, and Prisma are on the roadmap.
-          </p>
         </div>
       </section>
 
       {/* CTA */}
       <section className="relative overflow-hidden border-t border-line">
         <div
-          className="absolute bottom-[-280px] left-1/2 size-[640px] -translate-x-1/2 rounded-full bg-phosphor/[0.05] blur-[120px]"
+          className="absolute bottom-[-280px] left-1/2 size-[640px] -translate-x-1/2 rounded-full bg-accent/[0.05] blur-[120px]"
           aria-hidden="true"
         />
         <div className="relative mx-auto max-w-6xl px-5 py-20 text-center sm:px-6 sm:py-28">

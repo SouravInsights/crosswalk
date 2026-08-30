@@ -9,7 +9,7 @@ import { DEMO_SOURCE, DEMO_TOOLS } from "@/lib/demo-data";
    shows exactly what `npx webmcp-codegen generate` would write. */
 
 const VERB_CLASS: Record<string, string> = {
-  GET: "border-phosphor/40 text-phosphor",
+  GET: "border-accent/40 text-accent",
   POST: "border-signal/40 text-signal",
   DELETE: "border-fault/40 text-fault",
 };
@@ -25,12 +25,12 @@ const KEYWORDS = new Set([
 ]);
 
 /* Enough syntax color to read as code, not a highlighter. Strings amber,
-   known keywords phosphor, comments ghost, everything else quiet. */
+   known keywords accent, comments ghost, everything else quiet. */
 function CodeLine({ line }: { line: string }) {
   if (line.trimStart().startsWith("//")) {
     const isMarker = line.includes("───");
     return (
-      <div className={isMarker ? "text-phosphor" : "italic text-ghost"}>
+      <div className={isMarker ? "text-accent" : "italic text-ghost"}>
         {line}
       </div>
     );
@@ -47,7 +47,7 @@ function CodeLine({ line }: { line: string }) {
           <span key={i} className="text-dim">
             {part.split(/\b/).map((word, j) =>
               KEYWORDS.has(word) ? (
-                <span key={j} className="text-phosphor">
+                <span key={j} className="text-accent">
                   {word}
                 </span>
               ) : (
@@ -86,7 +86,7 @@ export function LiveDemo() {
 
       <div className="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         {/* Endpoint list: the spec side. */}
-        <div className="max-h-64 overflow-y-auto border-b border-line lg:max-h-none lg:border-b-0 lg:border-r">
+        <div className="max-h-56 min-w-0 overflow-y-auto border-b border-line lg:max-h-none lg:border-b-0 lg:border-r">
           {DEMO_TOOLS.map((t, i) => (
             <button
               key={t.name}
@@ -114,8 +114,8 @@ export function LiveDemo() {
         </div>
 
         {/* Generated file: the output side. */}
-        <div>
-          <p className="border-b border-line px-4 py-2 font-mono text-[11px] text-ghost">
+        <div className="min-w-0">
+          <p className="truncate border-b border-line px-4 py-2 font-mono text-[11px] text-ghost">
             src/webmcp/{tool.fileName}
           </p>
           <pre className="max-h-96 overflow-auto px-4 py-4 font-mono text-[11px] leading-relaxed sm:text-[11.5px] lg:max-h-[26rem]">

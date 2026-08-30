@@ -28,9 +28,9 @@ export function ResetSection() {
         type="button"
         onClick={reset}
         className="
-          border border-phosphor/50 bg-phosphor/5 px-6 py-4 font-mono text-sm
-          text-phosphor transition-all duration-200
-          hover:border-phosphor hover:bg-phosphor hover:text-baseline
+          border border-accent/50 bg-accent/5 px-6 py-4 font-mono text-sm
+          text-accent transition-all duration-200
+          hover:border-accent hover:bg-accent hover:text-baseline
           active:translate-y-px
         "
         style={{ transitionTimingFunction: "var(--ease-reading)" }}

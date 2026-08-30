@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from "react";
  * The page demonstrates the loop instead of describing it.
  *
  * Color semantics (declared in global.css): green means read, amber
- * means mutate. Reset gets the phosphor treatment.
+ * means mutate. Reset gets the accent treatment.
  */
 
 interface CartItem {
@@ -71,7 +71,7 @@ function P({ children }: { children: string }) {
 }
 function Str({
   children,
-  className = "text-phosphor-dim",
+  className = "text-accent-dim",
 }: {
   children: string;
   className?: string;
@@ -85,7 +85,7 @@ function Num({ children }: { children: number }) {
 const STATUS_COLOR: Record<PaymentStatus, string> = {
   idle: "text-dim",
   processing: "text-signal",
-  paid: "text-phosphor",
+  paid: "text-accent",
   declined: "text-fault",
 };
 
@@ -315,7 +315,7 @@ export function Instrument() {
               entry.kind === "note"
                 ? "text-[12px] text-ghost leading-relaxed"
                 : entry.kind === "call"
-                  ? `text-[12px] leading-relaxed ${entry.signal ? "text-signal-dim" : "text-phosphor-dim"}`
+                  ? `text-[12px] leading-relaxed ${entry.signal ? "text-signal-dim" : "text-accent-dim"}`
                   : "text-[12px] leading-relaxed text-dim"
             }
           >
@@ -349,17 +349,17 @@ function ToolButton({
       className={`
         group bg-panel px-4 py-3 text-left transition-colors duration-150
         disabled:cursor-not-allowed disabled:opacity-50
-        ${kind === "reset" ? "hover:bg-phosphor/10" : "hover:bg-panel-raised"}
+        ${kind === "reset" ? "hover:bg-accent/10" : "hover:bg-panel-raised"}
       `}
       style={{ transitionTimingFunction: "var(--ease-reading)" }}
     >
       <span
         className={`block text-[12.5px] ${
           kind === "reset"
-            ? "text-phosphor"
+            ? "text-accent"
             : kind === "write"
               ? "text-signal"
-              : "text-ink group-hover:text-phosphor"
+              : "text-ink group-hover:text-accent"
         }`}
       >
         {name}

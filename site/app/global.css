@@ -3,23 +3,17 @@
 @import "fumadocs-ui/css/preset.css";
 
 /* ────────────────────────────────────────────────────────────────
-   Groundstate landing: "bench instrument" design system.
+   webmcp-codegen design system.
 
-   Metaphor: the page is a measuring instrument (oscilloscope /
-   state analyzer) reading a live system, and "ground state" is the
-   baseline every reading returns to. Token names come from that
-   metaphor, not from Tailwind's defaults: baseline (page), panel
-   (instrument housing), line (hairlines), signal (mutations),
-   ink/dim/faint (text hierarchy).
+   Dark neutral surfaces with a single blue accent. Token names
+   describe the role, not the hue, so the palette can evolve
+   without renaming the codebase: baseline (page), panel (raised
+   surface), line (hairlines), ink/dim/faint/ghost (text), accent
+   (interactive color), signal (warnings), fault (errors).
 
-   Accent hues were authored in OKLCH, then converted to sRGB:
-   - phosphor  oklch(0.85 0.175 160) = #41f0a5, 13.1:1 on baseline.
-     Chosen over Tailwind emerald-400 (#34d399, 10.1:1): more
-     luminous, reads as a lit trace on a dark screen, and it is
-     not the stock value every dark dev-tool page ships with.
-   - signal    oklch(0.84 0.125 88) = #ecc663, 11.8:1 on baseline.
-     Amber is reserved for mutations (act / fixture). Green means
-     read, amber means write. Semantic split, not decoration.
+   Accent: #58a6ff, the blue GitHub ships on its dark theme.
+   Proven readable on near-black (roughly 7:1 on baseline) and
+   familiar to every developer who has read a README in the dark.
    ──────────────────────────────────────────────────────────────── */
 
 @theme inline {
@@ -29,28 +23,24 @@
 }
 
 @theme {
-  --color-baseline: #0b0e0c;
-  --color-panel: #0e1310;
-  --color-panel-raised: #111714;
-  --color-line: #1d2622;
-  --color-gridline: rgba(120, 200, 165, 0.055);
-  --color-gridline-major: rgba(120, 200, 165, 0.1);
-  --color-ink: #e6ece8;
-  --color-dim: #9aa9a0;
-  --color-faint: #68756e;
-  --color-ghost: #454f4a;
-  --color-phosphor: #41f0a5;
-  --color-phosphor-dim: #4ad496;
-  --color-signal: #ecc663;
-  --color-signal-dim: #d5b360;
-  /* fault: oklch(0.72 0.15 28) = 7.3:1 on baseline. Error states only
-     (declined payments, validation errors), never decoration. */
-  --color-fault: #f47c6e;
+  --color-baseline: #0a0b0f;
+  --color-panel: #0f1117;
+  --color-panel-raised: #151822;
+  --color-line: #20242f;
+  --color-gridline: rgba(148, 163, 190, 0.045);
+  --color-gridline-major: rgba(148, 163, 190, 0.09);
+  --color-ink: #e9ecf2;
+  --color-dim: #9aa3b2;
+  --color-faint: #5d6575;
+  --color-ghost: #3b4150;
+  --color-accent: #58a6ff;
+  --color-accent-dim: #3f8cff;
+  --color-signal: #e3b341;
+  --color-signal-dim: #c7952c;
+  --color-fault: #f47067;
 
   /* One easing identity for the whole page: fast attack, long
-     settle, like a needle registering a reading. Used for hovers
-     and the reading pulse. Stock ease/ease-in-out and Tailwind
-     duration-300 are deliberately unused here. */
+     settle. Used for hovers. */
   --ease-reading: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -70,21 +60,19 @@ body {
 }
 
 ::selection {
-  background-color: var(--color-phosphor);
+  background-color: var(--color-accent);
   color: var(--color-baseline);
 }
 
 :focus-visible {
-  outline: 1px solid var(--color-phosphor);
+  outline: 1px solid var(--color-accent);
   outline-offset: 3px;
 }
 
-/* Instrument grid.
-   Oscilloscope graticule behind the hero: minor divisions every
-   28px, major every 140px, faded at the edges so it reads as
-   instrumentation, not graph paper. Static CSS: zero runtime
-   cost, and intact under reduced motion. */
-.gs-grid-bg {
+/* Faint graph grid behind the hero: minor divisions every 28px,
+   major every 140px, faded at the edges. Static CSS, zero runtime
+   cost, intact under reduced motion. */
+.grid-bg {
   background-image:
     linear-gradient(to right, var(--color-gridline-major) 1px, transparent 1px),
     linear-gradient(to bottom, var(--color-gridline-major) 1px, transparent 1px),
@@ -111,5 +99,5 @@ body {
   background: var(--color-line);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2c3732;
+  background: #2c313d;
 }

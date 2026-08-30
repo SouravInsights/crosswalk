@@ -38,19 +38,22 @@ export function CopyCommand({ command }: { command: string }) {
   }
 
   return (
-    <div className="flex items-center gap-3 border border-line bg-panel py-2.5 pl-4 pr-2 font-mono text-[13px]">
+    <div className="flex w-full max-w-full items-center gap-3 border border-line bg-panel py-2.5 pl-4 pr-2 font-mono text-[13px] sm:w-auto">
       <span className="select-none text-ghost">$</span>
-      <span id={`copy-command-${command.length}`} className="whitespace-nowrap text-ink">
+      <span
+        id={`copy-command-${command.length}`}
+        className="min-w-0 overflow-x-auto whitespace-nowrap text-ink [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {command}
       </span>
       <button
         type="button"
         onClick={copy}
         aria-label={copied ? "Copied" : "Copy command"}
-        className="ml-auto flex size-7 items-center justify-center border border-line text-dim transition-colors duration-150 hover:border-dim hover:text-ink"
+        className="ml-auto flex size-7 shrink-0 items-center justify-center border border-line text-dim transition-colors duration-150 hover:border-faint hover:text-ink"
         style={{ transitionTimingFunction: "var(--ease-reading)" }}
       >
-        {copied ? <Check className="size-3.5 text-phosphor" /> : <Copy className="size-3.5" />}
+        {copied ? <Check className="size-3.5 text-accent" /> : <Copy className="size-3.5" />}
       </button>
     </div>
   );
