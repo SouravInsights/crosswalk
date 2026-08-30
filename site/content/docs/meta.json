@@ -1,4 +1,4 @@
 {
   "title": "webmcp-codegen",
-  "pages": ["index", "quickstart", "cli", "configuration", "safety", "regeneration", "guides"]
+  "pages": ["index", "quickstart", "cli", "configuration", "safety", "regeneration", "guides", "devtools", "troubleshooting"]
 }

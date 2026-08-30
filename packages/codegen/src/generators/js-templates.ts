@@ -151,8 +151,7 @@ export function ownedRegionScaffold(tool: ReviewedTool): string {
   if (tool.serverUrl) {
     lines.push(
       ` *`,
-      ` * Your spec lists the API at ${tool.serverUrl}. If the app and the API`,
-      ` * are on different hosts, pass the full URL to callApi instead.`,
+      ` * Calls the API at ${tool.serverUrl} (from your spec's servers list).`,
     );
   }
 
@@ -223,6 +222,13 @@ function requestCall(tool: ReviewedTool): string {
   // "/pets/{id}" → `/pets/${input.id}`. Params the schema knows by name.
   let pathExpr = `\`${tool.pathTemplate.replace(/\{([^}]+)\}/g, (_m, param: string) => `\${${inputRef(param)}}`)}\``;
   if (pathParams.length === 0) pathExpr = JSON.stringify(tool.pathTemplate);
+
+  // When the spec declares an absolute server URL, use it so the call goes
+  // to the API even when the app and API are on different origins.
+  if (tool.serverUrl) {
+    const base = tool.serverUrl.endsWith("/") ? tool.serverUrl.slice(0, -1) : tool.serverUrl;
+    pathExpr = `\`${base}\${${pathExpr}}\``;
+  }
 
   const options: string[] = [`method: ${JSON.stringify(tool.httpMethod)}`];
   if (queryParams.length > 0) {

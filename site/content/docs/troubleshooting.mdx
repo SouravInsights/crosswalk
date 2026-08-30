@@ -1,0 +1,51 @@
+---
+title: Troubleshooting
+description: Common errors and how to fix them.
+
+## "My tools 404 in DevTools"
+
+**Symptom:** You click "Run tool" in Chrome DevTools and get `Request failed: 404 Not Found`.
+
+**Cause:** The generated code uses a relative URL (`/v1/trips/`), which the browser resolves against your web app's origin. If your API is on a different port or domain, the request goes to the wrong server.
+
+**Fix:** Your spec's `servers` field tells the generator where the API lives. The generated code now uses absolute URLs automatically. If you generated before this fix, re-run:
+
+```bash
+npx webmcp-codegen generate
+```
+
+If your spec has no `servers` field, add one:
+
+```json title="openapi.json"
+{
+  "servers": [{ "url": "http://localhost:3001" }]
+}
+```
+
+**Alternative (monorepos):** Use a Next.js rewrite to proxy API requests through your web app, making them same-origin:
+
+```js title="apps/web/next.config.js"
+module.exports = {
+  async rewrites() {
+    return [{ source: "/v1/:path*", destination: "http://localhost:3001/v1/:path*" }];
+  },
+};
+```
+
+This avoids CORS entirely and is the standard pattern for web+API monorepos.
+
+## "The dashboard works but DevTools doesn't"
+
+**Symptom:** `npx webmcp-codegen dev` runs a tool successfully, but clicking "Run tool" in Chrome DevTools fails.
+
+**Cause:** The dashboard makes requests server-side (from your terminal), so it has no browser session. DevTools runs the tool in the browser, where authentication and CORS apply.
+
+**Fix:** This is expected. Use the dashboard to verify the request builds correctly; use DevTools to test with your real browser session. For auth'd endpoints, you'll only get real data in DevTools (where you're signed in).
+
+## "My tool is disabled and I don't know why"
+
+**Symptom:** A tool registers but returns "This tool is currently disabled by the app developer."
+
+**Cause:** The safety layer classified it as a mutation (POST/PUT/PATCH/DELETE) or flagged it as auth/admin. Mutations start disabled by default; auth and admin endpoints are always disabled.
+
+**Fix:** Open the generated file and uncomment the implementation. The working code is there, commented out. Delete the `return toolDisabled(...)` line and uncomment the `callApi` block.
