@@ -1,8 +1,8 @@
 import "./global.css";
 import { RootProvider } from "fumadocs-ui/provider";
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import type { ReactNode } from "react";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk" });

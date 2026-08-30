@@ -1,10 +1,11 @@
-import { getModelContext } from "./runtime.webmcp";
+import { getModelContext, callApi, toolResult } from "./runtime.webmcp";
 
 // ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
  * Get one pet, including its owner's contact details
  *
  * Source: GET /pets/{id} (openapi). Risk: safe-read.
+ * Starts enabled (see executeGetPet below).
  * Regenerate with: npx webmcp-codegen generate
  */
 
@@ -57,17 +58,15 @@ export async function registerGetPet(signal?: AbortSignal): Promise<void> {
 /**
  * What actually happens when the agent calls "get-pet".
  *
- * Source: GET /pets/{id}. Call your existing client code here.
- * Return { content: [{ type: "text", text: ... }] } (the MCP result shape).
+ * Default implementation: calls GET /pets/{id} from this page, with the
+ * signed-in user's session. Replace it with your app's own API client
+ * whenever you like; the contract above never changes.
  */
 //
 // ⚠ webmcp-codegen flagged these response fields as likely PII: owner.email.
-// Everything you return reaches the agent. Leave those fields out unless
-// the agent genuinely needs them, and say so in a comment if you keep them.
+// Everything you return reaches the agent. Leave those fields out of what you
+// return unless the agent genuinely needs them, and say so in a comment if you keep them.
 export async function executeGetPet(input: GetPetInput) {
-  // TODO: implement using your app's existing code, e.g.:
-  //   const response = await fetch("/pets/" + input.id + "");
-  //   if (!response.ok) throw new Error("Request failed: " + response.status);
-  //   return { content: [{ type: "text", text: "Done" }] };
-  throw new Error("Not implemented: executeGetPet");
+  const data = await callApi(`/pets/${input.id}`, { method: "GET" });
+  return toolResult(data);
 }

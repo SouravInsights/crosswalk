@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { dedupeNames, nameFromRoute, TOOL_NAME_PATTERN, toToolName } from "./naming.js";
+import {
+  dedupeNames,
+  nameFromRoute,
+  stripVersionPrefix,
+  TOOL_NAME_PATTERN,
+  toToolName,
+} from "./naming.js";
 
 describe("toToolName", () => {
   it("slugifies camelCase operationIds", () => {
@@ -51,5 +57,42 @@ describe("dedupeNames", () => {
     expect(new Set(names).size).toBe(3);
     expect(renames).toHaveLength(2);
     for (const name of names) expect(name).toMatch(TOOL_NAME_PATTERN);
+  });
+});
+
+describe("stripVersionPrefix", () => {
+  it("drops the version segment when nearly every name shares it", () => {
+    const { names, note } = stripVersionPrefix([
+      { name: "get-v1-trips" },
+      { name: "get-v1-users" },
+      { name: "post-v1-trips" },
+    ]);
+    expect(names).toEqual(["get-trips", "get-users", "post-trips"]);
+    expect(note).toContain("v1");
+  });
+
+  it("leaves names alone when the version is not shared", () => {
+    const { names, note } = stripVersionPrefix([
+      { name: "get-v1-trips" },
+      { name: "get-users" },
+      { name: "get-orders" },
+      { name: "get-products" },
+    ]);
+    expect(names).toEqual(["get-v1-trips", "get-users", "get-orders", "get-products"]);
+    expect(note).toBeUndefined();
+  });
+
+  it("only touches route-derived names, not operationIds that mention a version", () => {
+    // "preview-v2-changes" does not start with an HTTP method, so it neither
+    // counts toward the shared prefix nor gets stripped.
+    const { names, note } = stripVersionPrefix([
+      { name: "get-v1-a" },
+      { name: "get-v1-b" },
+      { name: "get-v1-c" },
+      { name: "get-v1-d" },
+      { name: "preview-v2-changes" },
+    ]);
+    expect(names).toEqual(["get-a", "get-b", "get-c", "get-d", "preview-v2-changes"]);
+    expect(note).toContain("v1");
   });
 });

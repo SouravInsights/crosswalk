@@ -62,6 +62,19 @@ export interface CandidateTool {
   /** Name of the generated TypeScript input type, e.g. "GetOrderStatusInput". */
   inputTypeName: string;
   httpMethod?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
+  /**
+   * The URL path template, e.g. "/pets/{id}". Sources that know it provide it
+   * so generators can emit a working request, not just a TODO.
+   */
+  pathTemplate?: string;
+  /**
+   * Which input fields go where in the request. The generated execute() uses
+   * this to place each field: path params are interpolated into the URL,
+   * query params become the search string, body fields become the JSON body.
+   */
+  paramLocations?: { path: string[]; query: string[]; body: string[] };
+  /** Absolute API base URL from the source (e.g. the spec's servers list), when known. */
+  serverUrl?: string;
   sideEffect: SideEffect;
   requiresAuth: boolean;
   /** Where the description text came from. Always reviewable before commit. */
@@ -76,15 +89,39 @@ export interface ToolHints {
   idempotentHint: boolean;
 }
 
+/**
+ * What kind of endpoint a tool wraps. Most are ordinary "endpoint"s; the
+ * special roles drive special handling:
+ *
+ *   webhook   skipped entirely: it receives server callbacks, so an agent
+ *             has nothing to call
+ *   auth      sign-in/session endpoints; generated disabled, flagged loudly
+ *   admin     admin operations; generated disabled, flagged loudly
+ */
+export type EndpointRole = "endpoint" | "webhook" | "auth" | "admin";
+
 /** A candidate after safety review: classified, hinted, and linted. */
 export interface ReviewedTool extends CandidateTool {
   riskTier: RiskTier;
   hints: ToolHints;
+  endpointRole: EndpointRole;
+  /**
+   * Whether the generated tool works out of the box. Reads start enabled;
+   * mutations and risky endpoints start disabled (the working code is
+   * generated but commented out, one edit away from live).
+   */
+  enabledByDefault: boolean;
   /**
    * Output field paths the PII heuristics flagged (e.g. "user.email").
    * These are fields that would leave the page and reach the agent.
    */
   piiInOutput: string[];
+}
+
+/** An endpoint the safety layer decided not to generate, with the reason. */
+export interface SkippedEndpoint {
+  ref: string;
+  reason: string;
 }
 
 /** One audit finding. Errors block generation (unless --force); warnings don't. */
@@ -93,6 +130,19 @@ export interface AuditFinding {
   /** Tool name this finding is about, or undefined for project-level findings. */
   tool?: string;
   message: string;
+}
+
+/**
+ * Hand-authored tweaks, usually written by the dev dashboard
+ * (`webmcp-codegen dev`) into `.webmcp-codegen.json`. They are applied after
+ * the safety review and survive regeneration, because they live outside the
+ * generated files.
+ */
+export interface ToolOverrides {
+  [toolName: string]: {
+    description?: string;
+    enabled?: boolean;
+  };
 }
 
 /** A file the generator wants to write. */
@@ -125,6 +175,8 @@ export interface Source {
  */
 export interface ToolGenerator {
   readonly kind: string;
+  /** Where the files go, relative to the project root. Reported by the CLI. */
+  readonly outDir: string;
   generate(tools: ReviewedTool[], cwd: string): Promise<GeneratedFile[]>;
 }
 

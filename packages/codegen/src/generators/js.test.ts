@@ -18,7 +18,11 @@ function reviewedTool(overrides: Partial<ReviewedTool> = {}): ReviewedTool {
     },
     inputTypeName: "GetOrderStatusInput",
     httpMethod: "GET",
+    pathTemplate: "/orders/{orderId}",
+    paramLocations: { path: ["orderId"], query: [], body: [] },
     sideEffect: "read",
+    endpointRole: "endpoint",
+    enabledByDefault: true,
     requiresAuth: false,
     description: "Returns the current status and tracking info for an order by ID.",
     descriptionSource: "openapi-summary",
@@ -73,12 +77,12 @@ describe("js generator", () => {
     const generator = js({ outDir: "src/webmcp" });
     const toolPath = join(cwd, "src/webmcp/get-order-status.webmcp.ts");
 
-    // First run creates the file; then the developer fills in execute().
+    // First run creates the file; then the developer edits execute().
     const first = await generator.generate([reviewedTool()], cwd);
     await writeAll(first);
     const before = await readFile(toolPath, "utf8");
     const implemented = before.replace(
-      'throw new Error("Not implemented: executeGetOrderStatus");',
+      "return toolResult(data);",
       'return { content: [{ type: "text", text: "Status: shipped" }] }; // my hand-written code',
     );
     await writeFile(toolPath, implemented);
@@ -96,6 +100,74 @@ describe("js generator", () => {
     expect(updated?.contents).toContain("my hand-written code");
   });
 
+  it("read tools are born with a working request, not a TODO", async () => {
+    const files = await js({ outDir: "src/webmcp" }).generate([reviewedTool()], cwd);
+    const tool = files.find((file) => file.path.includes("get-order-status"));
+    // The scaffold calls the real endpoint with the path param interpolated.
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: asserting on generated source, which contains a template literal
+    expect(tool?.contents).toContain("await callApi(`/orders/${input.orderId}`");
+    expect(tool?.contents).toContain('"GET"');
+    expect(tool?.contents).not.toContain("Not implemented");
+    expect(tool?.contents).not.toContain("toolDisabled(");
+  });
+
+  it("mutations start disabled, with working code one uncomment away", async () => {
+    const files = await js({ outDir: "src/webmcp" }).generate(
+      [
+        reviewedTool({
+          name: "cancel-order",
+          inputTypeName: "CancelOrderInput",
+          httpMethod: "POST",
+          pathTemplate: "/orders/{orderId}/cancel",
+          sideEffect: "destructive",
+          endpointRole: "endpoint",
+          enabledByDefault: false,
+          riskTier: "destructive-confirm",
+          hints: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+        }),
+      ],
+      cwd,
+    );
+    const tool = files.find((file) => file.path.includes("cancel-order"));
+    // Disabled notice first, the working call right below it, commented out.
+    expect(tool?.contents).toContain('return toolDisabled("cancel-order.webmcp.ts");');
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: asserting on generated source, which contains a template literal
+    expect(tool?.contents).toContain(
+      "// const data = await callApi(`/orders/${input.orderId}/cancel`",
+    );
+    // The consent gate is generated, not left as a comment for humans to remember.
+    expect(tool?.contents).toContain("requestUserConfirmation(");
+    expect(tool?.contents).toContain("The user declined this action.");
+  });
+
+  it("builds query strings and JSON bodies from the param locations", async () => {
+    const files = await js({ outDir: "src/webmcp" }).generate(
+      [
+        reviewedTool({
+          name: "search-assets",
+          inputTypeName: "SearchAssetsInput",
+          httpMethod: "POST",
+          pathTemplate: "/search",
+          paramLocations: { path: [], query: ["limit"], body: ["query", "tags"] },
+        }),
+      ],
+      cwd,
+    );
+    const tool = files.find((file) => file.path.includes("search-assets"));
+    expect(tool?.contents).toContain(
+      'callApi("/search", { method: "POST", query: { limit: input.limit }, body: { query: input.query, tags: input.tags } })',
+    );
+  });
+
+  it("falls back to an honest TODO when the source knows no route", async () => {
+    const files = await js({ outDir: "src/webmcp" }).generate(
+      [reviewedTool({ httpMethod: undefined, pathTemplate: undefined, paramLocations: undefined })],
+      cwd,
+    );
+    const tool = files.find((file) => file.path.includes("get-order-status"));
+    expect(tool?.contents).toContain("TODO: call your app's existing code here");
+  });
+
   it("never clobbers a file whose markers were removed; it reports a conflict", async () => {
     const generator = js({ outDir: "src/webmcp" });
     const toolPath = join(cwd, "src/webmcp/get-order-status.webmcp.ts");
@@ -109,23 +181,20 @@ describe("js generator", () => {
     expect(conflicted?.contents).toContain("my totally hand-written file");
   });
 
-  it("scaffolds a confirmation warning and PII notice for mutating tools", async () => {
+  it("scaffolds a PII notice for tools whose responses carry PII", async () => {
     const files = await js({ outDir: "src/webmcp" }).generate(
       [
         reviewedTool({
-          name: "cancel-order",
-          inputTypeName: "CancelOrderInput",
-          httpMethod: "POST",
-          sideEffect: "destructive",
-          riskTier: "destructive-confirm",
-          hints: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+          name: "get-me",
+          inputTypeName: "GetMeInput",
+          pathTemplate: "/me",
+          paramLocations: { path: [], query: [], body: [] },
           piiInOutput: ["user.email"],
         }),
       ],
       cwd,
     );
-    const tool = files.find((file) => file.path.includes("cancel-order"));
-    expect(tool?.contents).toContain("requestUserConfirmation");
+    const tool = files.find((file) => file.path.includes("get-me"));
     expect(tool?.contents).toContain("user.email");
   });
 

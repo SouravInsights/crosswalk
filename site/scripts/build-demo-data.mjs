@@ -8,8 +8,8 @@
 import { writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runGenerate } from "../../packages/codegen/dist/index.js";
 import { js } from "../../packages/codegen/dist/generators/index.js";
+import { runGenerate } from "../../packages/codegen/dist/index.js";
 import { openapi } from "../../packages/codegen/dist/sources/index.js";
 
 const site = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -26,7 +26,13 @@ const report = await runGenerate(
 const toolFiles = new Map(
   report.files
     .filter((f) => f.path.endsWith(".webmcp.ts") && !f.path.endsWith("runtime.webmcp.ts"))
-    .map((f) => [f.path.split("/").pop().replace(/\.webmcp\.ts$/, ""), f.contents]),
+    .map((f) => [
+      f.path
+        .split("/")
+        .pop()
+        .replace(/\.webmcp\.ts$/, ""),
+      f.contents,
+    ]),
 );
 
 const tools = report.tools.map((tool) => {

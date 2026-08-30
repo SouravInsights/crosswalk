@@ -92,9 +92,8 @@ export default function HomePage() {
               Turn your API into tools AI agents can call.
             </h1>
             <p className="mx-auto mb-10 max-w-xl text-[16px] leading-relaxed text-dim sm:text-[17px]">
-              One command reads your OpenAPI spec and writes a WebMCP tool for every
-              endpoint: typed, checked for safety, and committed to your repo as code you
-              own.
+              One command reads your OpenAPI spec and writes a WebMCP tool for every endpoint:
+              typed, checked for safety, and committed to your repo as code you own.
             </p>
             <div className="flex flex-col items-center gap-4">
               <CopyCommand command={COMMAND} />
@@ -122,11 +121,10 @@ export default function HomePage() {
             What happens when the user is an agent?
           </h2>
           <p className="mb-10 max-w-xl text-[15px] leading-relaxed text-dim sm:mb-14">
-            Today, an agent that wants to use your app does it the hard way: it reads the
-            screen and simulates clicks. WebMCP, now shipping in Chrome, gives agents a
-            better path. Your app exposes tools; agents call them. The question stops being
-            whether your app works for agents and starts being whether it has anything for
-            them to call.
+            Today, an agent that wants to use your app does it the hard way: it reads the screen and
+            simulates clicks. WebMCP, now shipping in Chrome, gives agents a better path. Your app
+            exposes tools; agents call them. The question stops being whether your app works for
+            agents and starts being whether it has anything for them to call.
           </p>
           <div className="grid gap-10 sm:grid-cols-3 sm:gap-8">
             {UNLOCKS.map((unlock) => (
@@ -148,8 +146,8 @@ export default function HomePage() {
             Your API changes. Your tools keep up.
           </h2>
           <p className="mb-10 max-w-xl text-[15px] leading-relaxed text-dim sm:mb-14">
-            Re-run the command whenever the spec moves. Regeneration never touches code
-            you wrote. The exact behavior:
+            Re-run the command whenever the spec moves. Regeneration never touches code you wrote.
+            The exact behavior:
           </p>
 
           <div className="border-y border-line">
@@ -161,7 +159,10 @@ export default function HomePage() {
                 }`}
               >
                 <p className="font-mono text-[12.5px] leading-relaxed text-faint">{when}</p>
-                <p className="hidden font-mono text-[12.5px] text-ghost sm:block" aria-hidden="true">
+                <p
+                  className="hidden font-mono text-[12.5px] text-ghost sm:block"
+                  aria-hidden="true"
+                >
                   →
                 </p>
                 <p className="text-[14.5px] leading-relaxed text-ink">{then}</p>
@@ -224,9 +225,8 @@ export default function HomePage() {
       <footer className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-8 sm:px-6">
           <p className="mx-auto mb-6 max-w-xl text-center text-[12.5px] leading-relaxed text-faint">
-            WebMCP itself is still early: tools run today in Chrome behind a flag, or
-            anywhere with a small polyfill. OpenAPI is supported now; tRPC, Zod, and Prisma
-            are on the roadmap.
+            WebMCP itself is still early: tools run today in Chrome behind a flag, or anywhere with
+            a small polyfill. OpenAPI is supported now; tRPC, Zod, and Prisma are on the roadmap.
           </p>
           <div className="flex flex-col items-center justify-between gap-3 font-mono text-[12px] text-faint sm:flex-row">
             <span>MIT · node 20+ · zero runtime dependencies</span>

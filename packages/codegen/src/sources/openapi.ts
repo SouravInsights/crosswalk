@@ -59,6 +59,7 @@ function operationsFromSpec(spec: unknown): CandidateTool[] {
   const root = spec as Record<string, unknown>;
   const paths = (root.paths ?? {}) as Record<string, Record<string, unknown>>;
   const rootSecurity = Array.isArray(root.security) && root.security.length > 0;
+  const serverUrl = pickServerUrl(root);
   const candidates: CandidateTool[] = [];
 
   for (const [path, pathItem] of Object.entries(paths)) {
@@ -87,6 +88,9 @@ function operationsFromSpec(spec: unknown): CandidateTool[] {
         outputSchema: findOutputSchema(operation, spec),
         inputTypeName: `${pascalCase(name)}Input`,
         httpMethod: upperMethod,
+        pathTemplate: path,
+        paramLocations: locateParams(operation, sharedParams, spec),
+        serverUrl,
         // The safety layer refines this; the source only reports the verb.
         sideEffect: "unknown",
         requiresAuth,
@@ -103,6 +107,53 @@ function operationsFromSpec(spec: unknown): CandidateTool[] {
     throw new Error('The OpenAPI spec has no operations under "paths". Nothing to generate.');
   }
   return candidates;
+}
+
+/**
+ * The spec's preferred base URL (the first entry in `servers`), when absolute.
+ * Generated code calls the API relative to the page by default; this goes in
+ * a comment so developers with a separate API host know the intended base.
+ */
+function pickServerUrl(root: Record<string, unknown>): string | undefined {
+  const servers = root.servers;
+  if (!Array.isArray(servers) || servers.length === 0) return undefined;
+  const first = servers[0] as Record<string, unknown> | undefined;
+  const url = first?.url;
+  return typeof url === "string" && url.length > 0 ? url : undefined;
+}
+
+/**
+ * Record which input fields belong to the path, the query string, or the
+ * JSON body. The generated execute() needs this split to build a real request
+ * from the same flat input object the agent fills in.
+ */
+function locateParams(
+  operation: Record<string, unknown>,
+  sharedParams: unknown[],
+  spec: unknown,
+): CandidateTool["paramLocations"] {
+  const locations = { path: [] as string[], query: [] as string[], body: [] as string[] };
+
+  const parameters = [
+    ...sharedParams,
+    ...(Array.isArray(operation.parameters) ? operation.parameters : []),
+  ];
+  for (const rawParam of parameters) {
+    const param = deref(rawParam as JsonSchema, spec) as Record<string, unknown>;
+    if (typeof param.name !== "string") continue;
+    if (param.in === "path") locations.path.push(param.name);
+    if (param.in === "query") locations.query.push(param.name);
+  }
+
+  const body = extractJsonBody(operation.requestBody, spec);
+  if (body) {
+    if (body.schema.type === "object" || body.schema.properties) {
+      locations.body.push(...Object.keys(body.schema.properties ?? {}));
+    } else {
+      locations.body.push("body");
+    }
+  }
+  return locations;
 }
 
 /**

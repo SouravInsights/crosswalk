@@ -21,7 +21,16 @@ const LABEL_CLASS: Record<string, string> = {
 };
 
 const KEYWORDS = new Set([
-  "export", "const", "async", "function", "type", "return", "await", "new", "import", "from",
+  "export",
+  "const",
+  "async",
+  "function",
+  "type",
+  "return",
+  "await",
+  "new",
+  "import",
+  "from",
 ]);
 
 /* Enough syntax color to read as code, not a highlighter. Strings amber,
@@ -29,11 +38,7 @@ const KEYWORDS = new Set([
 function CodeLine({ line }: { line: string }) {
   if (line.trimStart().startsWith("//")) {
     const isMarker = line.includes("───");
-    return (
-      <div className={isMarker ? "text-accent" : "italic text-ghost"}>
-        {line}
-      </div>
-    );
+    return <div className={isMarker ? "text-accent" : "italic text-ghost"}>{line}</div>;
   }
   const parts = line.split(/("(?:[^"\\]|\\.)*")/g);
   return (

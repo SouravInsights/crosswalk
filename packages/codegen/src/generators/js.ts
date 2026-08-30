@@ -52,6 +52,7 @@ export const GENERATED_END =
 export function js(options: JsGeneratorOptions): ToolGenerator {
   return {
     kind: "js",
+    outDir: options.outDir,
     async generate(tools, cwd) {
       const outDir = join(cwd, options.outDir);
       const files: GeneratedFile[] = [];

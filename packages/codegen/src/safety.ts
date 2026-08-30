@@ -16,11 +16,13 @@
 import type {
   AuditFinding,
   CandidateTool,
+  EndpointRole,
   JsonSchema,
   ReviewedTool,
   RiskTier,
   SafetyOptions,
   SideEffect,
+  SkippedEndpoint,
   ToolHints,
 } from "./types.js";
 
@@ -31,6 +33,46 @@ import type {
  */
 const DESTRUCTIVE_WORDS =
   /\b(cancel|delete|remove|destroy|deactivate|refund|revoke|purge|close)\b/i;
+
+/**
+ * Words that mark a POST as a read in disguise. Plenty of real APIs search
+ * with POST because the filter object is too big for a query string
+ * (`POST /search`, `POST /estimate`). These get read treatment: enabled by
+ * default, readOnlyHint set.
+ *
+ * Matched per dash-separated segment, so both route-derived names
+ * ("post-search") and operationId-derived names ("search-assets") qualify,
+ * while "blacklist-items" does not.
+ */
+const READING_POST_WORDS = new Set([
+  "search",
+  "query",
+  "list",
+  "find",
+  "filter",
+  "estimate",
+  "preview",
+  "validate",
+  "check",
+  "lookup",
+  "autocomplete",
+  "suggest",
+]);
+
+/** True when the tool's name contains a reading word as a whole segment. */
+function nameSaysRead(toolName: string): boolean {
+  return toolName.split("-").some((segment) => READING_POST_WORDS.has(segment));
+}
+
+/** Endpoints that receive server callbacks. An agent has nothing to call. */
+const WEBHOOK_PATTERN = /\bwebhooks?\b/i;
+
+/** Sign-in, session, and credential endpoints. Agents should not drive auth. */
+const AUTH_PATTERN =
+  /\b(auth|signin|sign-in|login|log-in|logout|log-out|oauth|password|credential|session)s?\b/i;
+
+/** Admin endpoints. Exposing them to agents is a deliberate decision. */
+const ADMIN_PATTERN = /\badmin\b/i;
 
 /**
  * Field names that usually hold personal data or secrets. Matched against
@@ -72,6 +114,12 @@ export function classifySideEffect(tool: CandidateTool): SideEffect {
     case "DELETE":
       return "destructive";
     case "POST":
+      // A POST whose name is a reading word ("search-assets", "post-search")
+      // is a read wearing a write verb. Treat it as one.
+      if (nameSaysRead(tool.name)) return "read";
+      return DESTRUCTIVE_WORDS.test(tool.name) || DESTRUCTIVE_WORDS.test(tool.source.ref)
+        ? "destructive"
+        : "write";
     case "PUT":
     case "PATCH":
       // Upgrade nominally-"write" verbs when the name says it can't be undone.
@@ -81,6 +129,18 @@ export function classifySideEffect(tool: CandidateTool): SideEffect {
     default:
       return "unknown";
   }
+}
+
+/**
+ * What kind of endpoint this tool wraps. Checked against the route and the
+ * name: "/v1/admin/users" and "admin-feature-access-approve" both catch it.
+ */
+export function endpointRoleFor(tool: CandidateTool): EndpointRole {
+  const haystack = `${tool.name} ${tool.source.ref}`;
+  if (WEBHOOK_PATTERN.test(haystack)) return "webhook";
+  if (AUTH_PATTERN.test(haystack)) return "auth";
+  if (ADMIN_PATTERN.test(haystack)) return "admin";
+  return "endpoint";
 }
 
 /** Step 2: derive the WebMCP hints from the classification. */
@@ -136,32 +196,57 @@ export function findPiiFields(
   return found;
 }
 
-/** Run the full review: classify, hint, PII-scan. Pure, no I/O. */
+/**
+ * Run the full review: classify, hint, PII-scan, decide the starting state.
+ * Pure, no I/O.
+ *
+ * Returns the surviving tools plus the endpoints we deliberately skipped
+ * (webhooks today), so the report can say what was left out and why.
+ */
 export function reviewTools(
   candidates: CandidateTool[],
   safety: SafetyOptions = {},
-): ReviewedTool[] {
+): { tools: ReviewedTool[]; skipped: SkippedEndpoint[] } {
   const excluded = (safety.exclude ?? []).map((pattern) => pattern.toLowerCase());
+  const skipped: SkippedEndpoint[] = [];
+  const tools: ReviewedTool[] = [];
 
-  return candidates
-    .filter(
-      (tool) =>
-        !excluded.some(
-          (pattern) =>
-            tool.name.toLowerCase().includes(pattern) ||
-            tool.source.ref.toLowerCase().includes(pattern),
-        ),
-    )
-    .map((tool) => {
-      const sideEffect = classifySideEffect(tool);
-      return {
-        ...tool,
-        sideEffect,
-        riskTier: riskTierFor(sideEffect),
-        hints: hintsFor(tool, sideEffect),
-        piiInOutput: findPiiFields(tool.outputSchema, safety.piiFields),
-      };
+  for (const tool of candidates) {
+    const excludedBy = excluded.find(
+      (pattern) =>
+        tool.name.toLowerCase().includes(pattern) ||
+        tool.source.ref.toLowerCase().includes(pattern),
+    );
+    if (excludedBy) {
+      skipped.push({ ref: tool.source.ref, reason: `excluded by config ("${excludedBy}")` });
+      continue;
+    }
+
+    const endpointRole = endpointRoleFor(tool);
+    if (endpointRole === "webhook") {
+      skipped.push({
+        ref: tool.source.ref,
+        reason: "a webhook receives server callbacks; an agent has nothing to call",
+      });
+      continue;
+    }
+
+    const sideEffect = classifySideEffect(tool);
+    tools.push({
+      ...tool,
+      sideEffect,
+      endpointRole,
+      riskTier: riskTierFor(sideEffect),
+      hints: hintsFor(tool, sideEffect),
+      // Reads work out of the box. Mutations, auth, and admin endpoints start
+      // disabled: the working code is generated but commented out, so enabling
+      // one is a deliberate edit, never an accident.
+      enabledByDefault: sideEffect === "read" && endpointRole === "endpoint",
+      piiInOutput: findPiiFields(tool.outputSchema, safety.piiFields),
     });
+  }
+
+  return { tools, skipped };
 }
 
 /**
@@ -240,6 +325,36 @@ export function auditTools(
         message:
           "This mutating tool wraps an authenticated endpoint. It runs with the page's session, so " +
           "make sure your server-side authorization checks apply to tool calls too.",
+      });
+    }
+
+    if (tool.endpointRole === "auth") {
+      findings.push({
+        level: "warning",
+        tool: tool.name,
+        message:
+          "This looks like a sign-in or session endpoint. It is generated disabled: " +
+          "agents should not drive authentication. Enable it by hand only if you are sure.",
+      });
+    }
+
+    if (tool.endpointRole === "admin") {
+      findings.push({
+        level: "warning",
+        tool: tool.name,
+        message:
+          "Admin endpoint. It is generated disabled: exposing admin operations to agents " +
+          "should be a deliberate decision, reviewed endpoint by endpoint.",
+      });
+    }
+
+    if (tool.httpMethod === "POST" && tool.sideEffect === "read") {
+      findings.push({
+        level: "warning",
+        tool: tool.name,
+        message:
+          "A POST treated as a read (the name says search/query-style). If it actually " +
+          "changes state, disable it: a mislabeled read skips the user-confirmation step.",
       });
     }
   }

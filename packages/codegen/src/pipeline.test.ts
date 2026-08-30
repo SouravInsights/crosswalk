@@ -87,4 +87,74 @@ describe("runGenerate", () => {
     // And the rename shows up in the report, not silently.
     expect(result.findings.some((finding) => finding.message.includes("Renamed"))).toBe(true);
   });
+
+  it("strips a shared API version prefix from tool names, with a note", async () => {
+    const result = await runGenerate(
+      configWith([
+        manualSource([
+          { name: "get-v1-trips" },
+          { name: "get-v1-users" },
+          { name: "post-v1-trips" },
+          { name: "get-v1-trips-id" },
+        ]),
+      ]),
+      { cwd, dryRun: true },
+    );
+    const names = result.tools.map((tool) => tool.name).sort();
+    expect(names).toEqual(["get-trips", "get-trips-id", "get-users", "post-trips"]);
+    expect(result.notes.some((note) => note.includes("v1"))).toBe(true);
+  });
+
+  it("keeps the version segment when it is not shared across the API", async () => {
+    const result = await runGenerate(
+      configWith([
+        manualSource([
+          { name: "get-v1-trips" },
+          { name: "get-users" },
+          { name: "get-orders" },
+          { name: "get-products" },
+        ]),
+      ]),
+      { cwd, dryRun: true },
+    );
+    expect(result.tools.map((tool) => tool.name)).toContain("get-v1-trips");
+    expect(result.notes).toHaveLength(0);
+  });
+
+  it("reports skipped endpoints instead of generating them silently", async () => {
+    const result = await runGenerate(
+      configWith([
+        manualSource([
+          {},
+          {
+            name: "post-payments-webhook",
+            httpMethod: "POST",
+            source: { kind: "manual", ref: "POST /payments/webhook" },
+          },
+        ]),
+      ]),
+      { cwd, dryRun: true },
+    );
+    expect(result.tools).toHaveLength(1);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]?.ref).toBe("POST /payments/webhook");
+  });
+
+  it("applies overrides on top of the safety review", async () => {
+    const result = await runGenerate(
+      configWith([
+        manualSource([{ name: "post-orders", httpMethod: "POST", description: "POST /orders" }]),
+      ]),
+      {
+        cwd,
+        dryRun: true,
+        overrides: {
+          "post-orders": { description: "Place a new order for the current cart.", enabled: true },
+        },
+      },
+    );
+    const tool = result.tools[0];
+    expect(tool?.description).toBe("Place a new order for the current cart.");
+    expect(tool?.enabledByDefault).toBe(true);
+  });
 });

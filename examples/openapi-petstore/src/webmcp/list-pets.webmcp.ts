@@ -1,10 +1,11 @@
-import { getModelContext } from "./runtime.webmcp";
+import { getModelContext, callApi, toolResult } from "./runtime.webmcp";
 
 // ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
  * List all pets in the store
  *
  * Source: GET /pets (openapi). Risk: safe-read.
+ * Starts enabled (see executeListPets below).
  * Regenerate with: npx webmcp-codegen generate
  */
 
@@ -60,13 +61,11 @@ export async function registerListPets(signal?: AbortSignal): Promise<void> {
 /**
  * What actually happens when the agent calls "list-pets".
  *
- * Source: GET /pets. Call your existing client code here.
- * Return { content: [{ type: "text", text: ... }] } (the MCP result shape).
+ * Default implementation: calls GET /pets from this page, with the
+ * signed-in user's session. Replace it with your app's own API client
+ * whenever you like; the contract above never changes.
  */
 export async function executeListPets(input: ListPetsInput) {
-  // TODO: implement using your app's existing code, e.g.:
-  //   const response = await fetch("/pets");
-  //   if (!response.ok) throw new Error("Request failed: " + response.status);
-  //   return { content: [{ type: "text", text: "Done" }] };
-  throw new Error("Not implemented: executeListPets");
+  const data = await callApi("/pets", { method: "GET", query: { status: input.status } });
+  return toolResult(data);
 }

@@ -1,10 +1,11 @@
-import { getModelContext } from "./runtime.webmcp";
+import { getModelContext, requestUserConfirmation, callApi, toolResult, toolDisabled } from "./runtime.webmcp";
 
 // ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
  * Create a user
  *
  * Source: POST /admin/users (openapi). Risk: write-confirm.
+ * Starts disabled (see executeCreateUserAdmin below).
  * Regenerate with: npx webmcp-codegen generate
  */
 
@@ -54,8 +55,21 @@ export async function registerCreateUserAdmin(signal?: AbortSignal): Promise<voi
   await modelContext.registerTool(
     {
       ...createUserAdminTool,
-      // The browser has already validated the agent's input against the schema.
-      execute: (input) => executeCreateUserAdmin(input as CreateUserAdminInput),
+      execute: async (input) => {
+        // This tool changes things, so the user is always asked first. The
+        // confirmation lives in the generated region: it cannot be edited away.
+        const confirmed = await requestUserConfirmation(
+          "Allow the agent to: Create a user",
+        );
+        if (!confirmed) {
+          return {
+            content: [{ type: "text", text: "The user declined this action." }],
+            isError: true,
+          };
+        }
+        // The browser has already validated the agent's input against the schema.
+        return executeCreateUserAdmin(input as CreateUserAdminInput);
+      },
     },
     { signal },
   );

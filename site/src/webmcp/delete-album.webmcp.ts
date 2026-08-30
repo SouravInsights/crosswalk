@@ -1,10 +1,11 @@
-import { getModelContext } from "./runtime.webmcp";
+import { getModelContext, requestUserConfirmation, callApi, toolResult, toolDisabled } from "./runtime.webmcp";
 
 // ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
  * Delete an album
  *
  * Source: DELETE /albums/{id} (openapi). Risk: destructive-confirm.
+ * Starts disabled (see executeDeleteAlbum below).
  * Regenerate with: npx webmcp-codegen generate
  */
 
@@ -47,8 +48,21 @@ export async function registerDeleteAlbum(signal?: AbortSignal): Promise<void> {
   await modelContext.registerTool(
     {
       ...deleteAlbumTool,
-      // The browser has already validated the agent's input against the schema.
-      execute: (input) => executeDeleteAlbum(input as DeleteAlbumInput),
+      execute: async (input) => {
+        // This tool changes things, so the user is always asked first. The
+        // confirmation lives in the generated region: it cannot be edited away.
+        const confirmed = await requestUserConfirmation(
+          "Allow the agent to: Delete an album",
+        );
+        if (!confirmed) {
+          return {
+            content: [{ type: "text", text: "The user declined this action." }],
+            isError: true,
+          };
+        }
+        // The browser has already validated the agent's input against the schema.
+        return executeDeleteAlbum(input as DeleteAlbumInput);
+      },
     },
     { signal },
   );

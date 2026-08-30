@@ -10,8 +10,13 @@
  *
  * Three kinds of output are built here:
  *   - generatedRegion()      the per-tool contract (regenerated freely)
- *   - ownedRegionScaffold()  the execute() stub (written once, then owned)
+ *   - ownedRegionScaffold()  the execute() body (written once, then owned)
  *   - runtimeSource() / barrelSource()   fully-generated support files
+ *
+ * The contract the output fulfills: read tools work out of the box (a real
+ * request to the endpoint), mutation tools start disabled with the working
+ * code generated but commented out, and the user-confirmation step for
+ * mutations lives in the generated region so it cannot be edited away.
  */
 
 import { jsonSchemaToTs, pascalCase } from "../schema.js";
@@ -28,15 +33,63 @@ export function generatedRegion(tool: ReviewedTool): string {
   const camel = lowercaseFirst(pascal);
   const schemaJson = JSON.stringify(tool.inputSchema, null, 2);
   const inputType = jsonSchemaToTs(tool.inputSchema, undefined);
+  const mutates = tool.riskTier !== "safe-read";
+
+  // The imports cover what this file's regions use: the generated register()
+  // and the owned execute() scaffold. A developer who replaces the scaffold
+  // with their own API client can trim the imports they stop using.
+  const runtimeImports = [
+    "getModelContext",
+    ...(mutates ? ["requestUserConfirmation"] : []),
+    "callApi",
+    "toolResult",
+    ...(tool.enabledByDefault ? [] : ["toolDisabled"]),
+  ].join(", ");
+
+  const registerBody = mutates
+    ? [
+        `  await modelContext.registerTool(`,
+        `    {`,
+        `      ...${camel}Tool,`,
+        `      execute: async (input) => {`,
+        `        // This tool changes things, so the user is always asked first. The`,
+        `        // confirmation lives in the generated region: it cannot be edited away.`,
+        `        const confirmed = await requestUserConfirmation(`,
+        `          ${JSON.stringify(`Allow the agent to: ${tool.description}`)},`,
+        `        );`,
+        `        if (!confirmed) {`,
+        `          return {`,
+        `            content: [{ type: "text", text: "The user declined this action." }],`,
+        `            isError: true,`,
+        `          };`,
+        `        }`,
+        `        // The browser has already validated the agent's input against the schema.`,
+        `        return execute${pascal}(input as ${tool.inputTypeName});`,
+        `      },`,
+        `    },`,
+        `    { signal },`,
+        `  );`,
+      ]
+    : [
+        `  await modelContext.registerTool(`,
+        `    {`,
+        `      ...${camel}Tool,`,
+        `      // The browser has already validated the agent's input against the schema.`,
+        `      execute: (input) => execute${pascal}(input as ${tool.inputTypeName}),`,
+        `    },`,
+        `    { signal },`,
+        `  );`,
+      ];
 
   return [
-    `import { getModelContext } from "./runtime.webmcp";`,
+    `import { ${runtimeImports} } from "./runtime.webmcp";`,
     ``,
     GENERATED_START,
     `/**`,
     ` * ${tool.description}`,
     ` *`,
     ` * Source: ${tool.source.ref} (${tool.source.kind}). Risk: ${tool.riskTier}.`,
+    ` * Starts ${tool.enabledByDefault ? "enabled" : "disabled"} (see execute${pascal} below).`,
     ` * Regenerate with: npx webmcp-codegen generate`,
     ` */`,
     ``,
@@ -64,14 +117,7 @@ export function generatedRegion(tool: ReviewedTool): string {
     ` */`,
     `export async function register${pascal}(signal?: AbortSignal): Promise<void> {`,
     `  const modelContext = getModelContext();`,
-    `  await modelContext.registerTool(`,
-    `    {`,
-    `      ...${camel}Tool,`,
-    `      // The browser has already validated the agent's input against the schema.`,
-    `      execute: (input) => execute${pascal}(input as ${tool.inputTypeName}),`,
-    `    },`,
-    `    { signal },`,
-    `  );`,
+    ...registerBody,
     `}`,
     ``,
     GENERATED_END,
@@ -82,25 +128,41 @@ export function generatedRegion(tool: ReviewedTool): string {
  * The scaffold below the marker, written exactly once (when the file is
  * first created). After that the developer owns it and regeneration never
  * touches it. That promise is the whole reason the marker split exists.
+ *
+ * The scaffold is real code, not a TODO: the spec knows the method, the
+ * path, and which fields go where, so the default implementation actually
+ * calls the endpoint from the page, with the signed-in user's session.
+ * Reads are born working; mutations are born disabled (the working code is
+ * right there, commented out, one deliberate edit away from live).
  */
 export function ownedRegionScaffold(tool: ReviewedTool): string {
   const pascal = pascalCase(tool.name);
+  const call = requestCall(tool);
   const lines: string[] = [
     ``,
     `/**`,
     ` * What actually happens when the agent calls "${tool.name}".`,
     ` *`,
-    ` * Source: ${tool.source.ref}. Call your existing client code here.`,
-    ` * Return { content: [{ type: "text", text: ... }] } (the MCP result shape).`,
+    ` * Default implementation: calls ${tool.source.ref} from this page, with the`,
+    ` * signed-in user's session. Replace it with your app's own API client`,
+    ` * whenever you like; the contract above never changes.`,
   ];
+
+  if (tool.serverUrl) {
+    lines.push(
+      ` *`,
+      ` * Your spec lists the API at ${tool.serverUrl}. If the app and the API`,
+      ` * are on different hosts, pass the full URL to callApi instead.`,
+    );
+  }
 
   if (tool.riskTier !== "safe-read") {
     lines.push(
       ` *`,
-      ` * ⚠ This tool is ${tool.riskTier}: it ${
+      ` * This tool is ${tool.riskTier}: it ${
         tool.riskTier === "destructive-confirm" ? "cannot easily be undone" : "changes things"
       }.`,
-      ` * Ask the user before acting. See requestUserConfirmation() in runtime.webmcp.ts.`,
+      ` * The user is asked to confirm every call (built into the generated region).`,
     );
   }
   lines.push(` */`);
@@ -109,52 +171,96 @@ export function ownedRegionScaffold(tool: ReviewedTool): string {
     lines.push(
       `//`,
       `// ⚠ webmcp-codegen flagged these response fields as likely PII: ${tool.piiInOutput.join(", ")}.`,
-      `// Everything you return reaches the agent. Leave those fields out unless`,
-      `// the agent genuinely needs them, and say so in a comment if you keep them.`,
+      `// Everything you return reaches the agent. Leave those fields out of what you`,
+      `// return unless the agent genuinely needs them, and say so in a comment if you keep them.`,
     );
   }
 
-  lines.push(
-    `export async function execute${pascal}(input: ${tool.inputTypeName}) {`,
-    ...usageExample(tool),
-    `  throw new Error("Not implemented: execute${pascal}");`,
-    `}`,
-  );
+  if (tool.enabledByDefault) {
+    lines.push(
+      `export async function execute${pascal}(input: ${tool.inputTypeName}) {`,
+      `  ${call}`,
+      `  return toolResult(data);`,
+      `}`,
+    );
+  } else {
+    lines.push(
+      `export async function execute${pascal}(input: ${tool.inputTypeName}) {`,
+      `  // This tool starts disabled: it ${
+        tool.endpointRole === "endpoint"
+          ? "changes things"
+          : `wraps an ${tool.endpointRole} endpoint`
+      }. Agents can see it, and calling it tells`,
+      `  // them it is disabled. To enable it, delete the line below and uncomment the code.`,
+      `  return toolDisabled("${tool.name}.webmcp.ts");`,
+      ``,
+      `  // ${call}`,
+      `  // return toolResult(data);`,
+      `}`,
+    );
+  }
 
   return lines.join("\n");
 }
 
 /**
- * The TODO example inside a fresh scaffold. When the source knows the route
- * (OpenAPI always does), the example shows the actual call. Seeing
- * `fetch("/pets/" + input.id, …)` beats an abstract placeholder every time.
+ * The one working request line inside a scaffold, built from what the spec
+ * knows: the path template becomes a template literal, query params become
+ * the search string, body fields become the JSON body.
+ *
+ *   "/pets/{id}" + DELETE  →  const data = await callApi(`/pets/${input.id}`, { method: "DELETE" });
+ *
+ * When the source carries no route information, we fall back to an honest
+ * TODO instead of inventing a URL.
  */
-function usageExample(tool: ReviewedTool): string[] {
-  if (!tool.httpMethod) {
-    return [`  // TODO: implement using your app's existing code.`];
+function requestCall(tool: ReviewedTool): string {
+  if (!tool.httpMethod || !tool.pathTemplate || !tool.paramLocations) {
+    return `const data = null; // TODO: call your app's existing code here.`;
   }
-  const path = tool.source.ref.replace(/^[A-Z]+ /, "");
-  // Turn "/pets/{id}" into '"/pets/" + input.id': a copy-pasteable example.
-  const exampleUrl = path
-    .replace(/\{(\w+)\}/g, (_match, param: string) => `" + input.${param} + "`)
-    // Trim the empty-string concat a leading/trailing placeholder leaves behind.
-    .replace(/^"" \+ /, "")
-    .replace(/ \+ ""$/, "");
-  const fetchArgs =
-    tool.httpMethod === "GET"
-      ? `"${exampleUrl}"`
-      : `"${exampleUrl}", { method: "${tool.httpMethod}" }`;
-  return [
-    `  // TODO: implement using your app's existing code, e.g.:`,
-    `  //   const response = await fetch(${fetchArgs});`,
-    `  //   if (!response.ok) throw new Error("Request failed: " + response.status);`,
-    `  //   return { content: [{ type: "text", text: "Done" }] };`,
-  ];
+
+  const { path: pathParams, query: queryParams, body: bodyParams } = tool.paramLocations;
+
+  // "/pets/{id}" → `/pets/${input.id}`. Params the schema knows by name.
+  let pathExpr = `\`${tool.pathTemplate.replace(/\{([^}]+)\}/g, (_m, param: string) => `\${${inputRef(param)}}`)}\``;
+  if (pathParams.length === 0) pathExpr = JSON.stringify(tool.pathTemplate);
+
+  const options: string[] = [`method: ${JSON.stringify(tool.httpMethod)}`];
+  if (queryParams.length > 0) {
+    const entries = queryParams.map((name) => `${safeKey(name)}: ${inputRef(name)}`).join(", ");
+    options.push(`query: { ${entries} }`);
+  }
+  if (bodyParams.length > 0) {
+    if (bodyParams.length === 1 && bodyParams[0] === "body") {
+      // A non-object request body arrives as a single "body" field.
+      options.push(`body: input.body`);
+    } else {
+      const entries = bodyParams.map((name) => `${safeKey(name)}: ${inputRef(name)}`).join(", ");
+      options.push(`body: { ${entries} }`);
+    }
+  }
+
+  return `const data = await callApi(${pathExpr}, { ${options.join(", ")} });`;
 }
 
 /**
- * The shared runtime: the minimal WebMCP browser types plus getModelContext().
- * Kept tiny on purpose: this is the only browser coupling in the output.
+ * How generated code reads a field off `input`. Dot access for identifier
+ * names ("input.limit"), bracket access for the rest ("input["pet-id"]").
+ */
+function inputRef(name: string): string {
+  return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)
+    ? `input.${name}`
+    : `input[${JSON.stringify(name)}]`;
+}
+
+/** Quote an object key only when it needs it. */
+function safeKey(name: string): string {
+  return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name) ? name : JSON.stringify(name);
+}
+
+/**
+ * The shared runtime: the minimal WebMCP browser types plus the helpers the
+ * generated files use. Kept tiny on purpose: this is the only browser
+ * coupling in the output.
  */
 export function runtimeSource(): string {
   return `/**
@@ -165,6 +271,7 @@ export function runtimeSource(): string {
 /** The result shape tools return (same as MCP tool results). */
 export interface WebMcpToolResult {
   content: { type: "text"; text: string }[];
+  isError?: boolean;
   [key: string]: unknown;
 }
 
@@ -198,6 +305,65 @@ export function getModelContext(): ModelContext {
     );
   }
   return modelContext;
+}
+
+/**
+ * Call your API from the page. Same origin by default (pass a full URL when
+ * the API lives on another host), always with the signed-in user's session
+ * cookies. Throws on HTTP errors; returns the parsed JSON body, or raw text
+ * when the response is not JSON.
+ */
+export async function callApi(
+  path: string,
+  options: { method?: string; query?: Record<string, unknown>; body?: unknown } = {},
+): Promise<unknown> {
+  const url = new URL(path, window.location.origin);
+  for (const [key, value] of Object.entries(options.query ?? {})) {
+    if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
+  }
+  const response = await fetch(url, {
+    method: options.method ?? "GET",
+    credentials: "include",
+    headers: options.body !== undefined ? { "content-type": "application/json" } : undefined,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+  if (!response.ok) {
+    throw new Error("Request failed: " + response.status + " " + response.statusText);
+  }
+  if (response.status === 204) return null;
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+/** Wrap a result in the MCP shape, so tool bodies stay one line. */
+export function toolResult(data: unknown): WebMcpToolResult {
+  return {
+    content: [
+      { type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) },
+    ],
+  };
+}
+
+/**
+ * What a disabled tool tells the agent. The tool stays visible (so the agent
+ * knows it exists and can ask the human to enable it) but does nothing.
+ */
+export function toolDisabled(fileName: string): WebMcpToolResult {
+  return {
+    content: [
+      {
+        type: "text",
+        text:
+          "This tool is currently disabled by the app developer. Ask them to enable it " +
+          "(uncomment the implementation in " + fileName + ").",
+      },
+    ],
+    isError: true,
+  };
 }
 
 /**

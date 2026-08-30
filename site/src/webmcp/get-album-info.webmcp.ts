@@ -1,10 +1,11 @@
-import { getModelContext } from "./runtime.webmcp";
+import { getModelContext, callApi, toolResult } from "./runtime.webmcp";
 
 // ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
  * Retrieve an album
  *
  * Source: GET /albums/{id} (openapi). Risk: safe-read.
+ * Starts enabled (see executeGetAlbumInfo below).
  * Regenerate with: npx webmcp-codegen generate
  */
 

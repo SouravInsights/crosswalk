@@ -1,10 +1,11 @@
-import { getModelContext } from "./runtime.webmcp";
+import { getModelContext, callApi, toolResult } from "./runtime.webmcp";
 
 // ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
  * Retrieve an asset
  *
  * Source: GET /assets/{id} (openapi). Risk: safe-read.
+ * Starts enabled (see executeGetAssetInfo below).
  * Regenerate with: npx webmcp-codegen generate
  */
 

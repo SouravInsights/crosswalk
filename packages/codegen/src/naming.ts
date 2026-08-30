@@ -81,3 +81,48 @@ export function dedupeNames(candidates: { name: string; httpMethod?: string }[])
 
   return { names, renames };
 }
+
+/**
+ * Strip a shared API version prefix from route-derived names.
+ *
+ * APIs that version every path (`/v1/trips`, `/v1/users`) would otherwise
+ * put "v1-" in every single tool name: "get-v1-trips", "post-v1-users".
+ * The prefix carries no information when it is on *every* name, so when at
+ * least 80% of names share the same version segment we drop it and tell the
+ * report. Runs before dedupe: stripping can create collisions (both
+ * `/v1/trips` and `/trips` become "get-trips"), and dedupe resolves them.
+ *
+ * Only the segment right after the method word is considered
+ * ("get-v1-trips"), so an operationId like "preview-v2-changes" is untouched.
+ */
+export function stripVersionPrefix(candidates: { name: string }[]): {
+  names: string[];
+  note?: string;
+} {
+  // Route-derived names always start with an HTTP method ("get-v1-trips");
+  // an operationId like "preview-v2-changes" does not, so it never counts.
+  const VERSION_AT = /^(get|post|put|patch|delete|head|options)-(v\d+)-/;
+
+  const counts = new Map<string, number>();
+  for (const { name } of candidates) {
+    const match = VERSION_AT.exec(name);
+    if (match) counts.set(match[2] as string, (counts.get(match[2] as string) ?? 0) + 1);
+  }
+
+  let shared: string | undefined;
+  for (const [version, count] of counts) {
+    if (count / candidates.length >= 0.8 && (!shared || count > (counts.get(shared) ?? 0))) {
+      shared = version;
+    }
+  }
+  if (!shared) return { names: candidates.map((candidate) => candidate.name) };
+
+  const prefix = new RegExp(`^((?:get|post|put|patch|delete|head|options))-${shared}-`);
+  const names = candidates.map(({ name }) =>
+    prefix.test(name) ? name.replace(prefix, "$1-") : name,
+  );
+  return {
+    names,
+    note: `Stripped the shared "${shared}" version prefix from tool names.`,
+  };
+}

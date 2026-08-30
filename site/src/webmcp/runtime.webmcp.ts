@@ -6,6 +6,7 @@
 /** The result shape tools return (same as MCP tool results). */
 export interface WebMcpToolResult {
   content: { type: "text"; text: string }[];
+  isError?: boolean;
   [key: string]: unknown;
 }
 
@@ -39,6 +40,65 @@ export function getModelContext(): ModelContext {
     );
   }
   return modelContext;
+}
+
+/**
+ * Call your API from the page. Same origin by default (pass a full URL when
+ * the API lives on another host), always with the signed-in user's session
+ * cookies. Throws on HTTP errors; returns the parsed JSON body, or raw text
+ * when the response is not JSON.
+ */
+export async function callApi(
+  path: string,
+  options: { method?: string; query?: Record<string, unknown>; body?: unknown } = {},
+): Promise<unknown> {
+  const url = new URL(path, window.location.origin);
+  for (const [key, value] of Object.entries(options.query ?? {})) {
+    if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
+  }
+  const response = await fetch(url, {
+    method: options.method ?? "GET",
+    credentials: "include",
+    headers: options.body !== undefined ? { "content-type": "application/json" } : undefined,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+  if (!response.ok) {
+    throw new Error("Request failed: " + response.status + " " + response.statusText);
+  }
+  if (response.status === 204) return null;
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+/** Wrap a result in the MCP shape, so tool bodies stay one line. */
+export function toolResult(data: unknown): WebMcpToolResult {
+  return {
+    content: [
+      { type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) },
+    ],
+  };
+}
+
+/**
+ * What a disabled tool tells the agent. The tool stays visible (so the agent
+ * knows it exists and can ask the human to enable it) but does nothing.
+ */
+export function toolDisabled(fileName: string): WebMcpToolResult {
+  return {
+    content: [
+      {
+        type: "text",
+        text:
+          "This tool is currently disabled by the app developer. Ask them to enable it " +
+          "(uncomment the implementation in " + fileName + ").",
+      },
+    ],
+    isError: true,
+  };
 }
 
 /**

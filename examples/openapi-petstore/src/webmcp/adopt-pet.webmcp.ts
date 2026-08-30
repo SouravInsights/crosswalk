@@ -1,10 +1,11 @@
-import { getModelContext } from "./runtime.webmcp";
+import { getModelContext, requestUserConfirmation, callApi, toolResult, toolDisabled } from "./runtime.webmcp";
 
 // ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
  * Adopt a pet — this finalizes the adoption paperwork
  *
  * Source: POST /pets/{id}/adopt (openapi). Risk: write-confirm.
+ * Starts disabled (see executeAdoptPet below).
  * Regenerate with: npx webmcp-codegen generate
  */
 
@@ -45,8 +46,21 @@ export async function registerAdoptPet(signal?: AbortSignal): Promise<void> {
   await modelContext.registerTool(
     {
       ...adoptPetTool,
-      // The browser has already validated the agent's input against the schema.
-      execute: (input) => executeAdoptPet(input as AdoptPetInput),
+      execute: async (input) => {
+        // This tool changes things, so the user is always asked first. The
+        // confirmation lives in the generated region: it cannot be edited away.
+        const confirmed = await requestUserConfirmation(
+          "Allow the agent to: Adopt a pet — this finalizes the adoption paperwork",
+        );
+        if (!confirmed) {
+          return {
+            content: [{ type: "text", text: "The user declined this action." }],
+            isError: true,
+          };
+        }
+        // The browser has already validated the agent's input against the schema.
+        return executeAdoptPet(input as AdoptPetInput);
+      },
     },
     { signal },
   );
@@ -57,20 +71,22 @@ export async function registerAdoptPet(signal?: AbortSignal): Promise<void> {
 /**
  * What actually happens when the agent calls "adopt-pet".
  *
- * Source: POST /pets/{id}/adopt. Call your existing client code here.
- * Return { content: [{ type: "text", text: ... }] } (the MCP result shape).
+ * Default implementation: calls POST /pets/{id}/adopt from this page, with the
+ * signed-in user's session. Replace it with your app's own API client
+ * whenever you like; the contract above never changes.
  *
- * ⚠ This tool is write-confirm: it changes things.
- * Ask the user before acting. See requestUserConfirmation() in runtime.webmcp.ts.
+ * This tool is write-confirm: it changes things.
+ * The user is asked to confirm every call (built into the generated region).
  */
 //
 // ⚠ webmcp-codegen flagged these response fields as likely PII: owner.email.
-// Everything you return reaches the agent. Leave those fields out unless
-// the agent genuinely needs them, and say so in a comment if you keep them.
+// Everything you return reaches the agent. Leave those fields out of what you
+// return unless the agent genuinely needs them, and say so in a comment if you keep them.
 export async function executeAdoptPet(input: AdoptPetInput) {
-  // TODO: implement using your app's existing code, e.g.:
-  //   const response = await fetch("/pets/" + input.id + "/adopt", { method: "POST" });
-  //   if (!response.ok) throw new Error("Request failed: " + response.status);
-  //   return { content: [{ type: "text", text: "Done" }] };
-  throw new Error("Not implemented: executeAdoptPet");
+  // This tool starts disabled: it changes things. Agents can see it, and calling it tells
+  // them it is disabled. To enable it, delete the line below and uncomment the code.
+  return toolDisabled("adopt-pet.webmcp.ts");
+
+  // const data = await callApi(`/pets/${input.id}/adopt`, { method: "POST" });
+  // return toolResult(data);
 }

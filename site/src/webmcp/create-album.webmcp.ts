@@ -1,10 +1,11 @@
-import { getModelContext } from "./runtime.webmcp";
+import { getModelContext, requestUserConfirmation, callApi, toolResult, toolDisabled } from "./runtime.webmcp";
 
 // ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
  * Create an album
  *
  * Source: POST /albums (openapi). Risk: write-confirm.
+ * Starts disabled (see executeCreateAlbum below).
  * Regenerate with: npx webmcp-codegen generate
  */
 
@@ -48,8 +49,21 @@ export async function registerCreateAlbum(signal?: AbortSignal): Promise<void> {
   await modelContext.registerTool(
     {
       ...createAlbumTool,
-      // The browser has already validated the agent's input against the schema.
-      execute: (input) => executeCreateAlbum(input as CreateAlbumInput),
+      execute: async (input) => {
+        // This tool changes things, so the user is always asked first. The
+        // confirmation lives in the generated region: it cannot be edited away.
+        const confirmed = await requestUserConfirmation(
+          "Allow the agent to: Create an album",
+        );
+        if (!confirmed) {
+          return {
+            content: [{ type: "text", text: "The user declined this action." }],
+            isError: true,
+          };
+        }
+        // The browser has already validated the agent's input against the schema.
+        return executeCreateAlbum(input as CreateAlbumInput);
+      },
     },
     { signal },
   );
