@@ -1,6 +1,8 @@
-# webmcp-codegen: the complete first run (spec for review)
+# webmcp-codegen: the complete first run
 
-Date: 2026-08-30. Status: for review, nothing implemented yet.
+Date: 2026-08-30. Status: implemented (sections 1-6 and the dashboard's first drop).
+The dashboard's agent panel (7, "agent test") and the standalone audit
+CI command remain unbuilt.
 
 ## The goal in one sentence
 
