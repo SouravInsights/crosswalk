@@ -1,0 +1,113 @@
+openapi: 3.0.3
+info:
+  title: Petstore (trimmed)
+  version: 1.0.0
+  description: A small spec that exercises the interesting codegen paths.
+security:
+  - bearerAuth: []
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      summary: List all pets in the store
+      parameters:
+        - name: status
+          in: query
+          description: Only show pets in this status
+          schema:
+            type: string
+            enum: [available, adopted]
+      responses:
+        "200":
+          description: The pets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pet"
+    post:
+      operationId: createPet
+      summary: Add a new pet to the store
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewPet"
+      responses:
+        "201":
+          description: The created pet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+  /pets/{id}:
+    get:
+      operationId: getPet
+      summary: Get one pet, including its owner's contact details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The pet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+    delete:
+      operationId: deletePet
+      summary: Remove a pet from the store permanently
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Removed
+  /pets/{id}/adopt:
+    post:
+      operationId: adoptPet
+      summary: Adopt a pet — this finalizes the adoption paperwork
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Adoption finalized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"
+components:
+  schemas:
+    Pet:
+      type: object
+      required: [id, name, status]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        status:
+          type: string
+          enum: [available, adopted]
+        owner:
+          type: object
+          properties:
+            name: { type: string }
+            email: { type: string }
+    NewPet:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        tag: { type: string }
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer

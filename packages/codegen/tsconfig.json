@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    // Explicit beats auto-discovered: some editor TS builds miss pnpm's
+    // symlinked node_modules/@types when auto-including, and then every
+    // "node:..." import shows a false error. Naming the types directly
+    // resolves through normal module resolution, which always works.
+    "types": ["node"]
+  },
+  "include": ["src"]
+}
+

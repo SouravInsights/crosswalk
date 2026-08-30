@@ -1,7 +1,7 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
   "files": {
-    "includes": ["**", "!**/dist", "!**/node_modules", "!**/.turbo", "!**/.next", "!**/.source"]
+    "includes": ["**", "!**/dist", "!**/node_modules", "!**/.turbo", "!**/.next", "!**/.source", "!**/src/webmcp"]
   },
   "formatter": {
     "enabled": true,

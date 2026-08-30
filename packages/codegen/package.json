@@ -1,17 +1,37 @@
 {
   "name": "webmcp-codegen",
-  "version": "0.0.1",
-  "description": "Generate safe, typed, human-reviewed WebMCP tools from the API contracts you already have (OpenAPI, tRPC, Zod). Under active development.",
+  "version": "0.1.0",
+  "description": "Generate safe, typed, human-reviewed WebMCP tools from the API contracts you already have (OpenAPI, tRPC, Zod).",
+  "license": "MIT",
   "type": "module",
-  "main": "./src/index.js",
+  "sideEffects": false,
+  "bin": {
+    "webmcp-codegen": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./sources": {
+      "types": "./dist/sources/index.d.ts",
+      "import": "./dist/sources/index.js"
+    },
+    "./generators": {
+      "types": "./dist/generators/index.d.ts",
+      "import": "./dist/generators/index.js"
+    }
   },
   "files": [
-    "src"
+    "dist"
   ],
-  "engines": {
-    "node": ">=20"
+  "scripts": {
+    "build": "tsup src/index.ts src/cli.ts src/sources/index.ts src/generators/index.ts --format esm --dts --sourcemap --clean",
+    "dev": "tsup src/index.ts src/cli.ts src/sources/index.ts src/generators/index.ts --format esm --dts --sourcemap --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "webmcp",
@@ -22,10 +42,18 @@
     "zod",
     "model-context-protocol"
   ],
-  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SouravInsights/groundstate.git",
     "directory": "packages/codegen"
+  },
+  "dependencies": {
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1"
   }
 }

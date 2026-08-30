@@ -1,0 +1,6 @@
+{
+  // Use the repo's own TypeScript (5.9.x) instead of the editor's bundled one.
+  // The bundled 6.x resolves @types differently under pnpm and shows false
+  // "cannot find node types" errors in packages/codegen.
+  "typescript.tsdk": "node_modules/typescript/lib"
+}
