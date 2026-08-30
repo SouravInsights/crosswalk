@@ -11,7 +11,7 @@ Point the CLI at a project with an OpenAPI spec. No install, no config file:
 npx webmcp-codegen generate --dry-run
 ```
 
-The CLI searches your project for spec files (`openapi.json/yaml`, `swagger.*` — monorepo
+The CLI searches your project for spec files (`openapi.json/yaml`, `swagger.*`; monorepo
 layouts included), shows what it found, and previews every tool it would create, with its
 risk tier and the audit findings. Nothing is written on a dry run.
 
@@ -38,7 +38,7 @@ Open any generated file. Everything above the marker is the contract, derived fr
 spec; below the marker is yours:
 
 ```ts title="src/webmcp/get-pet.webmcp.ts"
-// ─── webmcp-codegen: end generated — your code below survives regeneration ───
+// ─── webmcp-codegen: end generated. Your code below survives regeneration. ───
 
 export async function executeGetPet(input: GetPetInput) {
   // TODO: implement using your app's existing code, e.g.:
@@ -49,7 +49,7 @@ export async function executeGetPet(input: GetPetInput) {
 }
 ```
 
-Replace the stub with a call to your real client code — the fetch wrapper, SDK, or query
+Replace the stub with a call to your real client code: the fetch wrapper, SDK, or query
 client your app already uses. The TODO example shows the actual route when the spec knows it.
 
 Return the MCP result shape: `{ content: [{ type: "text", text: "..." }] }`.
@@ -62,7 +62,7 @@ import { registerAllTools } from "./webmcp";
 await registerAllTools();
 ```
 
-Or register only the tools you've implemented — the barrel exports one `register…()`
+Or register only the tools you've implemented. The barrel exports one `register…()`
 function per tool, so cherry-picking is just importing fewer of them.
 
 ## See them work

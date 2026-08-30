@@ -2,7 +2,7 @@
  * Config: `defineConfig` for authoring, `loadConfig` for the CLI.
  *
  * Config files are plain JavaScript (`codegen.config.mjs`) so the CLI can
- * load them with a plain dynamic import — no TypeScript loader, no build
+ * load them with a plain dynamic import. No TypeScript loader, no build
  * step, no extra dependencies. If you want types while authoring, that is
  * what `defineConfig` is for:
  *
@@ -53,7 +53,7 @@ export async function loadConfig(
   );
 }
 
-/** The lightest possible shape check — clear error beats deep validation. */
+/** The lightest possible shape check: a clear error beats deep validation. */
 function isCodegenConfig(value: unknown): value is CodegenConfig {
   if (value === null || typeof value !== "object") return false;
   const config = value as Record<string, unknown>;

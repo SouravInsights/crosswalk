@@ -1,14 +1,14 @@
 import { getModelContext } from "./runtime.webmcp";
 
-// ─── webmcp-codegen: generated — do not edit this region ───
+// ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
  * Adopt a pet — this finalizes the adoption paperwork
  *
- * Source: POST /pets/{id}/adopt (openapi) · risk: write-confirm
+ * Source: POST /pets/{id}/adopt (openapi). Risk: write-confirm.
  * Regenerate with: npx webmcp-codegen generate
  */
 
-/** The exact contract advertised to the agent. Derived from the API spec — do not hand-edit. */
+/** The exact contract advertised to the agent. Derived from the API spec. Do not hand-edit. */
 export const adoptPetInputSchema = {
   "type": "object",
   "properties": {
@@ -52,16 +52,16 @@ export async function registerAdoptPet(signal?: AbortSignal): Promise<void> {
   );
 }
 
-// ─── webmcp-codegen: end generated — your code below survives regeneration ───
+// ─── webmcp-codegen: end generated. Your code below survives regeneration. ───
 
 /**
  * What actually happens when the agent calls "adopt-pet".
  *
- * Source: POST /pets/{id}/adopt — call your existing client code here.
+ * Source: POST /pets/{id}/adopt. Call your existing client code here.
  * Return { content: [{ type: "text", text: ... }] } (the MCP result shape).
  *
  * ⚠ This tool is write-confirm: it changes things.
- * Ask the user before acting — see requestUserConfirmation() in runtime.webmcp.ts.
+ * Ask the user before acting. See requestUserConfirmation() in runtime.webmcp.ts.
  */
 //
 // ⚠ webmcp-codegen flagged these response fields as likely PII: owner.email.

@@ -1,5 +1,5 @@
 /**
- * Spec auto-detection — the reason `npx webmcp-codegen generate` works with
+ * Spec auto-detection: the reason `npx webmcp-codegen generate` works with
  * zero arguments, zero config, and zero install.
  *
  * The rule is deliberately boring: walk the project (skipping the obvious
@@ -34,7 +34,7 @@ const MAX_DEPTH = 5;
 
 /**
  * Find API spec files under `cwd`, returned as paths relative to `cwd`,
- * shallowest first — a root-level spec is a likelier intent than one
+ * shallowest first. A root-level spec is a likelier intent than one
  * buried six folders deep.
  */
 export async function findSpecs(cwd: string): Promise<string[]> {
@@ -46,7 +46,7 @@ export async function findSpecs(cwd: string): Promise<string[]> {
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {
-      return; // Unreadable directory — skip it, never die on detection.
+      return; // Unreadable directory. Skip it, never die on detection.
     }
     for (const entry of entries) {
       if (entry.isDirectory()) {

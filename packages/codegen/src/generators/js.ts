@@ -1,5 +1,5 @@
 /**
- * The `js` generator — named after what lands in your repo: plain JavaScript/
+ * The `js` generator, named after what lands in your repo: plain JavaScript/
  * TypeScript files that call the spec's imperative API
  * (`document.modelContext.registerTool`).
  *
@@ -19,7 +19,7 @@
  *
  * This file contains only the *file mechanics*: which files exist, and how to
  * update them without destroying hand-written code. The text of the generated
- * code itself lives in js-templates.ts — keeping "what the output looks like"
+ * code itself lives in js-templates.ts, keeping "what the output looks like"
  * separate from "how files get written" is what keeps both readable.
  */
 
@@ -44,9 +44,9 @@ export interface JsGeneratorOptions {
  * and we must never touch anything after it. js-templates.ts imports these
  * so the marker text is defined in exactly one place.
  */
-export const GENERATED_START = "// ─── webmcp-codegen: generated — do not edit this region ───";
+export const GENERATED_START = "// ─── webmcp-codegen: generated. Do not edit this region. ───";
 export const GENERATED_END =
-  "// ─── webmcp-codegen: end generated — your code below survives regeneration ───";
+  "// ─── webmcp-codegen: end generated. Your code below survives regeneration. ───";
 
 /** Create the `js` generator for the config's `generate` array. */
 export function js(options: JsGeneratorOptions): ToolGenerator {
@@ -56,7 +56,7 @@ export function js(options: JsGeneratorOptions): ToolGenerator {
       const outDir = join(cwd, options.outDir);
       const files: GeneratedFile[] = [];
 
-      // The runtime and the barrel are regenerated wholesale every run —
+      // The runtime and the barrel are regenerated wholesale every run;
       // their headers say "do not edit", and we mean it.
       files.push(await plainFile(join(outDir, "runtime.webmcp.ts"), runtimeSource()));
       files.push(await plainFile(join(outDir, "index.ts"), barrelSource(tools)));
@@ -91,7 +91,7 @@ async function toolFile(tool: ReviewedTool, outDir: string): Promise<GeneratedFi
   try {
     existing = await readFile(path, "utf8");
   } catch {
-    // No file yet — brand new tool, so we also lay down the execute() scaffold.
+    // No file yet: brand new tool, so we also lay down the execute() scaffold.
     return { path, contents: `${head}\n${ownedRegionScaffold(tool)}`, action: "create" };
   }
 

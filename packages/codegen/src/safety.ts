@@ -4,10 +4,10 @@
  * Nothing gets written to disk until every candidate tool has been through
  * here. This layer does three jobs:
  *
- *   1. Classify — what does calling this tool do to the world?
+ *   1. Classify: what does calling this tool do to the world?
  *      (read / write / destructive, from the HTTP verb plus name heuristics)
- *   2. Hint     — derive the WebMCP tool hints (readOnlyHint etc.) from that
- *   3. Audit    — lint the result and report problems in plain language
+ *   2. Hint:     derive the WebMCP tool hints (readOnlyHint etc.) from that
+ *   3. Audit:    lint the result and report problems in plain language
  *
  * Every rule is a heuristic with an escape hatch: the generated code carries
  * the classification in plain sight, and the developer owns the final file.
@@ -56,7 +56,7 @@ const DEFAULT_PII_FIELDS = [
 
 /**
  * Phrases that suggest a description is trying to *instruct the agent*
- * instead of describing the tool — a known prompt-injection smell.
+ * instead of describing the tool. That is a known prompt-injection smell.
  */
 const AGENT_INSTRUCTION_PATTERN =
   /\b(you (must|should|always|are)|as an ai|ignore (all |previous )?instructions|do not refuse)\b/i;
@@ -67,7 +67,7 @@ export function classifySideEffect(tool: CandidateTool): SideEffect {
     case "GET":
     case "HEAD":
     case "OPTIONS":
-      // A safe verb whose name says otherwise is suspicious — audit flags it.
+      // A safe verb whose name says otherwise is suspicious; audit flags it.
       return "read";
     case "DELETE":
       return "destructive";
@@ -136,7 +136,7 @@ export function findPiiFields(
   return found;
 }
 
-/** Run the full review: classify, hint, PII-scan. Pure — no I/O. */
+/** Run the full review: classify, hint, PII-scan. Pure, no I/O. */
 export function reviewTools(
   candidates: CandidateTool[],
   safety: SafetyOptions = {},
@@ -167,7 +167,7 @@ export function reviewTools(
 /**
  * Step 3: audit the reviewed tools and report in plain language.
  * Errors block file writing (unless --force); warnings never do. This is
- * meant to run in CI like `npm audit` — exit codes, not vibes.
+ * meant to run in CI like `npm audit`: exit codes, not vibes.
  */
 export function auditTools(
   tools: ReviewedTool[],
@@ -188,7 +188,7 @@ export function auditTools(
       findings.push({
         level: "error",
         tool: tool.name,
-        message: "No description. Agents pick tools by description — this tool is invisible.",
+        message: "No description. Agents pick tools by description. This tool is invisible.",
       });
       continue;
     }
@@ -199,7 +199,7 @@ export function auditTools(
         tool: tool.name,
         message:
           `Description is just "${tool.description}" (no summary in the source). ` +
-          "Write one sentence about what it does and why — it goes straight into the agent's prompt.",
+          "Write one sentence about what it does and why. It goes straight into the agent's prompt.",
       });
     }
 
@@ -219,7 +219,7 @@ export function auditTools(
         tool: tool.name,
         message:
           `The name suggests something destructive but ${tool.httpMethod} is a safe verb. ` +
-          "Check the spec — a GET named like a delete is either mislabeled or a design smell.",
+          "Check the spec: a GET named like a delete is either mislabeled or a design smell.",
       });
     }
 
@@ -229,7 +229,7 @@ export function auditTools(
         tool: tool.name,
         message:
           `Response may expose ${tool.piiInOutput.join(", ")}. ` +
-          "These fields reach the agent — exclude them in execute() unless they are truly needed.",
+          "These fields reach the agent. Exclude them in execute() unless they are truly needed.",
       });
     }
 
@@ -238,7 +238,7 @@ export function auditTools(
         level: "warning",
         tool: tool.name,
         message:
-          "This mutating tool wraps an authenticated endpoint. It runs with the page's session — " +
+          "This mutating tool wraps an authenticated endpoint. It runs with the page's session, so " +
           "make sure your server-side authorization checks apply to tool calls too.",
       });
     }

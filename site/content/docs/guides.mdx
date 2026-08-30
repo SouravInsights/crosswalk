@@ -4,11 +4,11 @@ description: Monorepos, large APIs, and getting the most out of your spec.
 ---
 
 Lessons from running webmcp-codegen against a real production API (73 operations,
-monorepo, zero `operationId`s — the tool's first field test).
+monorepo, zero `operationId`s): the tool's first field test.
 
 ## Monorepos
 
-Generated tools belong to the *app that will expose them* — usually your frontend — while
+Generated tools belong to the *app that will expose them* (usually your frontend), while
 the spec usually lives with the server. So run from the app, pointing across the repo:
 
 ```bash
@@ -53,24 +53,24 @@ await registerListTrips();
 await registerGetTripsTripId();
 ```
 
-Unimplemented tools fail loudly when called, never silently — but the better move is not
+Unimplemented tools fail loudly when called, never silently. But the better move is not
 registering them until they work.
 
 ## Spec hygiene: garbage in, tools out
 
 The generator is only as good as the spec. Three spec habits pay off immediately:
 
-**Write `summary` on every operation.** It becomes the tool description — which is part of
+**Write `summary` on every operation.** It becomes the tool description, which is part of
 the agent's prompt. "List all trips for the signed-in user" beats `GET /v1/trips/` as a
 reason to call a tool, every time.
 
 **Add `operationId`s.** They become tool names (`getOrderStatus` → `get-order-status`).
-Without them, names derive from method + path — valid, but verbose
+Without them, names derive from method + path: valid, but verbose
 (`get-v1-trips-trip-id`).
 
 **Mark server-generated fields `readOnly`.** Without it, "create trip" might offer `id` and
 `slug` as agent-settable inputs. (Honoring `readOnly` in generated schemas is on the
-roadmap — but marking it makes your spec better for every consumer, including your typed
+roadmap, but marking it makes your spec better for every consumer, including your typed
 SDK.)
 
 ## Keep the tools in sync
@@ -78,5 +78,5 @@ SDK.)
 Two habits, pick either or both:
 
 - `--watch` while developing: `npx webmcp-codegen generate --watch` re-runs on spec changes.
-- In CI: plain `npx webmcp-codegen generate` fails the build if the audit reports errors —
-  see [CLI reference](/docs/cli#exit-codes-for-ci).
+- In CI: plain `npx webmcp-codegen generate` fails the build if the audit reports errors.
+  See [CLI reference](/docs/cli#exit-codes-for-ci).

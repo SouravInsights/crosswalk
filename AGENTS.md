@@ -14,6 +14,12 @@ One line of positioning: **Chrome DevTools MCP tells the agent what the browser 
 Groundstate tells it what the app knows.** We never rebuild what DevTools MCP already provides
 (console logs, network logs, screenshots, generic a11y snapshots).
 
+## Writing style (strict)
+
+No em dashes (—), no middle-dot separators (·), no AI-slop lingo. This applies to everything
+user-facing: site copy, docs, CLI messages, generated-file comments, code comments. Write
+like better-auth/Drizzle docs: plain words, short sentences, say what the thing is.
+
 ## Package map
 
 | Path | npm name | What it is |

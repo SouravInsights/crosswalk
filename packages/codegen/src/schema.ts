@@ -23,7 +23,7 @@ export function resolveLocalRef(spec: unknown, ref: string): unknown {
   if (!ref.startsWith("#/")) {
     throw new Error(
       `Cannot resolve external $ref "${ref}". ` +
-        `Only local refs (starting with "#/") are supported — bundle the spec first if it is split across files.`,
+        `Only local refs (starting with "#/") are supported. Bundle the spec first if it is split across files.`,
     );
   }
   let node: unknown = spec;
@@ -39,7 +39,7 @@ export function resolveLocalRef(spec: unknown, ref: string): unknown {
 }
 
 /**
- * If `schema` is a `$ref`, resolve it (one level — recursion happens as the
+ * If `schema` is a `$ref`, resolve it (one level; recursion happens as the
  * caller walks the tree). Sibling keywords next to `$ref` are merged over
  * the resolved schema, which is what OpenAPI 3.1 semantics require.
  */
@@ -53,7 +53,7 @@ export function deref(schema: JsonSchema, spec: unknown): JsonSchema {
 
 /**
  * Resolve `$ref`s at every depth, so the generated `inputSchema` is a
- * self-contained JSON Schema — the browser has no idea what
+ * self-contained JSON Schema. The browser has no idea what
  * "#/components/schemas/Order" means, so refs must not survive codegen.
  *
  * Recursive models (Order → LineItem → Order) would loop forever, so a ref
@@ -148,7 +148,7 @@ export function jsonSchemaToTs(schema: JsonSchema, spec: unknown): string {
       return `{ ${fields.join("; ")} }`;
     }
     default:
-      return "unknown /* TODO: webmcp-codegen could not express this schema — tighten it by hand */";
+      return "unknown /* TODO: webmcp-codegen could not express this schema; tighten it by hand */";
   }
 }
 

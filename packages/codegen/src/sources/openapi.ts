@@ -87,7 +87,7 @@ function operationsFromSpec(spec: unknown): CandidateTool[] {
         outputSchema: findOutputSchema(operation, spec),
         inputTypeName: `${pascalCase(name)}Input`,
         httpMethod: upperMethod,
-        // The safety layer refines this — the source only reports the verb.
+        // The safety layer refines this; the source only reports the verb.
         sideEffect: "unknown",
         requiresAuth,
         description: pickDescription(operation, upperMethod ?? method.toUpperCase(), path),
@@ -107,7 +107,7 @@ function operationsFromSpec(spec: unknown): CandidateTool[] {
 
 /**
  * Merge path + query parameters and the JSON request body into one object
- * schema — that single object is what the agent fills in when calling the tool.
+ * schema. That single object is what the agent fills in when calling the tool.
  */
 function buildInputSchema(
   operation: Record<string, unknown>,
@@ -208,7 +208,7 @@ function pickDescription(operation: Record<string, unknown>, method: string, pat
     return operation.summary.trim();
   }
   if (typeof operation.description === "string" && operation.description.trim().length > 0) {
-    // Use the first line only — long prose belongs in docs, not in a prompt.
+    // Use the first line only; long prose belongs in docs, not in a prompt.
     return operation.description.trim().split("\n")[0] as string;
   }
   return `${method} ${path}`;

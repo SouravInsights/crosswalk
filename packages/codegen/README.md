@@ -1,19 +1,19 @@
 # webmcp-codegen
 
-Generate safe, typed, human-reviewed [WebMCP](https://github.com/webmachinelearning/webmcp) tools from the API contracts you already have — instead of hand-writing `registerTool()` calls for every action.
+Generate safe, typed, human-reviewed [WebMCP](https://github.com/webmachinelearning/webmcp) tools from the API contracts you already have, instead of hand-writing `registerTool()` calls for every action.
 
 > Generate the tool. Review the tool. You own the tool.
 
 ## Quick start
 
-Zero install, zero config — the CLI detects your OpenAPI spec:
+Zero install, zero config. The CLI detects your OpenAPI spec:
 
 ```bash
 npx webmcp-codegen generate --dry-run   # preview the tools it would generate
 npx webmcp-codegen generate             # write them into ./src/webmcp
 ```
 
-Then implement each `execute()` (below the marker — it's yours, regeneration never touches it) and register everything at app startup:
+Then implement each `execute()` (below the marker; it's yours, regeneration never touches it) and register everything at app startup:
 
 ```ts
 import { registerAllTools } from "./webmcp";
@@ -32,7 +32,7 @@ npx webmcp-codegen init
 ```
 
 (The config file imports from `webmcp-codegen`, which is why the install is
-needed in this mode. The generated code never depends on the package — you
+needed in this mode. The generated code never depends on the package. You
 own it.)
 
 ## What you get
@@ -52,11 +52,11 @@ export async function executeGetOrderStatus(input: GetOrderStatusInput) {
 }
 ```
 
-- **Real files in your repo** — readable, editable, no runtime magic
+- **Real files in your repo**: readable, editable, no runtime magic
 - **Schemas derived from your spec**, never hand-typed twice; `$ref`s fully resolved
-- **Safety classification on every tool** — read/write/destructive from the HTTP verb and naming heuristics, with `readOnlyHint`/`destructiveHint`/`idempotentHint` computed for you
-- **An audit pass built into `generate`** — PII-in-response warnings, agent-instructing description linting, auth-boundary checks; errors block generation (like `npm audit`, with exit codes for CI)
-- **Regeneration never clobbers your code** — contracts regenerate, your `execute()` survives; hand-edited generated regions produce a `.new` file instead of a conflict
+- **Safety classification on every tool**: read/write/destructive from the HTTP verb and naming heuristics, with `readOnlyHint`/`destructiveHint`/`idempotentHint` computed for you
+- **An audit pass built into `generate`**: PII-in-response warnings, agent-instructing description linting, auth-boundary checks; errors block generation (like `npm audit`, with exit codes for CI)
+- **Regeneration never clobbers your code**: contracts regenerate, your `execute()` survives; hand-edited generated regions produce a `.new` file instead of a conflict
 
 ## CLI
 

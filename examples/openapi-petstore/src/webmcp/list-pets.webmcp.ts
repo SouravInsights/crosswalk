@@ -1,14 +1,14 @@
 import { getModelContext } from "./runtime.webmcp";
 
-// ─── webmcp-codegen: generated — do not edit this region ───
+// ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
  * List all pets in the store
  *
- * Source: GET /pets (openapi) · risk: safe-read
+ * Source: GET /pets (openapi). Risk: safe-read.
  * Regenerate with: npx webmcp-codegen generate
  */
 
-/** The exact contract advertised to the agent. Derived from the API spec — do not hand-edit. */
+/** The exact contract advertised to the agent. Derived from the API spec. Do not hand-edit. */
 export const listPetsInputSchema = {
   "type": "object",
   "properties": {
@@ -55,12 +55,12 @@ export async function registerListPets(signal?: AbortSignal): Promise<void> {
   );
 }
 
-// ─── webmcp-codegen: end generated — your code below survives regeneration ───
+// ─── webmcp-codegen: end generated. Your code below survives regeneration. ───
 
 /**
  * What actually happens when the agent calls "list-pets".
  *
- * Source: GET /pets — call your existing client code here.
+ * Source: GET /pets. Call your existing client code here.
  * Return { content: [{ type: "text", text: ... }] } (the MCP result shape).
  */
 export async function executeListPets(input: ListPetsInput) {

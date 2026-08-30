@@ -1,14 +1,14 @@
 import { getModelContext } from "./runtime.webmcp";
 
-// ─── webmcp-codegen: generated — do not edit this region ───
+// ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
  * Get one pet, including its owner's contact details
  *
- * Source: GET /pets/{id} (openapi) · risk: safe-read
+ * Source: GET /pets/{id} (openapi). Risk: safe-read.
  * Regenerate with: npx webmcp-codegen generate
  */
 
-/** The exact contract advertised to the agent. Derived from the API spec — do not hand-edit. */
+/** The exact contract advertised to the agent. Derived from the API spec. Do not hand-edit. */
 export const getPetInputSchema = {
   "type": "object",
   "properties": {
@@ -52,12 +52,12 @@ export async function registerGetPet(signal?: AbortSignal): Promise<void> {
   );
 }
 
-// ─── webmcp-codegen: end generated — your code below survives regeneration ───
+// ─── webmcp-codegen: end generated. Your code below survives regeneration. ───
 
 /**
  * What actually happens when the agent calls "get-pet".
  *
- * Source: GET /pets/{id} — call your existing client code here.
+ * Source: GET /pets/{id}. Call your existing client code here.
  * Return { content: [{ type: "text", text: ... }] } (the MCP result shape).
  */
 //

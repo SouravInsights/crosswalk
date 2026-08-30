@@ -9,7 +9,7 @@ read it without running anything).
 ```bash
 cd examples/openapi-petstore
 
-# config already exists (created by `npx webmcp-codegen init`) — preview first:
+# config already exists (created by `npx webmcp-codegen init`). Preview first:
 node ../../packages/codegen/dist/cli.js generate --dry-run
 
 # then for real:
@@ -18,15 +18,15 @@ node ../../packages/codegen/dist/cli.js generate
 
 ## What to look at
 
-- `openapi.yaml` — the source of truth. Note it never mentions WebMCP.
-- `codegen.config.mjs` — three lines of actual configuration.
-- `src/webmcp/*.webmcp.ts` — the generated tools. Compare them:
-  - `list-pets` is `safe-read` — plain and simple.
-  - `delete-pet` is `destructive-confirm` — its scaffold carries the
+- `openapi.yaml`: the source of truth. Note it never mentions WebMCP.
+- `codegen.config.mjs`: three lines of actual configuration.
+- `src/webmcp/*.webmcp.ts`: the generated tools. Compare them:
+  - `list-pets` is `safe-read`: plain and simple.
+  - `delete-pet` is `destructive-confirm`: its scaffold carries the
     confirmation warning.
   - `get-pet` / `adopt-pet` show the PII warning (`owner.email`) in the
     scaffold, because the response schema includes it.
-- `src/webmcp/index.ts` — `registerAllTools()`, the only import an app needs.
+- `src/webmcp/index.ts`: `registerAllTools()`, the only import an app needs.
 
 ## The regeneration promise
 

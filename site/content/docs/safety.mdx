@@ -4,7 +4,7 @@ description: Every generated tool is classified, hinted, and audited before a li
 ---
 
 Agents will call these tools. That makes "what can this tool do?" a question the generator
-should answer up front — not something each developer re-derives by reading seventy files.
+should answer up front, not something each developer re-derives by reading seventy files.
 
 ## Classification
 
@@ -14,9 +14,9 @@ Every tool is classified by its HTTP verb, refined by naming heuristics:
 |---|---|---|
 | `read` | `GET`, `HEAD`, `OPTIONS` | `safe-read` |
 | `write` | `POST`, `PUT`, `PATCH` | `write-confirm` |
-| `destructive` | `DELETE` — or a write verb whose name/route says *cancel, delete, purge, destroy, remove, reset* | `destructive-confirm` |
+| `destructive` | `DELETE`, or a write verb whose name/route says *cancel, delete, purge, destroy, remove, reset* | `destructive-confirm` |
 
-A safe verb carrying a destructive name (`GET /delete-everything`) is an **error** — either
+A safe verb carrying a destructive name (`GET /delete-everything`) is an **error**. Either
 the route is mislabeled or the design is wrong, and both are worth knowing.
 
 ## Hints
@@ -31,8 +31,8 @@ export const deletePetHints = {
 } as const;
 ```
 
-`idempotentHint` is true for reads, `PUT`, `PATCH`, and `DELETE` — retrying them with the
-same input is safe — and false for `POST`.
+`idempotentHint` is true for reads, `PUT`, `PATCH`, and `DELETE`, since retrying them with the
+same input is safe. It is false for `POST`.
 
 ## The audit
 
@@ -42,31 +42,31 @@ writing**; warnings never do. Override with `--force` when you mean it.
 Real output from a real spec:
 
 ```
-  ⚠ Response may expose owner.email. These fields reach the agent — exclude them
+  ⚠ Response may expose owner.email. These fields reach the agent. Exclude them
     in execute() unless they are truly needed. (create-pet)
   ⚠ This mutating tool wraps an authenticated endpoint. It runs with the page's
-    session — make sure your server-side authorization checks apply to tool calls too.
+    session, so make sure your server-side authorization checks apply to tool calls too.
   ✖ The name suggests something destructive but GET is a safe verb. (delete-all)
 ```
 
 What it checks today:
 
-- **Template descriptions** *(warning)* — when the source has no summary, the description is
+- **Template descriptions** *(warning)*. When the source has no summary, the description is
   just `GET /route`. Agents pick tools by description; write a real sentence.
-- **Agent-instructing descriptions** *(warning)* — phrasing like "you must always call this"
+- **Agent-instructing descriptions** *(warning)*. Phrasing like "you must always call this"
   addresses the agent instead of describing the tool. That's a known prompt-injection
   pattern, and never what you want in a contract.
 - **Destructive name on a safe verb** *(error)*.
-- **PII in responses** *(warning)* — fields like `email`, `ssn`, `cardNumber` (plus your
+- **PII in responses** *(warning)*. Fields like `email`, `ssn`, `cardNumber` (plus your
   `safety.piiFields`) found in the response schema. Everything a tool returns reaches the
   agent.
-- **Mutating tools behind auth** *(warning)* — the tool runs with the page's session; your
+- **Mutating tools behind auth** *(warning)*. The tool runs with the page's session; your
   server-side authorization must apply to tool calls too.
 
 ## What safety means here, honestly
 
 Classification and hints are metadata: they tell hosts and UIs what a tool can do, and they
-tell *you* what you're exposing. They don't enforce anything by themselves — enforcement is
+tell *you* what you're exposing. They don't enforce anything by themselves. Enforcement is
 the human confirmation you wire into `execute()` (`requestUserConfirmation()` is scaffolded
 into the runtime for exactly this) and the server-side checks your API already has.
 

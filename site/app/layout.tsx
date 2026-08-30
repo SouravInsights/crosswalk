@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     default: "webmcp-codegen: generate WebMCP tools from the API spec you already have",
   },
   description:
-    "Turn an OpenAPI spec into safe, typed, human-reviewed WebMCP tools. Real files in your repo — contracts regenerate, your code survives, safety audit built in.",
+    "Turn an OpenAPI spec into safe, typed, human-reviewed WebMCP tools. Real files in your repo: contracts regenerate, your code survives, safety audit built in.",
 };
 
 export default function Layout({ children }: { children: ReactNode }) {

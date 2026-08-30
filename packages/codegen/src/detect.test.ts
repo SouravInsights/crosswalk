@@ -62,7 +62,7 @@ describe("findSpecs", () => {
   });
 
   it("stops looking past the depth limit", async () => {
-    // Depth 7 — beyond MAX_DEPTH, and good riddance.
+    // Depth 7, beyond MAX_DEPTH, and good riddance.
     await place(dir, "a/b/c/d/e/f/g/openapi.json");
     expect(await findSpecs(dir)).toEqual([]);
   });

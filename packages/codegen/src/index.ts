@@ -1,5 +1,5 @@
 /**
- * webmcp-codegen — public API.
+ * webmcp-codegen public API.
  *
  * Most people only ever need `defineConfig`. Sources and generators live
  * behind their own subpaths ("webmcp-codegen/sources", "…/generators") so

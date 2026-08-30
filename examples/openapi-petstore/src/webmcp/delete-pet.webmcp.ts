@@ -1,14 +1,14 @@
 import { getModelContext } from "./runtime.webmcp";
 
-// ─── webmcp-codegen: generated — do not edit this region ───
+// ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
  * Remove a pet from the store permanently
  *
- * Source: DELETE /pets/{id} (openapi) · risk: destructive-confirm
+ * Source: DELETE /pets/{id} (openapi). Risk: destructive-confirm.
  * Regenerate with: npx webmcp-codegen generate
  */
 
-/** The exact contract advertised to the agent. Derived from the API spec — do not hand-edit. */
+/** The exact contract advertised to the agent. Derived from the API spec. Do not hand-edit. */
 export const deletePetInputSchema = {
   "type": "object",
   "properties": {
@@ -52,16 +52,16 @@ export async function registerDeletePet(signal?: AbortSignal): Promise<void> {
   );
 }
 
-// ─── webmcp-codegen: end generated — your code below survives regeneration ───
+// ─── webmcp-codegen: end generated. Your code below survives regeneration. ───
 
 /**
  * What actually happens when the agent calls "delete-pet".
  *
- * Source: DELETE /pets/{id} — call your existing client code here.
+ * Source: DELETE /pets/{id}. Call your existing client code here.
  * Return { content: [{ type: "text", text: ... }] } (the MCP result shape).
  *
  * ⚠ This tool is destructive-confirm: it cannot easily be undone.
- * Ask the user before acting — see requestUserConfirmation() in runtime.webmcp.ts.
+ * Ask the user before acting. See requestUserConfirmation() in runtime.webmcp.ts.
  */
 export async function executeDeletePet(input: DeletePetInput) {
   // TODO: implement using your app's existing code, e.g.:

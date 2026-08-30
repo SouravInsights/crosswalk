@@ -61,8 +61,8 @@ describe("js generator", () => {
     const tool = files.find((file) => file.path.includes("get-order-status"));
     expect(tool?.action).toBe("create");
     expect(tool?.contents).toContain('name: "get-order-status"');
-    expect(tool?.contents).toContain("do not edit this region");
-    expect(tool?.contents).toContain("your code below survives regeneration");
+    expect(tool?.contents).toContain("Do not edit this region");
+    expect(tool?.contents).toContain("Your code below survives regeneration");
     expect(tool?.contents).toContain("export type GetOrderStatusInput");
     expect(tool?.contents).toContain("executeGetOrderStatus");
     // The agent-facing schema must never contain an unresolved $ref.
@@ -96,7 +96,7 @@ describe("js generator", () => {
     expect(updated?.contents).toContain("my hand-written code");
   });
 
-  it("never clobbers a file whose markers were removed — it reports a conflict", async () => {
+  it("never clobbers a file whose markers were removed; it reports a conflict", async () => {
     const generator = js({ outDir: "src/webmcp" });
     const toolPath = join(cwd, "src/webmcp/get-order-status.webmcp.ts");
     await mkdir(join(cwd, "src/webmcp"), { recursive: true });

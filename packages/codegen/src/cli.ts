@@ -7,7 +7,7 @@
  *
  *   npx webmcp-codegen generate
  *
- * No install, no config file, no flags — the CLI detects your API spec and
+ * No install, no config file, no flags. The CLI detects your API spec and
  * generates into ./src/webmcp. When you outgrow the defaults:
  *
  *   --spec/--out    quick overrides without a config file
@@ -31,7 +31,7 @@ import { type GenerateResult, runGenerate } from "./pipeline.js";
 import { openapi } from "./sources/openapi.js";
 import type { CodegenConfig } from "./types.js";
 
-const HELP = `webmcp-codegen — generate WebMCP tools from the API contracts you already have
+const HELP = `webmcp-codegen: generate WebMCP tools from the API contracts you already have
 
 Fastest start (no install, no config):
   npx webmcp-codegen generate --dry-run   Detect your spec, preview the tools
@@ -100,7 +100,7 @@ async function init(): Promise<number> {
   const configPath = join(cwd, CONFIG_FILE);
 
   if (existsSync(configPath)) {
-    console.error(`${CONFIG_FILE} already exists — nothing to do.`);
+    console.error(`${CONFIG_FILE} already exists. Nothing to do.`);
     return 1;
   }
 
@@ -130,7 +130,7 @@ export default defineConfig({
   console.log("Installed the package? A config file needs it:");
   console.log("  npm install -D webmcp-codegen\n");
   if (specs.length > 0) {
-    console.log(`Found ${specs[0]} — wrote ${CONFIG_FILE}.`);
+    console.log(`Found ${specs[0]}. Wrote ${CONFIG_FILE}.`);
     console.log("\nNext: npx webmcp-codegen generate --dry-run");
   } else {
     console.log(`No OpenAPI spec found, so ${CONFIG_FILE} points at ./openapi.yaml.`);
@@ -166,9 +166,9 @@ async function generate(flags: GenerateFlags): Promise<number> {
 /**
  * Where the tools come from, in priority order:
  *
- *   1. a config file (codegen.config.mjs or --config) — full control
- *   2. --spec/--out flags — quick overrides, no config needed
- *   3. auto-detection — the zero-argument npx run
+ *   1. a config file (codegen.config.mjs or --config) for full control
+ *   2. --spec/--out flags as quick overrides, no config needed
+ *   3. auto-detection, on the zero-argument npx run
  *
  * Branches 2 and 3 build the config right here inside the CLI, which is
  * what makes `npx webmcp-codegen generate` work without installing the
@@ -185,7 +185,7 @@ async function resolveConfig(
   if (hasConfigFile) {
     const { config, path } = await loadConfig(cwd, flags.configPath);
     if (flags.spec || flags.out) {
-      console.warn(`Note: --spec/--out are ignored — ${basename(path)} is in charge here.`);
+      console.warn(`Note: --spec/--out are ignored; ${basename(path)} is in charge here.`);
     }
     return { config, label: basename(path) };
   }
@@ -251,10 +251,10 @@ function printReport(
 ): void {
   const { tools, findings, files, blocked } = result;
 
-  console.log(`\nwebmcp-codegen (${configName}) — ${tools.length} tool(s)\n`);
+  console.log(`\nwebmcp-codegen (${configName}): ${tools.length} tool(s)\n`);
 
   for (const tool of tools) {
-    console.log(`  ${tool.name}  [${tool.riskTier}]  ← ${tool.source.ref}`);
+    console.log(`  ${tool.name}  [${tool.sideEffect}]  ← ${tool.source.ref}`);
   }
 
   if (findings.length > 0) {
@@ -282,7 +282,7 @@ function printReport(
       "\nGeneration blocked by audit errors. Fix them, or re-run with --force to write anyway.",
     );
   } else if (flags.dryRun) {
-    console.log("\nDry run — nothing written. Re-run without --dry-run to write these files.");
+    console.log("\nDry run: nothing written. Re-run without --dry-run to write these files.");
   } else {
     console.log("\nDone. Fill in each execute() below the marker, then registerAllTools().");
   }

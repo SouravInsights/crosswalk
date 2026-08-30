@@ -2,7 +2,7 @@
  * The pipeline: sources → normalize → safety review → audit → write.
  *
  * This module is the only place the stages meet. It owns no opinions of its
- * own — naming, safety, and file formats all live in their own modules — it
+ * own; naming, safety, and file formats all live in their own modules. It
  * just runs them in order and produces one honest report of what happened
  * (or what *would* happen, when called with `write: false`).
  */
@@ -19,7 +19,7 @@ export interface GenerateOptions {
   cwd: string;
   /** Preview mode: compute everything, write nothing. */
   dryRun?: boolean;
-  /** Skip the audit pass entirely (classification still runs — output needs it). */
+  /** Skip the audit pass entirely (classification still runs; output needs it). */
   skipAudit?: boolean;
   /** Write even when the audit found errors. The report still shows them. */
   force?: boolean;

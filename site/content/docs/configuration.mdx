@@ -1,10 +1,10 @@
 ---
 title: Configuration
-description: codegen.config.mjs — sources, generators, and safety options.
+description: "codegen.config.mjs: sources, generators, and safety options."
 ---
 
 You don't need a config file: `npx webmcp-codegen generate` detects your spec and uses
-sensible defaults. Reach for config when you want control — a different spec path, safety
+sensible defaults. Reach for config when you want control: a different spec path, safety
 options, or (soon) multiple sources and generators.
 
 ## The config file
@@ -18,13 +18,13 @@ export default defineConfig({
   sources: [openapi({ spec: "./openapi.yaml" })],
   generate: [js({ outDir: "./src/webmcp" })],
   safety: {
-    // options — see below
+    // options; see below
   },
 });
 ```
 
-Config files are plain JavaScript so the CLI can load them with a plain dynamic import —
-no TypeScript loader, no build step. Because the file imports from `webmcp-codegen`, this
+Config files are plain JavaScript so the CLI can load them with a plain dynamic import.
+No TypeScript loader, no build step. Because the file imports from `webmcp-codegen`, this
 mode needs the package installed:
 
 ```bash
@@ -32,7 +32,7 @@ npm install -D webmcp-codegen
 npx webmcp-codegen init   # writes this file for you, with your detected spec
 ```
 
-The generated code never imports `webmcp-codegen` — the package is a build-time tool only.
+The generated code never imports `webmcp-codegen`; the package is a build-time tool only.
 
 ## Sources
 
@@ -61,7 +61,7 @@ Generators turn reviewed tools into files. Today there is one:
 
 | Option | Type | Default | What it does |
 |---|---|---|---|
-| `outDir` | `string` | — (required) | Where tool files go, relative to where you run the CLI |
+| `outDir` | `string` | required | Where tool files go, relative to where you run the CLI |
 
 Emits one `*.webmcp.ts` file per tool plus a shared `runtime.webmcp.ts` (the only browser
 coupling) and an `index.ts` barrel with `registerAllTools()`.
@@ -80,7 +80,7 @@ safety: {
 | Option | Type | What it does |
 |---|---|---|
 | `piiFields` | `string[]` | Extends the built-in PII heuristics used when scanning response schemas |
-| `exclude` | `string[]` | Drops matching operations before generation — matched against both the tool name and the route |
+| `exclude` | `string[]` | Drops matching operations before generation. Matched against both the tool name and the route |
 
-`exclude` is the right tool for API areas that should never become agent tools — internal
+`exclude` is the right tool for API areas that should never become agent tools: internal
 routes, admin surfaces, webhook receivers. See [Safety & the audit](/docs/safety).

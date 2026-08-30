@@ -64,7 +64,7 @@ export interface CandidateTool {
   httpMethod?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
   sideEffect: SideEffect;
   requiresAuth: boolean;
-  /** Where the description text came from — always reviewable before commit. */
+  /** Where the description text came from. Always reviewable before commit. */
   description: string;
   descriptionSource: "openapi-summary" | "generated-template";
 }
@@ -101,7 +101,7 @@ export interface GeneratedFile {
   path: string;
   /** Full new contents. */
   contents: string;
-  /** What writing this file would do — used for the report and --dry-run. */
+  /** What writing this file would do. Used for the report and --dry-run. */
   action: "create" | "update" | "unchanged";
   /**
    * Present when an existing file was edited by hand in the generated region,
