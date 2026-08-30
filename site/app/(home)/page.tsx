@@ -135,11 +135,11 @@ export default function HomePage() {
       <section className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
           <h2 className="mb-3 font-display text-[clamp(1.5rem,3vw,2.1rem)] font-medium tracking-[-0.015em]">
-            Run it again. And again.
+            Your API changes. Your tools keep up.
           </h2>
           <p className="mb-10 max-w-xl text-[15px] leading-relaxed text-dim sm:mb-14">
-            Your API keeps moving. Your tools should keep up, without ever eating your
-            code. Exactly what happens each time:
+            Re-run the command whenever the spec moves. Regeneration never touches code
+            you wrote. The exact behavior:
           </p>
 
           <div className="border-y border-line">
