@@ -1,60 +1,66 @@
 ---
 title: The regeneration contract
-description: Contracts regenerate freely. Your code is never touched. That's the whole deal.
+description: Run it as often as you like. What updates, what never moves, and why.
 ---
 
-A codegen tool you can't re-run is a scaffolding tool. The point of webmcp-codegen is that
-your API keeps evolving and your tools keep up. So the merge behavior is the most carefully
-designed part of the whole thing.
+Codegen tools earn trust one way: by what they do on the *second* run. This one is built
+to be re-run every time your API changes.
 
-## One file, two regions
+## The rules
 
-Every per-tool file is split by marker lines:
+| Situation | What happens |
+| --- | --- |
+| An endpoint is added | A new file appears, ready to use |
+| The spec changed | Only the part generated from the spec updates |
+| Nothing changed | Nothing gets rewritten; your git history stays quiet |
+| You edited the generated part | Your version wins; the update waits in a separate `.new` file |
 
-```ts
-import { getModelContext } from "./runtime.webmcp";
+## How it works
 
-// ─── webmcp-codegen: generated — do not edit this region ───
-// name, description, input schema, input type, hints, register()
-// …derived from your spec, refreshed on every generate…
-// ─── webmcp-codegen: end generated — your code below survives regeneration ───
+Each tool file has two regions, split by a marker comment:
 
-export async function executeGetOrderStatus(input: GetOrderStatusInput) {
-  // yours, forever
+```ts title="src/webmcp/delete-pet.webmcp.ts"
+// ─── webmcp-codegen: generated. Do not edit this region. ───
+
+//   name, description, input schema, input type, hints, register()
+//   ... everything derived from the API contract
+
+// ─── webmcp-codegen: end generated. Your code below survives regeneration. ───
+
+export async function executeDeletePet(input: DeletePetInput) {
+  // This tool starts disabled: it changes things. ...
+  return toolDisabled("delete-pet.webmcp.ts");
+
+  // const data = await callApi(`/pets/${input.id}`, { method: "DELETE" });
+  // return toolResult(data);
 }
 ```
 
-**Above the marker** is the contract: name, description, the JSON Schema advertised to the
-agent, the TypeScript input type, the safety hints, the `register…()` wrapper. These track
-your spec and are regenerated on every run.
+Everything above the end-marker is regenerated freely: it tracks your spec exactly.
+Everything below it was written once and is never touched again. The scaffold below the
+marker is working code (reads) or working code one uncomment away (mutations), so "owning"
+the region usually means editing behavior, not writing plumbing.
 
-**Below the marker** is `execute()`, scaffolded exactly once, when the file is first
-created, and never written again. Change a description in your spec and re-run: the doc
-comment updates, your implementation survives word for word.
+Two support files are fully regenerated on every run and say so in their header:
+`runtime.webmcp.ts` (the shared helpers: `callApi`, `toolResult`, `toolDisabled`,
+`getModelContext`, `requestUserConfirmation`) and `index.ts` (the `registerAllTools()`
+barrel).
 
-## The rules, precisely
+## What never gets touched
 
-| Situation on re-run | What happens |
-|---|---|
-| New operation in the spec | New file, `create`, with a fresh `execute()` scaffold |
-| Contract changed, your region intact | File updated above the marker only (`update`) |
-| Nothing changed | Nothing written (`unchanged`, so no diff noise in git) |
-| You edited *above* the marker, or removed the markers | Your file is left alone; the new version goes to `<name>.webmcp.ts.new` and the report shows a **conflict** |
+- Your `execute()` implementations and anything else below the marker.
+- Your overrides in `.webmcp-codegen.json` (descriptions, enabled flags). They apply after
+  every regeneration, so dashboard edits survive.
 
-That last row is the promise in its sharpest form: webmcp-codegen would rather write a
-sibling file and admit defeat than overwrite something you wrote by hand.
+## Conflicts
 
-## Owning it
+If you edit above the marker on purpose (you own the files; maybe you had a reason), the
+next run does not fight you: it leaves your file alone and writes its version to
+`<name>.webmcp.ts.new` with a header explaining what happened. You merge by hand and delete
+the `.new` file.
 
-Because the output is plain TypeScript with no runtime dependency on the package, you can
-stop re-generating at any point and just keep the files. "You own the output" isn't a
-license question. It's an architecture property.
+## No dependency on the tool
 
-`runtime.webmcp.ts` and `index.ts` are the exception: they're fully regenerated every run
-(their headers say so), because you should never need to edit them.
-
-## What to commit
-
-Commit the generated files. They're source code your app imports. Like migrations or
-generated API clients, they belong in review. Diffs in the contract region are also the
-clearest possible signal of "the API changed, the tools follow."
+Generated files import only from each other. Nothing at runtime imports `webmcp-codegen`.
+Uninstall the package, delete the config, and everything you generated keeps working. That
+is the point of generating code instead of hiding it in a library.

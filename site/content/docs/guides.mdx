@@ -1,82 +1,77 @@
 ---
 title: Working with real APIs
-description: Monorepos, large APIs, and getting the most out of your spec.
+description: Monorepos, specs without operationIds, big APIs, and keeping descriptions human.
 ---
-
-Lessons from running webmcp-codegen against a real production API (73 operations,
-monorepo, zero `operationId`s): the tool's first field test.
 
 ## Monorepos
 
-Generated tools belong to the *app that will expose them* (usually your frontend), while
-the spec usually lives with the server. So run from the app, pointing across the repo:
+Run from the repo root. The CLI finds the spec and the web app on its own:
 
 ```bash
-cd apps/web
-npx webmcp-codegen generate --spec ../server/openapi/openapi.json
+npx webmcp-codegen generate
 ```
 
-If your server can export its spec as a build step (beenthere does this with an
-`openapi:export` script), regenerate the spec first so the tools track reality:
+Detection reads each workspace package's `package.json` and looks for a browser framework
+(`next`, `react` + `vite`, `nuxt`, `@sveltejs/kit`). With exactly one candidate it proceeds
+and says what it decided (`Found your web app: apps/web (next)`). With several, it asks
+once and remembers the answer in `.webmcp-codegen.json`. Override either with `--spec` and
+`--out`.
 
-```json title="package.json"
-{
-  "scripts": {
-    "webmcp": "pnpm --filter @my/server openapi:export && npx webmcp-codegen generate"
-  }
-}
+The tools land in the web app (`apps/web/src/webmcp`), because tools are browser code. The
+spec's location plays no role in placement.
+
+## Specs without operationIds
+
+Names fall back to method plus path: `GET /v1/trips/{id}` becomes `get-v1-trips-id`. Two
+automatic cleanups keep those readable:
+
+- A shared version prefix is stripped. When nearly every path starts with `/v1/`, names
+  become `get-trips-id`, with a note in the report.
+- Collisions append the method or a counter, and every rename shows up in the audit.
+
+For the best names and descriptions, add `operationId` and `summary` to your spec at the
+source. It improves your SDK generation too, not just this tool.
+
+## Big APIs
+
+A 200-endpoint API generates 200 tools. That works, but context matters: every tool's
+description joins the agent's prompt. Better to expose the endpoints agents should
+actually use. Use `safety.exclude` in the config for whole families (`["internal",
+"debug"]`), and the dashboard's toggles for individual calls.
+
+## Seeing your tools
+
+The generated tools register on page load. To watch that happen:
+
+- **Chrome:** turn on `chrome://flags/#enable-webmcp-testing` (Chrome 146+) and reload.
+  The *Model Context Tool Inspector* extension shows the registered tools and lets you
+  invoke them by hand.
+- **Other browsers:** add the WebMCP polyfill to your page; the same registration code
+  works unchanged.
+- **No browser at all:** `npx webmcp-codegen dev` runs any tool directly from the
+  dashboard (server-side, so without your browser session; auth'd endpoints will answer
+  accordingly).
+
+## The dashboard
+
+```bash
+npx webmcp-codegen dev
 ```
 
-## Large APIs
+A local control panel for the generated tools: browse and search them, see each one's
+route, risk label, and audit findings, edit descriptions, toggle tools on and off, and run
+them directly. Edits are written to `.webmcp-codegen.json` as overrides, so they survive
+regeneration and can be committed. The dashboard never touches your app: it is a localhost
+page served by the CLI, gone when you Ctrl+C.
 
-A 70-endpoint API generates 70 tools. That's correct, but it's rarely what you want to
-ship to an agent on day one.
+## CI
 
-**Exclude what agents should never touch.** Webhook receivers, admin surfaces, and auth
-endpoints are not user actions:
+The audit exits non-zero on errors, which makes it a CI check:
 
-```js
-safety: {
-  exclude: ["webhook", "/admin", "/auth", "internal"],
-}
+```bash
+npx webmcp-codegen generate --dry-run
 ```
 
-**Register selectively.** `registerAllTools()` is convenient; importing individual
-`register…()` functions from the barrel is explicit. A handful of well-described read tools
-is a better first agent experience than seventy stubs whose `execute()` throws
-"Not implemented":
-
-```ts
-import { registerListTrips, registerGetTripsTripId } from "./webmcp";
-
-await registerListTrips();
-await registerGetTripsTripId();
-```
-
-Unimplemented tools fail loudly when called, never silently. But the better move is not
-registering them until they work.
-
-## Spec hygiene: garbage in, tools out
-
-The generator is only as good as the spec. Three spec habits pay off immediately:
-
-**Write `summary` on every operation.** It becomes the tool description, which is part of
-the agent's prompt. "List all trips for the signed-in user" beats `GET /v1/trips/` as a
-reason to call a tool, every time.
-
-**Add `operationId`s.** They become tool names (`getOrderStatus` → `get-order-status`).
-Without them, names derive from method + path: valid, but verbose
-(`get-v1-trips-trip-id`).
-
-**Mark server-generated fields `readOnly`.** Without it, "create trip" might offer `id` and
-`slug` as agent-settable inputs. (Honoring `readOnly` in generated schemas is on the
-roadmap, but marking it makes your spec better for every consumer, including your typed
-SDK.)
-
-## Keep the tools in sync
-
-Two habits, pick either or both:
-
-- `--watch` while developing: `npx webmcp-codegen generate --watch` re-runs on spec changes.
-- In CI: plain `npx webmcp-codegen generate` fails the build if the audit reports errors.
-  See [CLI reference](/docs/cli#exit-codes-for-ci).
+Run it on pull requests that touch the spec. A new destructive endpoint, a description that
+tries to instruct the agent, a response that starts leaking PII: all three show up as
+findings before they ship.

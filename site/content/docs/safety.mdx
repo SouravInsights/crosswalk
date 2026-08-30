@@ -1,75 +1,83 @@
 ---
-title: Safety & the audit
-description: Every generated tool is classified, hinted, and audited before a line is written.
+title: Safety and the audit
+description: How tools are classified, which endpoints are skipped or disabled, and what the audit enforces.
 ---
 
-Agents will call these tools. That makes "what can this tool do?" a question the generator
-should answer up front, not something each developer re-derives by reading seventy files.
+Nothing is written to disk until every candidate tool has been through the safety layer.
+It does three jobs: classify what calling a tool does, decide its starting state, and lint
+the result in plain language.
 
 ## Classification
 
-Every tool is classified by its HTTP verb, refined by naming heuristics:
+Every tool is classified by what calling it does to the world:
 
-| Classification | How it's decided | Risk tier |
-|---|---|---|
-| `read` | `GET`, `HEAD`, `OPTIONS` | `safe-read` |
-| `write` | `POST`, `PUT`, `PATCH` | `write-confirm` |
-| `destructive` | `DELETE`, or a write verb whose name/route says *cancel, delete, purge, destroy, remove, reset* | `destructive-confirm` |
+| Label | Meaning | Examples |
+| --- | --- | --- |
+| `read` | Changes nothing | `GET` endpoints, `HEAD`, `OPTIONS` |
+| `write` | Changes things, reversibly | `POST`, `PUT`, `PATCH` |
+| `destructive` | Cannot easily be undone | `DELETE`, plus any route or name containing words like *cancel*, *refund*, *revoke*, *purge* |
 
-A safe verb carrying a destructive name (`GET /delete-everything`) is an **error**. Either
-the route is mislabeled or the design is wrong, and both are worth knowing.
+**Search-style POSTs are reads.** If a POST's name contains a reading word as a whole
+segment (`search`, `query`, `list`, `find`, `filter`, `estimate`, `preview`, `validate`,
+`check`, `lookup`, `autocomplete`, `suggest`), it is classified as a read. `POST /search`
+and `POST /estimate` are reads wearing a write verb. The audit shows a warning for these,
+so a mislabeled one is visible.
 
-## Hints
+Classification drives the WebMCP hints (`readOnlyHint`, `destructiveHint`,
+`idempotentHint`), which the generated files carry as metadata.
 
-Each tool gets WebMCP hints derived from the classification, exported in its file:
+## Starting state: enabled or disabled
 
-```ts
-export const deletePetHints = {
-  readOnlyHint: false,
-  destructiveHint: true,
-  idempotentHint: true,
-} as const;
-```
+Classification also decides whether a tool works out of the box:
 
-`idempotentHint` is true for reads, `PUT`, `PATCH`, and `DELETE`, since retrying them with the
-same input is safe. It is false for `POST`.
+- **Reads start enabled.** The generated `execute()` calls your API from the page, with
+  the signed-in user's session. It works immediately.
+- **Writes and destructive tools start disabled.** The same working code is generated but
+  commented out. The tool still registers, so agents can see it; calling it returns a clear
+  "this tool is disabled" message that tells the agent to ask the human. Enabling one is
+  deleting the return line and uncommenting the code.
+
+**User confirmation for mutations is generated, not remembered.** The register wrapper for
+write and destructive tools asks the user to confirm before every call, and that step lives
+in the generated region of the file, so it cannot be edited away by accident. The default
+is `window.confirm`; replace `requestUserConfirmation()` in `runtime.webmcp.ts` with your
+app's own dialog when you outgrow it.
+
+## Endpoint roles
+
+Some endpoints should not become agent tools just because they exist in the spec:
+
+- **Webhooks are skipped entirely.** A webhook receives server callbacks; an agent has
+  nothing to call. Skips are listed in the report with the reason.
+- **Auth endpoints** (sign-in, logout, token, password, session) are generated disabled,
+  with a warning. Agents should not drive authentication.
+- **Admin endpoints** are generated disabled, with a warning. Exposing admin operations is
+  a deliberate decision to make endpoint by endpoint.
+
+Your own rules join via `safety.exclude` in the config: matched endpoints are skipped and
+listed, never silently dropped.
 
 ## The audit
 
-The audit runs as part of every `generate` (skip with `--skip-audit`). **Errors block file
-writing**; warnings never do. Override with `--force` when you mean it.
+After classification, every tool is linted. Findings come in two levels:
 
-Real output from a real spec:
+- **Errors block generation.** Generation writes nothing until they are fixed (or you pass
+  `--force`). Example: a safe verb (`GET`) carrying a destructive name. That is either a
+  mislabeled spec or a genuinely dangerous GET, and both deserve a human look.
+- **Warnings never block.** Missing descriptions, descriptions that read like agent
+  instructions (a prompt-injection smell), responses that may expose PII, mutating tools
+  behind auth.
 
+The audit is meant to run in CI like `npm audit`: exit codes, not vibes.
+
+```bash
+npx webmcp-codegen generate --dry-run   # see the findings without writing anything
 ```
-  ⚠ Response may expose owner.email. These fields reach the agent. Exclude them
-    in execute() unless they are truly needed. (create-pet)
-  ⚠ This mutating tool wraps an authenticated endpoint. It runs with the page's
-    session, so make sure your server-side authorization checks apply to tool calls too.
-  ✖ The name suggests something destructive but GET is a safe verb. (delete-all)
-```
 
-What it checks today:
+## PII scanning
 
-- **Template descriptions** *(warning)*. When the source has no summary, the description is
-  just `GET /route`. Agents pick tools by description; write a real sentence.
-- **Agent-instructing descriptions** *(warning)*. Phrasing like "you must always call this"
-  addresses the agent instead of describing the tool. That's a known prompt-injection
-  pattern, and never what you want in a contract.
-- **Destructive name on a safe verb** *(error)*.
-- **PII in responses** *(warning)*. Fields like `email`, `ssn`, `cardNumber` (plus your
-  `safety.piiFields`) found in the response schema. Everything a tool returns reaches the
-  agent.
-- **Mutating tools behind auth** *(warning)*. The tool runs with the page's session; your
-  server-side authorization must apply to tool calls too.
-
-## What safety means here, honestly
-
-Classification and hints are metadata: they tell hosts and UIs what a tool can do, and they
-tell *you* what you're exposing. They don't enforce anything by themselves. Enforcement is
-the human confirmation you wire into `execute()` (`requestUserConfirmation()` is scaffolded
-into the runtime for exactly this) and the server-side checks your API already has.
-
-The audit's job is narrower and more valuable: **never let a tool exist that you didn't
-consciously decide to expose.** Errors force the decision; the config's `safety.exclude`
-records it.
+Response schemas are scanned for fields that look like personal data or secrets
+(`email`, `password`, `ssn`, `token`, `phone`, and more; extend with `safety.piiFields`).
+The security-relevant direction is data leaving the page and reaching the agent, so only
+*outputs* are scanned. Flagged fields are called out in the report, on the dashboard, and
+in a comment above the tool's `execute()`.

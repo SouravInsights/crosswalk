@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: From an OpenAPI spec to registered WebMCP tools, in three steps.
+description: One command, working tools, wired into your app. Five minutes to an agent calling your API.
 ---
 
 ## 1. Generate
@@ -8,81 +8,67 @@ description: From an OpenAPI spec to registered WebMCP tools, in three steps.
 Point the CLI at a project with an OpenAPI spec. No install, no config file:
 
 ```bash
-npx webmcp-codegen generate --dry-run
-```
-
-The CLI searches your project for spec files (`openapi.json/yaml`, `swagger.*`; monorepo
-layouts included), shows what it found, and previews every tool it would create, with its
-risk tier and the audit findings. Nothing is written on a dry run.
-
-Happy with the preview? Write the files:
-
-```bash
 npx webmcp-codegen generate
 ```
 
-Tools land in `./src/webmcp/` (override with `--out`).
+The CLI finds your spec (including monorepo layouts like
+`apps/server/openapi/openapi.json`), finds the package that is your web app, and writes
+tools into it. In a monorepo with several app candidates it asks once and remembers your
+answer in `.webmcp-codegen.json`, so the next run never re-asks.
 
-<Callout type="info">
-**Monorepo?** Run from the app that will expose the tools, pointing at the spec:
+What you get, per endpoint:
 
-```bash
-cd apps/web && npx webmcp-codegen generate --spec ../server/openapi/openapi.json
-```
+- **Read tools work immediately.** `GET /trips` becomes a tool whose `execute()` calls your
+  API from the page, with the signed-in user's session. No homework.
+- **Mutations start disabled.** `DELETE /trips/{id}` gets the same working code, commented
+  out, behind a generated user-confirmation step. Enable it by uncommenting.
+- **Webhooks, auth, and admin endpoints are handled on purpose:** webhooks are skipped,
+  auth and admin are generated disabled with a warning.
 
-</Callout>
-
-## 2. Implement `execute()`
-
-Open any generated file. Everything above the marker is the contract, derived from your
-spec; below the marker is yours:
-
-```ts title="src/webmcp/get-pet.webmcp.ts"
-// ─── webmcp-codegen: end generated. Your code below survives regeneration. ───
-
-export async function executeGetPet(input: GetPetInput) {
-  // TODO: implement using your app's existing code, e.g.:
-  //   const response = await fetch("/pets/" + input.id);
-  //   if (!response.ok) throw new Error("Request failed: " + response.status);
-  //   return { content: [{ type: "text", text: "Done" }] };
-  throw new Error("Not implemented: executeGetPet");
-}
-```
-
-Replace the stub with a call to your real client code: the fetch wrapper, SDK, or query
-client your app already uses. The TODO example shows the actual route when the spec knows it.
-
-Return the MCP result shape: `{ content: [{ type: "text", text: "..." }] }`.
-
-## 3. Register on startup
-
-```ts
-import { registerAllTools } from "./webmcp";
-
-await registerAllTools();
-```
-
-Or register only the tools you've implemented. The barrel exports one `register…()`
-function per tool, so cherry-picking is just importing fewer of them.
-
-## See them work
-
-WebMCP is a draft spec, so today you need one of:
-
-- **Chrome 146+** with `chrome://flags/#enable-webmcp-testing` enabled
-- The **WebMCP polyfill** from `GoogleChromeLabs/webmcp-tools`
-
-Then open your app and inspect the tools with the **Model Context Tool Inspector** extension,
-or connect any MCP-capable agent.
-
-## When you want control
-
-The zero-config run covers the common case. For custom output paths, multiple sources,
-safety options, or plugin hooks, install the package and write a config file:
+Preview without writing anything first:
 
 ```bash
-npm install -D webmcp-codegen
-npx webmcp-codegen init
+npx webmcp-codegen generate --dry-run
 ```
 
-See [Configuration](/docs/configuration).
+## 2. Registration is wired for you
+
+Generated files do nothing until your app registers them once at startup. The CLI does
+this edit for you:
+
+- **Next.js (app router):** creates `src/webmcp/register.tsx` (a small client component)
+  and adds an import plus `<WebMCPRegister />` to your root layout.
+- **Vite + React:** adds an import and one `registerAllTools()` call to `main.tsx`.
+
+Edits are additive only, idempotent, and printed in the report with undo instructions. If
+the CLI can't find your entry file confidently, it prints the two lines instead of
+guessing.
+
+## 3. Try it
+
+1. Start your app and open it in Chrome.
+2. Turn on `chrome://flags/#enable-webmcp-testing` and reload.
+3. Ask the agent to do something real. The CLI suggests one, drawn from your spec
+   ("list my trips").
+
+Other browsers: add the [WebMCP polyfill](https://github.com/webmachinelearning/webmcp-polyfill)
+to your page and the same tools work there.
+
+## 4. Manage your tools
+
+```bash
+npx webmcp-codegen dev
+```
+
+Opens a local dashboard: every tool with its description, risk label, and audit findings.
+Edit descriptions, toggle tools on and off, and run any tool directly to check it works.
+Edits are saved to `.webmcp-codegen.json` and survive regeneration.
+
+## 5. Refine what matters
+
+The default implementations call your API with `fetch`. For tools you care about, open the
+file and replace the body of `execute()` with your app's own API client. The contract above
+the marker never changes; your code below it is never touched.
+
+Add summaries to your OpenAPI operations as you go. A tool's description goes straight into
+the agent's prompt, and the audit reminds you when one is missing.

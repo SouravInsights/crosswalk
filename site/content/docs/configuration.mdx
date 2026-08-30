@@ -1,15 +1,35 @@
 ---
 title: Configuration
-description: "codegen.config.mjs: sources, generators, and safety options."
+description: codegen.config.mjs for structure, .webmcp-codegen.json for choices and tweaks.
 ---
 
-You don't need a config file: `npx webmcp-codegen generate` detects your spec and uses
-sensible defaults. Reach for config when you want control: a different spec path, safety
-options, or (soon) multiple sources and generators.
+## Two files, two jobs
 
-## The config file
+**`codegen.config.mjs`** is code. It defines structure: sources, generators, safety
+options. Write it with `npx webmcp-codegen init` when you outgrow the defaults. It imports
+from the package, so it needs `npm install -D webmcp-codegen`.
 
-```js title="codegen.config.mjs"
+**`.webmcp-codegen.json`** is data. The CLI writes it to remember choices it had to ask or
+detect (which spec, which app is your web app), and the dev dashboard writes per-tool
+overrides to it. It needs no install, and it is meant to be committed.
+
+```json title=".webmcp-codegen.json"
+{
+  "spec": "apps/server/openapi/openapi.json",
+  "app": "apps/web",
+  "overrides": {
+    "get-trips": { "description": "List my trips, newest first." },
+    "delete-trip": { "enabled": true }
+  }
+}
+```
+
+Overrides apply after the safety review, so they win over derived defaults and survive
+regeneration. Editing this file by hand is fine.
+
+## codegen.config.mjs
+
+```ts title="codegen.config.mjs"
 import { defineConfig } from "webmcp-codegen";
 import { openapi } from "webmcp-codegen/sources";
 import { js } from "webmcp-codegen/generators";
@@ -18,69 +38,46 @@ export default defineConfig({
   sources: [openapi({ spec: "./openapi.yaml" })],
   generate: [js({ outDir: "./src/webmcp" })],
   safety: {
-    // options; see below
+    // Extra field names to treat as PII, on top of the built-in list:
+    // piiFields: ["internalId"],
+    // Tools to skip entirely (matched against name and route):
+    // exclude: ["internal"],
   },
 });
 ```
 
-Config files are plain JavaScript so the CLI can load them with a plain dynamic import.
-No TypeScript loader, no build step. Because the file imports from `webmcp-codegen`, this
-mode needs the package installed:
+Config files are plain JavaScript so the CLI loads them with a plain dynamic import. No
+TypeScript loader, no build step. Paths (`spec`, `outDir`) resolve from the directory you
+run the command in.
 
-```bash
-npm install -D webmcp-codegen
-npx webmcp-codegen init   # writes this file for you, with your detected spec
-```
+## Options
 
-The generated code never imports `webmcp-codegen`; the package is a build-time tool only.
+### `sources`
 
-## Sources
+An array; today there is one source. `openapi({ spec })` reads an OpenAPI 3.x document
+(YAML or JSON). Add more entries to combine several specs into one toolset.
 
-Sources read an existing contract and produce candidate tools. Today there is one:
+### `generate`
 
-### `openapi({ spec })`
+An array; today there is one generator. `js({ outDir })` writes the plain-TypeScript
+output described in [Regeneration](/docs/regeneration). Framework generators
+(`react`, `html`) are on the roadmap.
 
-| Option | Type | What it does |
-|---|---|---|
-| `spec` | `string` | Path to the OpenAPI 3.x document (JSON or YAML), relative to where you run the CLI |
+### `safety.piiFields`
 
-Every operation under `paths` becomes a candidate tool. Path and query parameters merge
-with the JSON request body into a single input object; header and cookie parameters are
-skipped on purpose (transport concerns, not agent inputs). `$ref`s are fully resolved, so
-generated schemas are self-contained.
+Extends the built-in list of field names the audit flags as likely PII in responses
+(`email`, `password`, `phone`, and friends). Add your domain's own sensitive fields.
 
-Names come from `operationId` when present (`getOrderStatus` → `get-order-status`),
-otherwise from method + path. See [Working with real APIs](/docs/guides#spec-hygiene) for
-how spec quality shapes tool quality.
+### `safety.exclude`
 
-## Generators
+Substrings matched against tool names and routes, case-insensitive. Excluded endpoints are
+skipped and listed in the report with the reason, never silently dropped.
 
-Generators turn reviewed tools into files. Today there is one:
+## Precedence
 
-### `js({ outDir })`
+When several sources of truth exist, the winner is:
 
-| Option | Type | Default | What it does |
-|---|---|---|---|
-| `outDir` | `string` | required | Where tool files go, relative to where you run the CLI |
-
-Emits one `*.webmcp.ts` file per tool plus a shared `runtime.webmcp.ts` (the only browser
-coupling) and an `index.ts` barrel with `registerAllTools()`.
-
-## Safety options
-
-```js
-safety: {
-  // Extra field names to treat as PII, on top of the built-in list:
-  piiFields: ["internalId"],
-  // Tools to skip entirely (matched as substrings against tool name and route):
-  exclude: ["internal", "/admin"],
-}
-```
-
-| Option | Type | What it does |
-|---|---|---|
-| `piiFields` | `string[]` | Extends the built-in PII heuristics used when scanning response schemas |
-| `exclude` | `string[]` | Drops matching operations before generation. Matched against both the tool name and the route |
-
-`exclude` is the right tool for API areas that should never become agent tools: internal
-routes, admin surfaces, webhook receivers. See [Safety & the audit](/docs/safety).
+1. `codegen.config.mjs` (structure)
+2. `--spec` / `--out` flags (one-off overrides)
+3. `.webmcp-codegen.json` (remembered choices, per-tool overrides)
+4. Detection (spec filenames, web-app package.json)
