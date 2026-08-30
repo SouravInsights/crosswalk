@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start -p 3001",
     "postinstall": "fumadocs-mdx",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "demo:build": "node scripts/build-demo-data.mjs"
   },
   "dependencies": {
     "fumadocs-core": "^15.0.0",

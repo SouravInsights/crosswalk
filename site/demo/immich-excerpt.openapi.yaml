@@ -1,0 +1,93 @@
+# Excerpt of Immich's real OpenAPI spec (open-api/immich-openapi-specs.json).
+# operationIds, summaries, verbs, and paths are verbatim; schemas are trimmed
+# to keep the excerpt readable. Used to build the landing page demo.
+openapi: 3.0.3
+info:
+  title: Immich
+  version: 2.0.0
+paths:
+  /albums:
+    get:
+      operationId: getAllAlbums
+      summary: List all albums
+      tags: [albums]
+      parameters:
+        - name: shared
+          in: query
+          required: false
+          description: Only return shared albums
+          schema: { type: boolean }
+      responses:
+        "200": { description: OK }
+    post:
+      operationId: createAlbum
+      summary: Create an album
+      tags: [albums]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [albumName]
+              properties:
+                albumName: { type: string }
+                description: { type: string }
+      responses:
+        "201": { description: Created }
+  /albums/{id}:
+    get:
+      operationId: getAlbumInfo
+      summary: Retrieve an album
+      tags: [albums]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Album ID
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: OK }
+    delete:
+      operationId: deleteAlbum
+      summary: Delete an album
+      tags: [albums]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Album ID
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Deleted }
+  /assets/{id}:
+    get:
+      operationId: getAssetInfo
+      summary: Retrieve an asset
+      tags: [assets]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Asset ID
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: OK }
+  /admin/users:
+    post:
+      operationId: createUserAdmin
+      summary: Create a user
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, name, password]
+              properties:
+                email: { type: string, format: email }
+                name: { type: string }
+                password: { type: string }
+      responses:
+        "201": { description: Created }
