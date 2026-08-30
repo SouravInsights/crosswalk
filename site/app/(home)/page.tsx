@@ -38,26 +38,26 @@ const TOOL_LINES: Array<{ text: string; tone?: "key" | "dim" | "marker" }> = [
 
 const STEPS: Array<{ title: string; body: string }> = [
   {
-    title: "Point it at your repo",
-    body: "It finds your OpenAPI or Swagger spec on its own, monorepos included. Nothing to install, nothing to configure.",
+    title: "Point it at your project",
+    body: "It finds your API spec on its own. Nothing to install, nothing to configure.",
   },
   {
-    title: "Review the report",
-    body: "Every endpoint becomes a tool: named, typed, and labeled read, write, or destructive. Anything that looks dangerous stops the run before a line is written.",
+    title: "Look at the report",
+    body: "Every endpoint becomes a tool, checked and labeled. Anything that looks risky gets flagged before anything is written.",
   },
   {
-    title: "Fill in one function",
-    body: "Each file has a marker line. The spec contract lives above it and stays in sync. Your execute() lives below it and is never touched.",
+    title: "Fill in the part that's yours",
+    body: "Each file has a part that stays in sync with your spec and a part you write yourself. Re-running never touches your part.",
   },
 ];
 
-/* ── Section: the rules, as a ledger of terms ── */
+/* ── Section: the rules, as a ledger ── */
 
 const RULES: Array<[string, string]> = [
-  ["a new endpoint appears", "a new file appears too, with a stub for your code"],
-  ["the spec changed", "only the part above the marker updates"],
-  ["nothing changed", "nothing is written, so no noise in git"],
-  ["you edited the top part by hand", "your file wins; the new version lands in a .new file"],
+  ["an endpoint is added", "a new file appears, with space for your code"],
+  ["the spec changed", "only the part generated from the spec updates"],
+  ["nothing changed", "nothing gets rewritten, and your git history stays quiet"],
+  ["you edited the generated part", "your version wins; the update waits in a separate file"],
 ];
 
 /* ── Section: the safety report, real output ── */
@@ -78,14 +78,14 @@ const AUDIT_LINES: Array<{ text: string; tone?: "dim" | "warn" | "err" }> = [
 /* ── Section: the details ── */
 
 const FACTS: Array<[string, string]> = [
-  ["no config needed", "finds your spec on its own, works in monorepos"],
-  ["nothing to install", "runs with npx, your project stays clean"],
-  ["no runtime dependency", "generated files never import the package"],
-  ["dry run", "--dry-run shows every file before writing anything"],
-  ["watch mode", "--watch regenerates when the spec changes"],
-  ["works in CI", "stops the build when the safety check fails"],
-  ["node", ">= 20"],
-  ["license", "MIT"],
+  ["nothing to install", "one command, run with npx"],
+  ["no setup", "it finds your API spec itself"],
+  ["your code stays yours", "generated files never depend on the tool"],
+  ["preview first", "see every file before anything is written"],
+  ["stays in sync", "re-run it whenever your API changes"],
+  ["catches risky tools", "before they reach anyone's agent"],
+  ["runs anywhere", "works locally and in CI"],
+  ["open source", "MIT"],
 ];
 
 export default function HomePage() {
@@ -126,9 +126,10 @@ export default function HomePage() {
             Your API spec, as agent tools.
           </h1>
           <p className="mb-9 max-w-xl text-[16px] leading-relaxed text-dim sm:text-[17px]">
-            WebMCP lets AI agents call your app through tools. Writing them by hand means
-            copying names, schemas, and descriptions out of your spec for every endpoint.
-            This does it for you, and keeps them in sync when your API changes.
+            WebMCP lets AI agents call your app through tools. Writing those tools by hand
+            means copying names, types, and descriptions out of your API spec, one endpoint
+            at a time. This does it for you, and keeps them up to date when your API
+            changes.
           </p>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <CopyCommand command={COMMAND} />
@@ -164,7 +165,7 @@ export default function HomePage() {
             </div>
 
             <div className="border border-line bg-panel">
-              <p className="border-b border-line px-4 py-2 font-mono text-[11px] text-ghost">
+              <p className="border-b border-line px-4 py-2.5 font-mono text-[11px] text-ghost">
                 src/webmcp/adopt-pet.webmcp.ts
               </p>
               <pre className="overflow-x-auto px-4 py-4 font-mono text-[11.5px] leading-relaxed">
@@ -206,16 +207,15 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* The regeneration rules, as a ledger of terms. */}
+      {/* The regeneration rules, as a ledger. */}
       <section className="border-b border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
           <h2 className="mb-3 font-display text-[clamp(1.5rem,3vw,2.1rem)] font-medium tracking-[-0.015em]">
             Re-run it as often as you like
           </h2>
           <p className="mb-10 max-w-xl text-[15px] leading-relaxed text-dim sm:mb-14">
-            Most codegen tools are scaffolding: run once, then you're on your own. Your API
-            keeps changing, so this one is built to be re-run. The rules, exactly as they
-            behave:
+            Most generators are run-once scaffolding. Your API keeps changing, so this one
+            is built to be run again. Exactly what happens each time:
           </p>
 
           <div className="border border-line">
@@ -233,8 +233,8 @@ export default function HomePage() {
           </div>
 
           <p className="mt-8 max-w-xl text-[14.5px] leading-relaxed text-dim">
-            The files are plain TypeScript with no runtime dependency on the package. Stop
-            using the tool tomorrow and everything you generated keeps working.
+            The files are plain TypeScript and don't depend on the tool. Stop using it
+            tomorrow and everything you generated keeps working.
           </p>
         </div>
       </section>
@@ -246,9 +246,8 @@ export default function HomePage() {
             It checks before it writes
           </h2>
           <p className="mb-10 max-w-xl text-[15px] leading-relaxed text-dim sm:mb-14">
-            Before any file is written, every tool gets labeled and checked. Warnings are
-            informational. Errors stop the run with exit code 1, so CI catches them before
-            your users do.
+            Before anything is written, every tool gets checked: what it does, what it
+            might expose, whether it sounds safe. Anything that looks wrong stops the run.
           </p>
 
           <div className="border border-line bg-panel">
@@ -277,6 +276,11 @@ export default function HomePage() {
               ))}
             </pre>
           </div>
+
+          <p className="mt-8 max-w-xl text-[14.5px] leading-relaxed text-dim">
+            Tools are labeled by what they can do. Responses that might expose personal
+            data get flagged. Problems stop here, not in front of your users' agents.
+          </p>
         </div>
       </section>
 
@@ -295,10 +299,9 @@ export default function HomePage() {
             ))}
           </div>
           <p className="mt-8 max-w-xl text-[13px] leading-relaxed text-faint">
-            One honest note: WebMCP itself is a draft spec. The tools run today in Chrome
-            146+ behind #enable-webmcp-testing, or anywhere with the WebMCP polyfill. The
-            OpenAPI source and the js generator are tested and shipping; tRPC, Zod, and
-            Prisma sources are on the roadmap.
+            One honest note: WebMCP itself is still early. The tools run today in Chrome
+            behind a flag, or anywhere with a small polyfill. OpenAPI is supported now;
+            tRPC, Zod, and Prisma are on the roadmap.
           </p>
         </div>
       </section>
