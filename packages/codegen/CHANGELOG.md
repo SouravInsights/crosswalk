@@ -1,5 +1,11 @@
 # webmcp-codegen
 
+## 0.3.0
+
+### Minor Changes
+
+- Generate now emits working tools (reads call your API immediately, mutations start disabled), auto-wires registration into Next.js and Vite apps, and detects your web app in monorepos. Adds the dev command: a local dashboard to review, describe, toggle, and try tools.
+
 ## 0.2.1
 
 ### Patch Changes
