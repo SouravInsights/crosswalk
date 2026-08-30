@@ -1,0 +1,68 @@
+---
+title: Introduction
+description: Generate safe, typed, human-reviewed WebMCP tools from the OpenAPI spec you already have.
+---
+
+## The problem
+
+WebMCP lets your web app expose tools that AI agents can call — but somebody has to write
+those tools. Today that means hand-writing a `registerTool()` call per action: a name, a
+description, a JSON Schema for the inputs, an `execute` function. For one endpoint that's a
+chore. For an API with seventy endpoints it's a project nobody starts.
+
+And the details matter more than they look: a tool's **description is literally part of the
+prompt** the agent reasons over, and its **schema is the contract** the agent fills in.
+Hand-written copies of things your spec already knows go stale, drift, and lie.
+
+## What webmcp-codegen does
+
+You already have an OpenAPI spec. webmcp-codegen turns it into WebMCP tools — real TypeScript
+files in your repo that you own:
+
+```bash
+npx webmcp-codegen generate
+```
+
+```
+Detected apps/server/openapi/openapi.json (override with --spec)
+
+webmcp-codegen (detected apps/server/openapi/openapi.json) — 5 tool(s)
+
+  list-pets    [safe-read]           ← GET /pets
+  create-pet   [write-confirm]       ← POST /pets
+  get-pet      [safe-read]           ← GET /pets/{id}
+  delete-pet   [destructive-confirm] ← DELETE /pets/{id}
+  adopt-pet    [write-confirm]       ← POST /pets/{id}/adopt
+```
+
+For every operation, one colocated file with the schema derived from your spec, the input
+type inferred, safety hints computed, and a `register…()` wrapper. You implement `execute()`
+with your app's existing code — below a marker line that regeneration never crosses.
+
+## Three promises
+
+**You own the output.** Generated files are plain TypeScript in your repo. No runtime
+dependency on webmcp-codegen — uninstall it after generating and everything still works.
+
+**Regeneration never clobbers your code.** The API contract lives above a marker line and
+regenerates freely. Your `execute()` lives below it and is never touched. Hand-edit the
+generated region and you get a `.new` file to merge, never a silent overwrite.
+
+**Safety is built in, not bolted on.** Every tool is classified (read / write / destructive)
+from the HTTP verb and naming heuristics, gets correct `readOnlyHint` / `destructiveHint` /
+`idempotentHint` values, and passes through an audit that flags PII in responses, vague
+descriptions, and suspicious mutating tools. Audit errors block generation — CI-gateable,
+like `npm audit`.
+
+## Status
+
+webmcp-codegen is young. The OpenAPI source and `js` generator are solid and tested;
+tRPC/Zod/Prisma sources and `react`/`manifest` generators are on the roadmap. WebMCP itself
+is a draft spec — generated tools run in Chrome 146+ behind `#enable-webmcp-testing`, or
+anywhere with the WebMCP polyfill.
+
+<Cards>
+  <Card title="Quickstart" href="/docs/quickstart" description="Zero to generated tools in one command." />
+  <Card title="Safety & the audit" href="/docs/safety" description="How classification, hints, and the audit pass work." />
+  <Card title="The regeneration contract" href="/docs/regeneration" description="What regenerates, what's yours, and why." />
+</Cards>

@@ -1,0 +1,82 @@
+---
+title: Working with real APIs
+description: Monorepos, large APIs, and getting the most out of your spec.
+---
+
+Lessons from running webmcp-codegen against a real production API (73 operations,
+monorepo, zero `operationId`s — the tool's first field test).
+
+## Monorepos
+
+Generated tools belong to the *app that will expose them* — usually your frontend — while
+the spec usually lives with the server. So run from the app, pointing across the repo:
+
+```bash
+cd apps/web
+npx webmcp-codegen generate --spec ../server/openapi/openapi.json
+```
+
+If your server can export its spec as a build step (beenthere does this with an
+`openapi:export` script), regenerate the spec first so the tools track reality:
+
+```json title="package.json"
+{
+  "scripts": {
+    "webmcp": "pnpm --filter @my/server openapi:export && npx webmcp-codegen generate"
+  }
+}
+```
+
+## Large APIs
+
+A 70-endpoint API generates 70 tools. That's correct, but it's rarely what you want to
+ship to an agent on day one.
+
+**Exclude what agents should never touch.** Webhook receivers, admin surfaces, and auth
+endpoints are not user actions:
+
+```js
+safety: {
+  exclude: ["webhook", "/admin", "/auth", "internal"],
+}
+```
+
+**Register selectively.** `registerAllTools()` is convenient; importing individual
+`register…()` functions from the barrel is explicit. A handful of well-described read tools
+is a better first agent experience than seventy stubs whose `execute()` throws
+"Not implemented":
+
+```ts
+import { registerListTrips, registerGetTripsTripId } from "./webmcp";
+
+await registerListTrips();
+await registerGetTripsTripId();
+```
+
+Unimplemented tools fail loudly when called, never silently — but the better move is not
+registering them until they work.
+
+## Spec hygiene: garbage in, tools out
+
+The generator is only as good as the spec. Three spec habits pay off immediately:
+
+**Write `summary` on every operation.** It becomes the tool description — which is part of
+the agent's prompt. "List all trips for the signed-in user" beats `GET /v1/trips/` as a
+reason to call a tool, every time.
+
+**Add `operationId`s.** They become tool names (`getOrderStatus` → `get-order-status`).
+Without them, names derive from method + path — valid, but verbose
+(`get-v1-trips-trip-id`).
+
+**Mark server-generated fields `readOnly`.** Without it, "create trip" might offer `id` and
+`slug` as agent-settable inputs. (Honoring `readOnly` in generated schemas is on the
+roadmap — but marking it makes your spec better for every consumer, including your typed
+SDK.)
+
+## Keep the tools in sync
+
+Two habits, pick either or both:
+
+- `--watch` while developing: `npx webmcp-codegen generate --watch` re-runs on spec changes.
+- In CI: plain `npx webmcp-codegen generate` fails the build if the audit reports errors —
+  see [CLI reference](/docs/cli#exit-codes-for-ci).

@@ -1,0 +1,86 @@
+---
+title: Configuration
+description: codegen.config.mjs — sources, generators, and safety options.
+---
+
+You don't need a config file: `npx webmcp-codegen generate` detects your spec and uses
+sensible defaults. Reach for config when you want control — a different spec path, safety
+options, or (soon) multiple sources and generators.
+
+## The config file
+
+```js title="codegen.config.mjs"
+import { defineConfig } from "webmcp-codegen";
+import { openapi } from "webmcp-codegen/sources";
+import { js } from "webmcp-codegen/generators";
+
+export default defineConfig({
+  sources: [openapi({ spec: "./openapi.yaml" })],
+  generate: [js({ outDir: "./src/webmcp" })],
+  safety: {
+    // options — see below
+  },
+});
+```
+
+Config files are plain JavaScript so the CLI can load them with a plain dynamic import —
+no TypeScript loader, no build step. Because the file imports from `webmcp-codegen`, this
+mode needs the package installed:
+
+```bash
+npm install -D webmcp-codegen
+npx webmcp-codegen init   # writes this file for you, with your detected spec
+```
+
+The generated code never imports `webmcp-codegen` — the package is a build-time tool only.
+
+## Sources
+
+Sources read an existing contract and produce candidate tools. Today there is one:
+
+### `openapi({ spec })`
+
+| Option | Type | What it does |
+|---|---|---|
+| `spec` | `string` | Path to the OpenAPI 3.x document (JSON or YAML), relative to where you run the CLI |
+
+Every operation under `paths` becomes a candidate tool. Path and query parameters merge
+with the JSON request body into a single input object; header and cookie parameters are
+skipped on purpose (transport concerns, not agent inputs). `$ref`s are fully resolved, so
+generated schemas are self-contained.
+
+Names come from `operationId` when present (`getOrderStatus` → `get-order-status`),
+otherwise from method + path. See [Working with real APIs](/docs/guides#spec-hygiene) for
+how spec quality shapes tool quality.
+
+## Generators
+
+Generators turn reviewed tools into files. Today there is one:
+
+### `js({ outDir })`
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `outDir` | `string` | — (required) | Where tool files go, relative to where you run the CLI |
+
+Emits one `*.webmcp.ts` file per tool plus a shared `runtime.webmcp.ts` (the only browser
+coupling) and an `index.ts` barrel with `registerAllTools()`.
+
+## Safety options
+
+```js
+safety: {
+  // Extra field names to treat as PII, on top of the built-in list:
+  piiFields: ["internalId"],
+  // Tools to skip entirely (matched as substrings against tool name and route):
+  exclude: ["internal", "/admin"],
+}
+```
+
+| Option | Type | What it does |
+|---|---|---|
+| `piiFields` | `string[]` | Extends the built-in PII heuristics used when scanning response schemas |
+| `exclude` | `string[]` | Drops matching operations before generation — matched against both the tool name and the route |
+
+`exclude` is the right tool for API areas that should never become agent tools — internal
+routes, admin surfaces, webhook receivers. See [Safety & the audit](/docs/safety).

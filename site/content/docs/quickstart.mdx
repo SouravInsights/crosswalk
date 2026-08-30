@@ -1,0 +1,88 @@
+---
+title: Quickstart
+description: From an OpenAPI spec to registered WebMCP tools, in three steps.
+---
+
+## 1. Generate
+
+Point the CLI at a project with an OpenAPI spec. No install, no config file:
+
+```bash
+npx webmcp-codegen generate --dry-run
+```
+
+The CLI searches your project for spec files (`openapi.json/yaml`, `swagger.*` — monorepo
+layouts included), shows what it found, and previews every tool it would create, with its
+risk tier and the audit findings. Nothing is written on a dry run.
+
+Happy with the preview? Write the files:
+
+```bash
+npx webmcp-codegen generate
+```
+
+Tools land in `./src/webmcp/` (override with `--out`).
+
+<Callout type="info">
+**Monorepo?** Run from the app that will expose the tools, pointing at the spec:
+
+```bash
+cd apps/web && npx webmcp-codegen generate --spec ../server/openapi/openapi.json
+```
+
+</Callout>
+
+## 2. Implement `execute()`
+
+Open any generated file. Everything above the marker is the contract, derived from your
+spec; below the marker is yours:
+
+```ts title="src/webmcp/get-pet.webmcp.ts"
+// ─── webmcp-codegen: end generated — your code below survives regeneration ───
+
+export async function executeGetPet(input: GetPetInput) {
+  // TODO: implement using your app's existing code, e.g.:
+  //   const response = await fetch("/pets/" + input.id);
+  //   if (!response.ok) throw new Error("Request failed: " + response.status);
+  //   return { content: [{ type: "text", text: "Done" }] };
+  throw new Error("Not implemented: executeGetPet");
+}
+```
+
+Replace the stub with a call to your real client code — the fetch wrapper, SDK, or query
+client your app already uses. The TODO example shows the actual route when the spec knows it.
+
+Return the MCP result shape: `{ content: [{ type: "text", text: "..." }] }`.
+
+## 3. Register on startup
+
+```ts
+import { registerAllTools } from "./webmcp";
+
+await registerAllTools();
+```
+
+Or register only the tools you've implemented — the barrel exports one `register…()`
+function per tool, so cherry-picking is just importing fewer of them.
+
+## See them work
+
+WebMCP is a draft spec, so today you need one of:
+
+- **Chrome 146+** with `chrome://flags/#enable-webmcp-testing` enabled
+- The **WebMCP polyfill** from `GoogleChromeLabs/webmcp-tools`
+
+Then open your app and inspect the tools with the **Model Context Tool Inspector** extension,
+or connect any MCP-capable agent.
+
+## When you want control
+
+The zero-config run covers the common case. For custom output paths, multiple sources,
+safety options, or plugin hooks, install the package and write a config file:
+
+```bash
+npm install -D webmcp-codegen
+npx webmcp-codegen init
+```
+
+See [Configuration](/docs/configuration).

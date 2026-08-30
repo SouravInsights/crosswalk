@@ -1,0 +1,64 @@
+---
+title: CLI reference
+description: Two commands, a handful of flags. Learnable in one sitting.
+---
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `webmcp-codegen generate` | Detect your spec, generate (or update) tool files |
+| `webmcp-codegen generate --watch` | Re-generate when source files change |
+| `webmcp-codegen init` | Write a `codegen.config.mjs` starter config |
+
+`generate` is the command you'll actually use. `init` exists for the day you want a config
+file — it detects your spec and scaffolds one for you.
+
+## Flags for `generate`
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--spec PATH` | auto-detected | Which OpenAPI spec to use |
+| `--out DIR` | `./src/webmcp` | Where the tool files go |
+| `--dry-run` | off | Preview the report and file actions; write nothing |
+| `--skip-audit` | off | Skip the safety report |
+| `--force` | off | Write files even when the audit reports errors |
+| `--config PATH` | `codegen.config.mjs` | Use a config file at PATH |
+
+## How the config is resolved
+
+1. A config file, if one exists (`codegen.config.mjs`, or `--config PATH`) — full control
+2. `--spec` / `--out` flags — quick overrides, no config needed
+3. Auto-detection — the zero-argument run
+
+When a config file exists it wins, and `--spec`/`--out` print a note saying they're ignored.
+
+Auto-detection searches for `openapi`/`swagger`/`api` `.json`/`.yaml` files, skipping
+`node_modules` and build output, a few levels deep — enough for monorepo layouts like
+`apps/server/openapi/openapi.json`. One spec found: it's used, and the report says so.
+Several: they're listed, and you're asked to pick one with `--spec`.
+
+## Exit codes (for CI)
+
+| Code | Meaning |
+|---|---|
+| `0` | Generation succeeded (warnings are fine) |
+| `1` | Audit errors blocked generation, or the run failed |
+
+The audit runs as part of every `generate`. In CI, plain `webmcp-codegen generate` is
+therefore already a safety gate — audit errors fail the build unless `--force` was passed.
+
+```yaml title=".github/workflows/webmcp.yml"
+- run: npx webmcp-codegen generate
+# fails the job if the audit reports errors
+```
+
+## Watch mode
+
+```bash
+npx webmcp-codegen generate --watch
+```
+
+Runs once, then re-generates when spec or source files change (debounced, ignoring
+`node_modules`, build output, and the generated directory itself). Useful while iterating
+on both the API and the tools against a running dev server.

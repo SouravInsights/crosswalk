@@ -5,7 +5,7 @@ export function baseOptions(): BaseLayoutProps {
     nav: {
       title: (
         <span style={{ fontWeight: 700, letterSpacing: "0.02em" }}>
-          <span style={{ color: "#7ee787" }}>●</span> Groundstate
+          <span style={{ color: "#7ee787" }}>●</span> webmcp-codegen
         </span>
       ),
     },
