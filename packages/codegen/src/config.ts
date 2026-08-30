@@ -20,7 +20,7 @@ export function defineConfig(config: CodegenConfig): CodegenConfig {
   return config;
 }
 
-const CONFIG_FILE_NAMES = ["codegen.config.mjs", "codegen.config.js"];
+export const CONFIG_FILE_NAMES = ["codegen.config.mjs", "codegen.config.js"];
 
 /**
  * Find and load the config file. Resolving relative to `cwd` keeps the CLI

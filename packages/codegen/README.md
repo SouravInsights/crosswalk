@@ -6,11 +6,11 @@ Generate safe, typed, human-reviewed [WebMCP](https://github.com/webmachinelearn
 
 ## Quick start
 
-```bash
-npm install -D webmcp-codegen
+Zero install, zero config — the CLI detects your OpenAPI spec:
 
-npx webmcp-codegen init       # detects your OpenAPI spec, writes codegen.config.mjs
-npx webmcp-codegen generate   # generates reviewed tool files into ./src/webmcp
+```bash
+npx webmcp-codegen generate --dry-run   # preview the tools it would generate
+npx webmcp-codegen generate             # write them into ./src/webmcp
 ```
 
 Then implement each `execute()` (below the marker — it's yours, regeneration never touches it) and register everything at app startup:
@@ -20,6 +20,20 @@ import { registerAllTools } from "./webmcp";
 
 await registerAllTools();
 ```
+
+### Full control
+
+When you want to choose the spec, the output directory, or safety options,
+install the package and let `init` write a config file:
+
+```bash
+npm install -D webmcp-codegen
+npx webmcp-codegen init
+```
+
+(The config file imports from `webmcp-codegen`, which is why the install is
+needed in this mode. The generated code never depends on the package — you
+own it.)
 
 ## What you get
 

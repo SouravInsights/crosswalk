@@ -245,7 +245,7 @@ export default defineConfig({
 ```
 
 ### 6.2 Core CLI surface
-The MVP surface is deliberately three commands. Audit checks run automatically as part of `generate` (with `--skip-audit` to bypass); everything else from earlier drafts (`diff`, `watch`, `doctor`, `snapshot` as standalone commands) is real but deferred — a flag or `--watch` mode on `generate` is cheaper to add later than a command is to remove.
+The first run needs nothing at all: `npx webmcp-codegen generate` auto-detects the spec (OpenAPI/Swagger filenames, monorepo-aware search) and generates into `./src/webmcp`, with `--spec`/`--out` as config-free overrides. The config file (`init`) is the upgrade path for control, not a prerequisite. Beyond that, the MVP surface is deliberately small. Audit checks run automatically as part of `generate` (with `--skip-audit` to bypass); everything else from earlier drafts (`diff`, `watch`, `doctor`, `snapshot` as standalone commands) is real but deferred — a flag or `--watch` mode on `generate` is cheaper to add later than a command is to remove.
 
 | Command | Purpose |
 |---|---|

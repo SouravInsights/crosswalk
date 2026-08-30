@@ -3,32 +3,48 @@
 /**
  * The webmcp-codegen CLI.
  *
- * Deliberately three commands, learnable in one sitting:
+ * The path we optimize for is the zero-everything first run:
  *
- *   webmcp-codegen init       detect your API spec, write codegen.config.mjs
- *   webmcp-codegen generate   run the pipeline, write the files
- *   webmcp-codegen generate --watch   re-run when source files change
+ *   npx webmcp-codegen generate
+ *
+ * No install, no config file, no flags — the CLI detects your API spec and
+ * generates into ./src/webmcp. When you outgrow the defaults:
+ *
+ *   --spec/--out    quick overrides without a config file
+ *   init            writes codegen.config.mjs for full control (needs the
+ *                   package installed, since the config imports from it)
  *
  * Plus the flags you'd expect on a codegen tool: --dry-run to preview,
- * --skip-audit to bypass the safety report, --force to write through
- * audit errors, --config to point at a config file somewhere else.
+ * --watch to re-run on change, --skip-audit to bypass the safety report,
+ * --force to write through audit errors, --config to point at a config
+ * file somewhere else.
  */
 
 import { existsSync, watch } from "node:fs";
-import { readdir, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { basename, join, relative } from "node:path";
 import { parseArgs } from "node:util";
-import { loadConfig } from "./config.js";
+import { CONFIG_FILE_NAMES, loadConfig } from "./config.js";
+import { findSpecs } from "./detect.js";
+import { js } from "./generators/js.js";
 import { type GenerateResult, runGenerate } from "./pipeline.js";
+import { openapi } from "./sources/openapi.js";
+import type { CodegenConfig } from "./types.js";
 
 const HELP = `webmcp-codegen — generate WebMCP tools from the API contracts you already have
 
-Usage:
-  webmcp-codegen init                  Detect your spec and write codegen.config.mjs
-  webmcp-codegen generate              Generate (or update) your WebMCP tools
-  webmcp-codegen generate --watch      Re-generate when files change
+Fastest start (no install, no config):
+  npx webmcp-codegen generate --dry-run   Detect your spec, preview the tools
+  npx webmcp-codegen generate             Write the tool files
+
+Commands:
+  init                         Write a codegen.config.mjs for full control
+  generate                     Generate (or update) your WebMCP tools
+  generate --watch             Re-generate when files change
 
 Flags for generate:
+  --spec PATH    Which OpenAPI spec to use (auto-detected when omitted)
+  --out DIR      Where the tool files go (default: ./src/webmcp)
   --dry-run      Preview what would be written, write nothing
   --skip-audit   Skip the safety report
   --force        Write files even when the audit reports errors
@@ -36,9 +52,6 @@ Flags for generate:
 `;
 
 const CONFIG_FILE = "codegen.config.mjs";
-
-/** Spec filenames we recognize during `init`, most common first. */
-const SPEC_FILE_PATTERN = /^(openapi|swagger|api)\.(ya?ml|json)$/i;
 
 async function main(): Promise<number> {
   const { positionals, values } = parseArgs({
@@ -49,6 +62,8 @@ async function main(): Promise<number> {
       force: { type: "boolean", default: false },
       watch: { type: "boolean", default: false },
       config: { type: "string" },
+      spec: { type: "string" },
+      out: { type: "string" },
       help: { type: "boolean", default: false },
     },
   });
@@ -69,6 +84,8 @@ async function main(): Promise<number> {
         force: values.force,
         watch: values.watch,
         configPath: values.config,
+        spec: values.spec,
+        out: values.out,
       });
     default:
       console.error(`Unknown command "${command}".\n`);
@@ -87,8 +104,8 @@ async function init(): Promise<number> {
     return 1;
   }
 
-  const specFile = (await readdir(cwd)).find((name) => SPEC_FILE_PATTERN.test(name));
-  const specPath = specFile ? `./${specFile}` : "./openapi.yaml";
+  const specs = await findSpecs(cwd);
+  const specPath = specs.length > 0 ? `./${specs[0]}` : "./openapi.yaml";
 
   await writeFile(
     configPath,
@@ -109,13 +126,16 @@ export default defineConfig({
 `,
   );
 
-  if (specFile) {
-    console.log(`Found ${specFile} — wrote ${CONFIG_FILE}.`);
-    console.log(`\nNext: npx webmcp-codegen generate --dry-run`);
+  // The config imports from the package, so keeping it means installing it.
+  console.log("Installed the package? A config file needs it:");
+  console.log("  npm install -D webmcp-codegen\n");
+  if (specs.length > 0) {
+    console.log(`Found ${specs[0]} — wrote ${CONFIG_FILE}.`);
+    console.log("\nNext: npx webmcp-codegen generate --dry-run");
   } else {
     console.log(`No OpenAPI spec found, so ${CONFIG_FILE} points at ./openapi.yaml.`);
     console.log("Edit the `spec` path to point at your spec, then run:");
-    console.log(`\n  npx webmcp-codegen generate --dry-run`);
+    console.log("\n  npx webmcp-codegen generate --dry-run");
   }
   return 0;
 }
@@ -126,6 +146,8 @@ interface GenerateFlags {
   force: boolean;
   watch: boolean;
   configPath?: string;
+  spec?: string;
+  out?: string;
 }
 
 async function generate(flags: GenerateFlags): Promise<number> {
@@ -141,16 +163,79 @@ async function generate(flags: GenerateFlags): Promise<number> {
   return result.blocked ? 1 : 0;
 }
 
-/** One generate pass: load config, run the pipeline, print the report. */
+/**
+ * Where the tools come from, in priority order:
+ *
+ *   1. a config file (codegen.config.mjs or --config) — full control
+ *   2. --spec/--out flags — quick overrides, no config needed
+ *   3. auto-detection — the zero-argument npx run
+ *
+ * Branches 2 and 3 build the config right here inside the CLI, which is
+ * what makes `npx webmcp-codegen generate` work without installing the
+ * package: the user's project never has to resolve a webmcp-codegen import.
+ */
+async function resolveConfig(
+  cwd: string,
+  flags: GenerateFlags,
+): Promise<{ config: CodegenConfig; label: string }> {
+  const hasConfigFile = flags.configPath
+    ? existsSync(join(cwd, flags.configPath))
+    : CONFIG_FILE_NAMES.some((name) => existsSync(join(cwd, name)));
+
+  if (hasConfigFile) {
+    const { config, path } = await loadConfig(cwd, flags.configPath);
+    if (flags.spec || flags.out) {
+      console.warn(`Note: --spec/--out are ignored — ${basename(path)} is in charge here.`);
+    }
+    return { config, label: basename(path) };
+  }
+  if (flags.configPath) {
+    throw new Error(`No config file at "${flags.configPath}".`);
+  }
+
+  const spec = flags.spec ?? (await detectSpec(cwd));
+  const outDir = flags.out ?? "./src/webmcp";
+  return {
+    config: { sources: [openapi({ spec })], generate: [js({ outDir })] },
+    label: flags.spec ? `--spec ${spec}` : `detected ${spec}`,
+  };
+}
+
+/**
+ * Find the project's API spec. One candidate: use it and say so. Several:
+ * list them and make the human pick. None: say exactly what to do next.
+ */
+async function detectSpec(cwd: string): Promise<string> {
+  const specs = await findSpecs(cwd);
+
+  if (specs.length === 0) {
+    throw new Error(
+      "No OpenAPI spec found in this project.\n" +
+        "Point at one:  npx webmcp-codegen generate --spec path/to/openapi.json",
+    );
+  }
+  if (specs.length > 1) {
+    const list = specs.map((spec) => `  - ${spec}`).join("\n");
+    throw new Error(
+      `Found ${specs.length} API specs:\n${list}\n\n` +
+        `Pick one:  npx webmcp-codegen generate --spec ${specs[0]}`,
+    );
+  }
+
+  console.log(`Detected ${specs[0]} (override with --spec)\n`);
+  return specs[0] as string;
+}
+
+/** One generate pass: resolve the config, run the pipeline, print the report. */
 async function runOnce(cwd: string, flags: GenerateFlags): Promise<GenerateResult> {
-  const { config, path } = await loadConfig(cwd, flags.configPath);
+  const { config, label } = await resolveConfig(cwd, flags);
   const result = await runGenerate(config, {
     cwd,
     dryRun: flags.dryRun,
     skipAudit: flags.skipAudit,
     force: flags.force,
   });
-  printReport(result, flags, basename(path), cwd);
+  printReport(result, flags, label, cwd);
   return result;
 }
 
