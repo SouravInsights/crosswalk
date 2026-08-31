@@ -4,7 +4,7 @@
  * Tool names are the vocabulary an agent reasons over, so we make them
  * boring and predictable: kebab-case, derived from the operationId when the
  * source has one, and always matching the character set the WebMCP runtime
- * accepts (the same rule the groundstate core registry enforces).
+ * accepts.
  */
 
 /** The character set the WebMCP runtime accepts for tool names. */

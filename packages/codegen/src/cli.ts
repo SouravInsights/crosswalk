@@ -235,7 +235,7 @@ main().then(
   (code) => process.exit(code),
   (error) => {
     console.error("\n✖ Unexpected error:", error instanceof Error ? error.message : error);
-    console.error("\nPlease report this: https://github.com/SouravInsights/groundstate/issues\n");
+    console.error("\nPlease report this: https://github.com/SouravInsights/webmcp-codegen/issues\n");
     process.exit(1);
   },
 );

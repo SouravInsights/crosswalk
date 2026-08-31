@@ -1,18 +1,19 @@
-# AGENTS.md — Groundstate
+# AGENTS.md — webmcp-codegen
 
-Guidance for coding agents working in this repo. Read `groundstate.md` (product plan) and
-`groundstate-critique.md` (design rationale) before making architectural decisions.
+Guidance for coding agents working in this repo. Read `docs/specs/codegen-design.md`
+(product design) and `docs/specs/first-run-experience.md` (the zero-config flow) before
+making architectural decisions. Decision history lives in `docs/notes/`.
 
 ## What this is
 
-Groundstate gives coding agents ground truth about a running web app. A dev-only SDK exposes
-the app's real state and actions as WebMCP tools (`document.modelContext`), and a local bridge
-makes those tools callable from any MCP client (Claude Code, Codex, Cursor) today, before
-native WebMCP agent clients exist.
+webmcp-codegen generates safe, typed, human-reviewed WebMCP tools from the API contracts
+developers already have (OpenAPI today), instead of hand-writing `registerTool()` calls
+for every action. It writes real files into the user's repo (drizzle/shadcn style): no
+runtime dependency on this package, no black box deciding what gets exposed to agents.
 
-One line of positioning: **Chrome DevTools MCP tells the agent what the browser sees;
-Groundstate tells it what the app knows.** We never rebuild what DevTools MCP already provides
-(console logs, network logs, screenshots, generic a11y snapshots).
+The safety audit is the differentiator: classification (read/write/destructive), PII and
+auth-boundary warnings, and endpoint-role rules (webhooks are never tools). The audit
+blocks generation on errors; `--force` is the only override.
 
 ## Writing style (strict)
 
@@ -24,66 +25,46 @@ like better-auth/Drizzle docs: plain words, short sentences, say what the thing 
 
 | Path | npm name | What it is |
 |---|---|---|
-| `packages/core` | `groundstate` | Framework-agnostic runtime: `observe` / `act` / `fixture` / `reset` / `record` (flight recorder) / `doctor` (health check), transport adapter, production guard, internal registry. **Zero runtime dependencies — this ships inside people's apps.** |
-| `packages/react` | `@groundstate/react` | React hooks (`useObservable`, `useAction`, `useFixture`) plus auto-derived observables: `observeStore` (Zustand-shaped stores, with auto flight-recording) and `observeQueries` (TanStack Query). Structural typing — no dependency on zustand/@tanstack. |
-| `packages/bridge` | `@groundstate/bridge` | Local MCP server (stdio) that connects a running page's Groundstate registry to an MCP client via CDP. The v1 centerpiece. |
-| `packages/inspector` | `@groundstate/inspector` | In-page dev overlay (shadow DOM, vanilla TS, no framework deps): browse/invoke registered tools. |
-| `examples/demo-app` | private | Vite + React + Zustand cart/checkout app used to develop and demo the loop. |
-| `site/` | — | Static landing page (plain HTML, no build step). |
-
-Planned, not yet scaffolded: `@groundstate/ci` (scenario runner + GitHub Action). Do not
-create it without being asked. Current ecosystem scope is React/Next.js — do not add other
-framework adapters unprompted.
+| `packages/codegen` | `webmcp-codegen` | The CLI (`webmcp-codegen generate / dev / init`) and the pipeline. Single runtime dep: `yaml`. |
+| `packages/codegen/src/sources` | — | Input adapters. `openapi` today; tRPC and Zod are on the roadmap. |
+| `packages/codegen/src/generators` | — | Output generators, named after what they produce. `js` today. |
+| `packages/codegen/src/dev` | — | The local tools dashboard (`webmcp-codegen dev`). |
+| `examples/openapi-petstore` | private | Example app with tools generated from the Petstore spec. |
+| `site/` | private | Landing page and docs (Next.js + Fumadocs). |
 
 ## Architecture invariants
 
-1. **Core has zero runtime dependencies.** Never add one. Dev-time deps are fine.
-2. **Dev/preview only.** `init()` must refuse to start when it detects a production
-   environment, loudly. Never weaken the guard; there is deliberately no override flag.
-3. **Transport adapter order:** `document.modelContext` (spec current) →
-   `navigator.modelContext` (deprecated, Chrome origin trial still serves it) →
-   internal registry only (bridge reaches it via `window.__GROUNDSTATE__`). Feature-detect;
-   never user-agent sniff.
-4. **The bridge is the primary transport today.** No mainstream agent client consumes WebMCP
-   natively yet (as of Aug 2026). Native registration is the standards bet, not the product.
-5. **Tool naming is part of the API contract:** observables register `get<Name>State`,
-   actions register their given name, fixtures are served through the single `loadFixture`
-   tool (plus `listFixtures`), reset through `resetToGroundState`, the flight recorder
-   through `getStateHistory`, and the health check through `getGroundstateHealth`
-   (always registered at init).
-6. **Deterministic verdicts.** Anything CI-facing asserts mechanical predicates over JSON
-   state snapshots. Never make pass/fail depend on an LLM judgment.
-7. **Naming:** every package, binary, and public API derives from "groundstate". No off-brand
-   names (no "reviewer-*", "agent-*").
+1. **Generated files never clobber user code.** The generated region sits between markers;
+   user code below the marker survives regeneration. Hand-edited generated regions produce
+   a `.new` file, never a silent overwrite.
+2. **The audit fails loudly.** Errors block `generate` (nonzero exit, CI-friendly). Warnings
+   report and continue. Never downgrade this without being asked.
+3. **No runtime dependency.** Generated code must not import from `webmcp-codegen`.
+4. **Zero-config first.** Detection (spec, app package) must work from a repo root with no
+   flags and no config. Flags and `codegen.config.mjs` are overrides, not requirements.
+5. **Naming:** names say what the thing is. No jargon (no "IR", no "emitters"). Generators
+   are named after what they produce (`js`, and planned: `html`, `react`, `manifest`).
+6. **The dashboard adds nothing to the user's app.** It reads the project, saves edits to
+   `.webmcp-codegen.json`, and those edits survive regeneration.
 
 ## Conventions
 
 - TypeScript strict, ESM-only, `verbatimModuleSyntax`. Node >= 20.
 - Build with `tsup`, test with `vitest`, lint/format with Biome (`pnpm lint:fix`).
-- pnpm workspaces + Turborepo. Internal deps use `workspace:*`.
-- Versioning/publishing via Changesets — add a changeset with any user-facing change.
-- Tests live next to sources as `*.test.ts`. Every exported behavior of `core` gets a test;
-  the production guard and transport fallback order are the two most important behaviors
-  in the repo — never leave them untested.
+- pnpm workspaces + Turborepo.
+- Versioning/publishing via Changesets: add a changeset with any user-facing change.
+  Publishing is done by the user, never by an agent.
+- Tests live next to sources as `*.test.ts`. The audit (safety.ts) and naming rules are
+  the two most important behaviors in the repo: never leave them untested.
 - Keep error messages actionable: say what was wrong and what to do, in one sentence each.
 
 ## Commands
 
 ```bash
 pnpm install
-pnpm build            # turbo run build (respects dependency graph)
+pnpm build            # turbo run build
 pnpm test             # turbo run test
 pnpm typecheck
 pnpm lint:fix
-pnpm --filter demo-app dev    # run the demo app
+pnpm --filter site dev    # landing page and docs on :3001
 ```
-
-## Security posture (do not regress)
-
-- Mutating tools (`act`, `loadFixture`, `resetToGroundState`) exist only because the guard
-  restricts them to dev/preview. Any change that could let them run in production is a bug,
-  full stop.
-- The bridge assumes a locally-controlled browser (CDP). Before any remote/shared-preview
-  transport ships, it needs the authenticated handshake described in `groundstate.md` §7.
-- Threat model to keep in mind: a prompt-injected agent calling a mutating tool. Prefer
-  small, explicit, developer-blessed actions over generic "run anything" surfaces.

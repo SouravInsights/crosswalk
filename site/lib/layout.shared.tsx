@@ -11,7 +11,7 @@ export function baseOptions(): BaseLayoutProps {
     },
     links: [
       { text: "Docs", url: "/docs" },
-      { text: "GitHub", url: "https://github.com/souravinsights/groundstate", external: true },
+      { text: "GitHub", url: "https://github.com/SouravInsights/webmcp-codegen", external: true },
     ],
   };
 }
