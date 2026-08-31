@@ -11,11 +11,35 @@
 - `generate-tools` — the generated file contents, ready to review and copy
 - `preview-tool` — one operation's generated tool, for inspection
 
-The judging flow: judge opens the live URL in ChatGPT's in-app browser, pastes a spec (or picks a bundled sample), and watches ChatGPT run the whole pipeline through the page's tools, including the audit catching an endpoint that must not become a tool. The repo tells the same story in code.
+The judging flow: judge opens the live URL in ChatGPT's in-app browser, drops their own spec onto the page (or pastes text, or passes a URL), and watches ChatGPT run the pipeline through the page's tools, including the audit catching an endpoint that must not become a tool. The repo tells the same story in code.
 
 Why this fits the rules where alternatives do not: the challenge requires a **WebMCP-powered web app** at a live URL. The CLI alone has no URL. The planned analytics/audit apps are dashboards *about* WebMCP but do not register tools, so they are not WebMCP-powered. This page is codegen itself, agent-consumable — no bending, and it seeds the cloud roadmap (hosted codegen, audit service).
 
-Feasibility (checked Aug 31): the pipeline stages are already pure functions (parse, naming, safety, templates); only the edges touch the filesystem. The browser build is a thin entry point — spec text in, `{files, report}` out. CORS blocks fetching arbitrary spec URLs from a page, so: bundled sample specs + paste are the reliable inputs, URL fetch is best-effort.
+## Honest capability split (site vs CLI)
+
+The site cannot do everything the CLI does, and it never will: browsers cannot touch the user's filesystem. The site owns the *try* experience (parse, classify, audit, generate file contents, iterate with an agent). The CLI owns the *adopt* experience (detect spec and app, write files with merge protection, wire registration, watch mode, CI exit codes, dashboard persistence). Every site session funnels to `npx webmcp-codegen generate`.
+
+## Input and output design
+
+- **Inputs**: (a) drop/paste a spec file onto the page — the page holds it, tools operate on the loaded spec, no giant payload through the chat; (b) spec URL — fetched through a small same-origin proxy route (guarded: https-only, size cap, no private hosts), because browsers block cross-origin fetches; the agent can also fetch URLs itself; (c) bundled samples exist only so a judge without a spec can try it in 10 seconds.
+- **Outputs**: the page is the artifact surface — file tree, per-file copy, download-as-zip, all client-side. `generate-tools` returns only a manifest to the agent (paths, sizes, audit summary); the page holds the bytes. A 73-file dump would flood the chat context; a manifest does not. The agent explains, reviews, and iterates surgically.
+
+## The question judges will ask: how is this different from pasting a spec into ChatGPT with a prompt?
+
+- For a one-off toy spec, it is not very different — so the demo always uses a real-scale spec, where improvisation breaks.
+- **Determinism**: naming, schema derivation, and classification are tested code, identical every run. LLM output drifts run to run.
+- **The audit is a gate, not a vibe**: a prompt sometimes notices a webhook; the pipeline flags it every time, with severity, and blocks. A prompt can never gate CI.
+- **Iteration without drift**: page-held state makes "disable mutations" a surgical operation, not a regeneration roulette.
+- **The meta-proof**: the page demonstrates codegen's own thesis — typed deterministic tools beat agent improvisation. The video shows the contrast directly: same spec through a bare prompt (misses the webhook, invents parameters) vs through the tools (caught, structured).
+
+## Risks
+
+1. **Registration invisible to the agent in ChatGPT's browser** — fatal if it happens. Test on day one; ship an on-page "N tools registered" indicator so failure is visible; the video records the working path in advance.
+2. **Big specs** — parse is fast in-browser; context limits are handled by the manifest pattern.
+3. **Proxy SSRF** — the fetch proxy ships with guards or not at all.
+4. **Deadline (3.5 days)** — cut list: no dashboard-style editing on the page; the proxy goes first if the timeline slips.
+
+Already true in the code (checked Aug 31): the webhook/admin role rules exist in `safety.ts`, so the audit-catch beat needs no new P0 work for the demo. The registration API is `document.modelContext.registerTool()`.
 
 ## Submission checklist
 
