@@ -227,7 +227,10 @@ export default function HomePage() {
             a small polyfill. OpenAPI is supported now; tRPC, Zod, and Prisma are on the roadmap.
           </p>
           <div className="flex flex-col items-center justify-between gap-3 font-mono text-[12px] text-faint sm:flex-row">
-            <span>MIT · node 20+ · zero runtime dependencies</span>
+            <span className="flex items-center gap-4">
+              <Logo />
+              <span>MIT · node 20+ · zero runtime dependencies</span>
+            </span>
             <span className="flex items-center gap-5">
               <Link
                 href="/docs"

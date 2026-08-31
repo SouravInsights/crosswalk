@@ -547,8 +547,9 @@ export function dashboardHtml(): string {
     <div class="sidebar-header">
       <div class="brand">
         <svg class="brand-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="2.5" y="10.5" width="10" height="10" stroke="currentColor" stroke-width="1.8"></rect>
-          <rect x="11.5" y="3.5" width="10" height="10" fill="var(--accent)"></rect>
+          <path d="M12 2.5 L21 7 L12 11.5 L3 7 Z" fill="var(--accent)"></path>
+          <path d="M3 12 L12 16.5 L21 12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+          <path d="M3 16.5 L12 21 L21 16.5" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
         </svg>
         <span>webmcp<span class="brand-accent">stack</span><span class="brand-product"> / codegen</span></span>
       </div>
