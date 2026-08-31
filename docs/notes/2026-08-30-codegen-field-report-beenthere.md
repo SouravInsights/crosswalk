@@ -5,7 +5,7 @@ The first run of `webmcp-codegen` against a real production API: beenthere's
 7 DELETE), OpenAPI 3.0.3, no operationIds, no security blocks, no component
 schemas, every operation has a summary.
 
-Ran zero-config from the repo root: `npx webmcp-codegen generate`.
+Ran zero-config from the repo root: `npx @webmcp-stack/codegen generate`.
 
 ## What worked
 
@@ -49,7 +49,7 @@ hatch: `stripPrefix: false | string`.
 
 ### P1 — monorepo output placement
 Running from the repo root wrote tools to `<root>/src/webmcp`, which belongs to
-no app. The right flow is `cd apps/web && npx webmcp-codegen generate --spec
+no app. The right flow is `cd apps/web && npx @webmcp-stack/codegen generate --spec
 ../server/openapi/openapi.json`. Detection can't know which app should own the
 tools — this is a **docs** problem, not a code problem.
 

@@ -50,7 +50,7 @@ A team should be able to generate one tool for one endpoint on a Tuesday afterno
 The pipeline core and the generation engine know nothing about React, Next.js, or Express. Everything framework-specific — a Next.js route scanner, a React hook binding, a Rails generator — is a small, replaceable adapter. Same shape as better-auth's core + framework-adapter split. ("Thin adapters" means small in *scope*, not necessarily separate npm packages — see §10.)
 
 ### 2.8 The CLI is a first-class product
-`npx webmcp-codegen init`, `webmcp-codegen generate` — as polished as `drizzle-kit` or `better-auth`'s CLI, and few enough commands that a developer learns the whole CLI by using it once. Good error messages, good defaults, plain-English output over flags and options.
+`npx @webmcp-stack/codegen init`, `webmcp-codegen generate` — as polished as `drizzle-kit` or `better-auth`'s CLI, and few enough commands that a developer learns the whole CLI by using it once. Good error messages, good defaults, plain-English output over flags and options.
 
 ---
 
@@ -224,15 +224,15 @@ A companion module ships accessible, framework-specific components implementing 
 
 ### 6.1 Zero-config start
 ```bash
-npx webmcp-codegen init
+npx @webmcp-stack/codegen init
 ```
 Detects the project's framework and existing API layer (looks for an OpenAPI file, a tRPC router, Prisma schema, etc.), proposes a source, and scaffolds config:
 
 ```ts
 // codegen.config.ts
-import { defineConfig } from "webmcp-codegen";
-import { openapi } from "webmcp-codegen/sources";
-import { js } from "webmcp-codegen/generators";
+import { defineConfig } from "@webmcp-stack/codegen";
+import { openapi } from "@webmcp-stack/codegen/sources";
+import { js } from "@webmcp-stack/codegen/generators";
 
 export default defineConfig({
   sources: [openapi({ spec: "./openapi.yaml" })],
@@ -245,7 +245,7 @@ export default defineConfig({
 ```
 
 ### 6.2 Core CLI surface
-The first run needs nothing at all: `npx webmcp-codegen generate` auto-detects the spec (OpenAPI/Swagger filenames, monorepo-aware search) and generates into `./src/webmcp`, with `--spec`/`--out` as config-free overrides. The config file (`init`) is the upgrade path for control, not a prerequisite. Beyond that, the MVP surface is deliberately small. Audit checks run automatically as part of `generate` (with `--skip-audit` to bypass); everything else from earlier drafts (`diff`, `watch`, `doctor`, `snapshot` as standalone commands) is real but deferred — a flag or `--watch` mode on `generate` is cheaper to add later than a command is to remove.
+The first run needs nothing at all: `npx @webmcp-stack/codegen generate` auto-detects the spec (OpenAPI/Swagger filenames, monorepo-aware search) and generates into `./src/webmcp`, with `--spec`/`--out` as config-free overrides. The config file (`init`) is the upgrade path for control, not a prerequisite. Beyond that, the MVP surface is deliberately small. Audit checks run automatically as part of `generate` (with `--skip-audit` to bypass); everything else from earlier drafts (`diff`, `watch`, `doctor`, `snapshot` as standalone commands) is real but deferred — a flag or `--watch` mode on `generate` is cheaper to add later than a command is to remove.
 
 | Command | Purpose |
 |---|---|
@@ -262,7 +262,7 @@ When the source is tRPC or Zod, the generated `inputSchema` (JSON Schema) is der
 A test module provides a mock agent for unit/integration tests:
 
 ```ts
-import { mockAgent } from "webmcp-codegen/test";
+import { mockAgent } from "@webmcp-stack/codegen/test";
 
 test("get-order-status returns tracking info", async () => {
   const agent = mockAgent(tools);
@@ -387,9 +387,9 @@ docs/                     # section of the existing site, not a second site
 
 ## 12. Naming
 
-**`webmcp-codegen`** — package, binary, and product share one name. Says exactly what it does; searchable; indexes cleanly. Availability checked 2026-08-29: npm name unclaimed, zero GitHub repos with the name, `webmcp-codegen.dev` / `.com` not resolving (confirm at a registrar before relying on the domains — DNS absence isn't proof of availability).
+**`@webmcp-stack/codegen`** — the package lives in the webmcp-stack npm org; the binary stays `webmcp-codegen`. The family is `webmcp-stack`, and future products take scoped functional names (`@webmcp-stack/audit`, `@webmcp-stack/telemetry`). The zero-install command is `npx @webmcp-stack/codegen`.
 
-Namespace note: ship unscoped, functional names for every product (`webmcp-codegen`, and the same pattern for what comes next). Product names say what the thing does; the Crosswalk brand stays the umbrella, not a package prefix.
+Namespace note: product names say what the thing does. The scope carries the family name; the suffix carries the function.
 
 Tagline: *"Generate the tool. Review the tool. You own the tool."*
 

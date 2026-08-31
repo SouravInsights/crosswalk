@@ -90,7 +90,7 @@ export function generatedRegion(tool: ReviewedTool): string {
     ` *`,
     ` * Source: ${tool.source.ref} (${tool.source.kind}). Risk: ${tool.riskTier}.`,
     ` * Starts ${tool.enabledByDefault ? "enabled" : "disabled"} (see execute${pascal} below).`,
-    ` * Regenerate with: npx webmcp-codegen generate`,
+    ` * Regenerate with: npx @webmcp-stack/codegen generate`,
     ` */`,
     ``,
     `/** The exact contract advertised to the agent. Derived from the API spec. Do not hand-edit. */`,

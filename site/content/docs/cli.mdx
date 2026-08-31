@@ -3,7 +3,7 @@ title: CLI reference
 description: Every command and flag, with the exact behavior of each.
 ---
 
-## `npx webmcp-codegen generate`
+## `npx @webmcp-stack/codegen generate`
 
 The main command. Resolves where tools come from and where they go, in this order:
 
@@ -28,19 +28,19 @@ choices in `.webmcp-codegen.json`.
 
 Exit codes: `0` on success, `1` when the audit blocks generation (unless `--force`).
 
-## `npx webmcp-codegen generate --dry-run`
+## `npx @webmcp-stack/codegen generate --dry-run`
 
 Computes everything and writes nothing: the tool list with risk labels, skipped endpoints
 and why, the audit findings, the files it would write, and the registration edits it would
 make. The first command to run in any repo.
 
-## `npx webmcp-codegen generate --watch`
+## `npx @webmcp-stack/codegen generate --watch`
 
 Re-runs on every relevant file change. Regeneration is cheap and merge-safe, so watch mode
 keeps tools in sync while you edit the spec. The watcher ignores its own outputs
 (`src/webmcp`, `.webmcp-codegen.json`), so it never loops.
 
-## `npx webmcp-codegen dev`
+## `npx @webmcp-stack/codegen dev`
 
 Opens the tools dashboard on `http://localhost:4700` (override with `--port N`). A local
 control panel for what was generated:
@@ -55,7 +55,7 @@ control panel for what was generated:
 The dashboard serves a localhost page from inside the CLI. Nothing is added to your app,
 and it stops existing when you Ctrl+C.
 
-## `npx webmcp-codegen init`
+## `npx @webmcp-stack/codegen init`
 
 Writes a starter `codegen.config.mjs`, pointed at your detected spec. The config imports
 from the package, so this path needs an install:

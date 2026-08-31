@@ -6,7 +6,7 @@ description: codegen.config.mjs for structure, .webmcp-codegen.json for choices 
 ## Two files, two jobs
 
 **`codegen.config.mjs`** is code. It defines structure: sources, generators, safety
-options. Write it with `npx webmcp-codegen init` when you outgrow the defaults. It imports
+options. Write it with `npx @webmcp-stack/codegen init` when you outgrow the defaults. It imports
 from the package, so it needs `npm install -D webmcp-codegen`.
 
 **`.webmcp-codegen.json`** is data. The CLI writes it to remember choices it had to ask or
@@ -30,9 +30,9 @@ regeneration. Editing this file by hand is fine.
 ## codegen.config.mjs
 
 ```ts title="codegen.config.mjs"
-import { defineConfig } from "webmcp-codegen";
-import { openapi } from "webmcp-codegen/sources";
-import { js } from "webmcp-codegen/generators";
+import { defineConfig } from "@webmcp-stack/codegen";
+import { openapi } from "@webmcp-stack/codegen/sources";
+import { js } from "@webmcp-stack/codegen/generators";
 
 export default defineConfig({
   sources: [openapi({ spec: "./openapi.yaml" })],

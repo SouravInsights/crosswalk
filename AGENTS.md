@@ -1,4 +1,4 @@
-# AGENTS.md — webmcp-codegen
+# AGENTS.md — webmcp-stack
 
 Guidance for coding agents working in this repo. Read `docs/specs/codegen-design.md`
 (product design) and `docs/specs/first-run-experience.md` (the zero-config flow) before
@@ -6,7 +6,8 @@ making architectural decisions. Decision history lives in `docs/notes/`.
 
 ## What this is
 
-webmcp-codegen generates safe, typed, human-reviewed WebMCP tools from the API contracts
+webmcp-stack is the tooling stack for the WebMCP ecosystem. Its first product is codegen,
+which generates safe, typed, human-reviewed WebMCP tools from the API contracts
 developers already have (OpenAPI today), instead of hand-writing `registerTool()` calls
 for every action. It writes real files into the user's repo (drizzle/shadcn style): no
 runtime dependency on this package, no black box deciding what gets exposed to agents.
@@ -25,7 +26,7 @@ like better-auth/Drizzle docs: plain words, short sentences, say what the thing 
 
 | Path | npm name | What it is |
 |---|---|---|
-| `packages/codegen` | `webmcp-codegen` | The CLI (`webmcp-codegen generate / dev / init`) and the pipeline. Single runtime dep: `yaml`. |
+| `packages/codegen` | `@webmcp-stack/codegen` | The CLI (`webmcp-codegen generate / dev / init`) and the pipeline. Single runtime dep: `yaml`. |
 | `packages/codegen/src/sources` | — | Input adapters. `openapi` today; tRPC and Zod are on the roadmap. |
 | `packages/codegen/src/generators` | — | Output generators, named after what they produce. `js` today. |
 | `packages/codegen/src/dev` | — | The local tools dashboard (`webmcp-codegen dev`). |

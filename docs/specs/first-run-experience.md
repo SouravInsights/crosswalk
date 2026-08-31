@@ -11,7 +11,7 @@ can really call their app in the browser — without the developer needing to
 understand WebMCP first.
 
 ```
-$ npx webmcp-codegen
+$ npx @webmcp-stack/codegen
 
   found spec:    apps/server/openapi/openapi.json (73 operations)
   found web app: apps/web (next)
@@ -129,7 +129,7 @@ real: after generation, 73 files are invisible inside the app. There is no
 way to see them, tune them, or try them without first learning Chrome flags
 and extensions.
 
-**Recommendation: a local dev server (`npx webmcp-codegen dev`), not a
+**Recommendation: a local dev server (`npx @webmcp-stack/codegen dev`), not a
 generated page, not a shipped React package.** Reasons:
 
 - A generated page in the app inherits the app's auth and routing, and ships
@@ -220,7 +220,7 @@ across them because the first-run story matters more than the order.
 3. **Session cookies on fetch**: include them by default
    (`credentials: "include"`)? Needed for most real apps; slightly wider than
    the browser default. My leaning: yes, include.
-4. **Dashboard scope**: build `npx webmcp-codegen dev` as described in §7?
+4. **Dashboard scope**: build `npx @webmcp-stack/codegen dev` as described in §7?
    My leaning: yes, and in two drops — list + edit + enable/disable + direct
    "run it" first, the agent panel second. The alternative (a React component
    package) is in §7 with reasons against; overrule if you disagree.

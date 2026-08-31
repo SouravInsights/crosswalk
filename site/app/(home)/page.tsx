@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { CopyCommand } from "@/components/copy-command";
 import { LiveDemo } from "@/components/live-demo";
+import { Logo } from "@/components/logo";
 
-const COMMAND = "npx webmcp-codegen generate";
+const COMMAND = "npx @webmcp-stack/codegen generate";
 
 /* Why now, as three plain statements: what agents can do once your app
    exposes tools. Each is an outcome for the app, not a feature of the CLI. */
@@ -56,10 +57,7 @@ export default function HomePage() {
       {/* Nav */}
       <header className="absolute inset-x-0 top-0 z-10">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-6">
-          <span className="flex items-center gap-2.5 font-mono text-sm tracking-tight text-ink">
-            <span className="inline-block size-2 bg-accent" aria-hidden="true" />
-            webmcp-codegen
-          </span>
+          <Logo product="codegen" />
           <nav className="flex items-center gap-5 font-mono text-[13px] text-dim sm:gap-6">
             <Link
               href="/docs"
@@ -69,7 +67,7 @@ export default function HomePage() {
               docs
             </Link>
             <a
-              href="https://github.com/SouravInsights/crosswalk"
+              href="https://github.com/SouravInsights/webmcp-stack"
               className="transition-colors duration-150 hover:text-ink"
               style={{ transitionTimingFunction: "var(--ease-reading)" }}
             >
@@ -239,7 +237,7 @@ export default function HomePage() {
                 docs
               </Link>
               <a
-                href="https://github.com/SouravInsights/crosswalk"
+                href="https://github.com/SouravInsights/webmcp-stack"
                 className="transition-colors duration-150 hover:text-ink"
                 style={{ transitionTimingFunction: "var(--ease-reading)" }}
               >

@@ -1,5 +1,5 @@
 {
-  "name": "groundstate-monorepo",
+  "name": "webmcp-stack",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.11.0",

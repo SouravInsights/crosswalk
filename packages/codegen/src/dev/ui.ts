@@ -38,7 +38,7 @@ export function dashboardHtml(): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>webmcp-codegen</title>
+<title>webmcpstack / codegen</title>
 <style>
   :root {
     --baseline: #0a0b0f;
@@ -101,16 +101,16 @@ export function dashboardHtml(): string {
     margin-bottom: 4px;
   }
   .brand-mark {
-    width: 24px;
-    height: 24px;
-    background: linear-gradient(135deg, var(--accent), #7c3aed);
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: 700;
-    color: white;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+  .brand-accent {
+    color: var(--accent);
+  }
+  .brand-product {
+    color: var(--faint);
+    font-weight: 400;
   }
   .brand-sub {
     color: var(--faint);
@@ -546,8 +546,11 @@ export function dashboardHtml(): string {
   <aside class="sidebar">
     <div class="sidebar-header">
       <div class="brand">
-        <div class="brand-mark">W</div>
-        <span>webmcp-codegen</span>
+        <svg class="brand-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="2.5" y="10.5" width="10" height="10" stroke="currentColor" stroke-width="1.8"></rect>
+          <rect x="11.5" y="3.5" width="10" height="10" fill="var(--accent)"></rect>
+        </svg>
+        <span>webmcp<span class="brand-accent">stack</span><span class="brand-product"> / codegen</span></span>
       </div>
       <div class="brand-sub" id="tool-count"></div>
     </div>

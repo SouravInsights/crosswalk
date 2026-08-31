@@ -1,5 +1,5 @@
 /**
- * The dev dashboard server: `npx webmcp-codegen dev`.
+ * The dev dashboard server: `npx @webmcp-stack/codegen dev`.
  *
  * A small HTTP server on localhost that serves the tools UI and answers its
  * three kinds of requests: list the tools, save an override (description /

@@ -6,7 +6,7 @@ import { getModelContext, callApi, toolResult } from "./runtime.webmcp";
  *
  * Source: GET /albums/{id} (openapi). Risk: safe-read.
  * Starts enabled (see executeGetAlbumInfo below).
- * Regenerate with: npx webmcp-codegen generate
+ * Regenerate with: npx @webmcp-stack/codegen generate
  */
 
 /** The exact contract advertised to the agent. Derived from the API spec. Do not hand-edit. */

@@ -119,10 +119,10 @@ export function renderSummary(
   console.log("");
 
   // Next step
-  console.log(`  ${bold("Next:")} ${c("cyan", "npx webmcp-codegen dev")}`);
+  console.log(`  ${bold("Next:")} ${c("cyan", "npx @webmcp-stack/codegen dev")}`);
   console.log(dim("  Review your tools, edit descriptions, test them live"));
   console.log("");
-  console.log(dim(`  Docs: https://webmcp-codegen.vercel.app/docs`));
+  console.log(dim(`  Docs: https://webmcp-stack.vercel.app/docs`));
   console.log("");
 }
 
@@ -181,6 +181,6 @@ export function renderVerbose(result: GenerateResult, setup: Setup, _cwd: string
   }
 
   console.log(dim(`Files: ${setup.config.generate[0]?.outDir ?? "src/webmcp"}`));
-  console.log(dim(`Docs: https://webmcp-codegen.vercel.app/docs`));
+  console.log(dim(`Docs: https://webmcp-stack.vercel.app/docs`));
   console.log("");
 }

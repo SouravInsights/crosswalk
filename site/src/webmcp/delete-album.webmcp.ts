@@ -6,7 +6,7 @@ import { getModelContext, requestUserConfirmation, callApi, toolResult, toolDisa
  *
  * Source: DELETE /albums/{id} (openapi). Risk: destructive-confirm.
  * Starts disabled (see executeDeleteAlbum below).
- * Regenerate with: npx webmcp-codegen generate
+ * Regenerate with: npx @webmcp-stack/codegen generate
  */
 
 /** The exact contract advertised to the agent. Derived from the API spec. Do not hand-edit. */

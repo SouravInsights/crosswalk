@@ -1,6 +1,6 @@
-# webmcp-codegen
+# @webmcp-stack/codegen
 
-Generate safe, typed, human-reviewed [WebMCP](https://github.com/webmachinelearning/webmcp) tools from the API contracts you already have, instead of hand-writing `registerTool()` calls for every action.
+Generate safe, typed, human-reviewed [WebMCP](https://github.com/webmachinelearning/webmcp) tools from the API contracts you already have, instead of hand-writing `registerTool()` calls for every action. Part of [webmcp-stack](https://github.com/SouravInsights/webmcp-stack).
 
 > Your spec already knows your tools. One command writes them, wires them into your app, and gets out of the way.
 
@@ -9,7 +9,7 @@ Generate safe, typed, human-reviewed [WebMCP](https://github.com/webmachinelearn
 Zero install, zero config:
 
 ```bash
-npx webmcp-codegen generate
+npx @webmcp-stack/codegen generate
 ```
 
 One run finds your OpenAPI spec (monorepos included), finds the package that is your web app, and:
@@ -21,7 +21,7 @@ One run finds your OpenAPI spec (monorepos included), finds the package that is 
 Preview first, write nothing:
 
 ```bash
-npx webmcp-codegen generate --dry-run
+npx @webmcp-stack/codegen generate --dry-run
 ```
 
 Then start your app, open it in Chrome with `#enable-webmcp-testing`, and ask the agent to use one of your tools.
@@ -29,7 +29,7 @@ Then start your app, open it in Chrome with `#enable-webmcp-testing`, and ask th
 ## The dashboard
 
 ```bash
-npx webmcp-codegen dev
+npx @webmcp-stack/codegen dev
 ```
 
 A local control panel for your tools: browse them, edit descriptions, toggle tools on and off, and run any tool directly to check it works. Edits save to `.webmcp-codegen.json` and survive regeneration. Nothing is added to your app.
@@ -82,9 +82,9 @@ overrides live in `.webmcp-codegen.json` (data, safe with npx, commit it).
 
 ```js
 // codegen.config.mjs
-import { defineConfig } from "webmcp-codegen";
-import { openapi } from "webmcp-codegen/sources";
-import { js } from "webmcp-codegen/generators";
+import { defineConfig } from "@webmcp-stack/codegen";
+import { openapi } from "@webmcp-stack/codegen/sources";
+import { js } from "@webmcp-stack/codegen/generators";
 
 export default defineConfig({
   sources: [openapi({ spec: "./openapi.yaml" })],

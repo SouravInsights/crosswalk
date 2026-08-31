@@ -4,7 +4,7 @@
 
 ## What we submit
 
-**webmcp-codegen as a WebMCP-native site.** A page on the Crosswalk site where the codegen pipeline itself is exposed as WebMCP tools, callable by the judge's agent:
+**webmcp-codegen as a WebMCP-native site.** A page on the webmcp-stack site where the codegen pipeline itself is exposed as WebMCP tools, callable by the judge's agent:
 
 - `analyze-spec` — spec URL or pasted text → operation count, read/write/destructive breakdown, skipped endpoints
 - `audit-spec` — the safety report: webhook/admin/auth endpoints flagged, PII warnings
@@ -17,7 +17,7 @@ Why this fits the rules where alternatives do not: the challenge requires a **We
 
 ## Honest capability split (site vs CLI)
 
-The site cannot do everything the CLI does, and it never will: browsers cannot touch the user's filesystem. The site owns the *try* experience (parse, classify, audit, generate file contents, iterate with an agent). The CLI owns the *adopt* experience (detect spec and app, write files with merge protection, wire registration, watch mode, CI exit codes, dashboard persistence). Every site session funnels to `npx webmcp-codegen generate`.
+The site cannot do everything the CLI does, and it never will: browsers cannot touch the user's filesystem. The site owns the *try* experience (parse, classify, audit, generate file contents, iterate with an agent). The CLI owns the *adopt* experience (detect spec and app, write files with merge protection, wire registration, watch mode, CI exit codes, dashboard persistence). Every site session funnels to `npx @webmcp-stack/codegen generate`.
 
 ## Input and output design
 

@@ -8,7 +8,7 @@ description: Monorepos, specs without operationIds, big APIs, and keeping descri
 Run from the repo root. The CLI finds the spec and the web app on its own:
 
 ```bash
-npx webmcp-codegen generate
+npx @webmcp-stack/codegen generate
 ```
 
 Detection reads each workspace package's `package.json` and looks for a browser framework
@@ -48,14 +48,14 @@ The generated tools register on page load. To watch that happen:
   invoke them by hand.
 - **Other browsers:** add the WebMCP polyfill to your page; the same registration code
   works unchanged.
-- **No browser at all:** `npx webmcp-codegen dev` runs any tool directly from the
+- **No browser at all:** `npx @webmcp-stack/codegen dev` runs any tool directly from the
   dashboard (server-side, so without your browser session; auth'd endpoints will answer
   accordingly).
 
 ## The dashboard
 
 ```bash
-npx webmcp-codegen dev
+npx @webmcp-stack/codegen dev
 ```
 
 ![The webmcp-codegen dashboard](/images/dev-server-dashboard.png)
@@ -71,7 +71,7 @@ is a localhost page served by the CLI, gone when you Ctrl+C.
 The audit exits non-zero on errors, which makes it a CI check:
 
 ```bash
-npx webmcp-codegen generate --dry-run
+npx @webmcp-stack/codegen generate --dry-run
 ```
 
 Run it on pull requests that touch the spec. A new destructive endpoint, a description that

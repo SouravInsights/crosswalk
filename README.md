@@ -1,6 +1,6 @@
-# webmcp-codegen
+# webmcp-stack
 
-Generate safe, typed, human-reviewed [WebMCP](https://github.com/webmachinelearning/webmcp) tools from the API contracts you already have, instead of hand-writing `registerTool()` calls for every action.
+Tools for the WebMCP ecosystem. The first product is **codegen**: generate safe, typed, human-reviewed [WebMCP](https://github.com/webmachinelearning/webmcp) tools from the API contracts you already have, instead of hand-writing `registerTool()` calls for every action.
 
 > Your spec already knows your tools. One command writes them, wires them into your app, and gets out of the way.
 
@@ -9,7 +9,7 @@ Generate safe, typed, human-reviewed [WebMCP](https://github.com/webmachinelearn
 Zero install, zero config:
 
 ```bash
-npx webmcp-codegen generate
+npx @webmcp-stack/codegen generate
 ```
 
 One run finds your OpenAPI spec (monorepos included), finds the package that is your web app, and:
@@ -21,13 +21,13 @@ One run finds your OpenAPI spec (monorepos included), finds the package that is 
 Preview first, write nothing:
 
 ```bash
-npx webmcp-codegen generate --dry-run
+npx @webmcp-stack/codegen generate --dry-run
 ```
 
 ## The dashboard
 
 ```bash
-npx webmcp-codegen dev
+npx @webmcp-stack/codegen dev
 ```
 
 A local control panel for your tools: browse them, edit descriptions, toggle tools on and off, and run any tool directly to check it works. Edits save to `.webmcp-codegen.json` and survive regeneration. Nothing is added to your app.
@@ -44,7 +44,7 @@ A local control panel for your tools: browse them, edit descriptions, toggle too
 
 | Path | npm name | What it is |
 |---|---|---|
-| `packages/codegen` | `webmcp-codegen` | The CLI and the generation pipeline: sources (OpenAPI today), generators, the safety audit, the dev dashboard. |
+| `packages/codegen` | `@webmcp-stack/codegen` | The CLI and the generation pipeline: sources (OpenAPI today), generators, the safety audit, the dev dashboard. |
 | `examples/openapi-petstore` | private | Example app with tools generated from the Petstore OpenAPI spec. |
 | `site/` | private | Landing page and documentation (Next.js + Fumadocs). |
 | `docs/` | — | Design specs (`specs/`) and decision notes (`notes/`). |
@@ -73,7 +73,7 @@ pnpm --filter site dev    # Next.js dev server on :3001
 
 ## Links
 
-- [npm](https://www.npmjs.com/package/webmcp-codegen)
+- [npm](https://www.npmjs.com/package/@webmcp-stack/codegen)
 - [WebMCP spec](https://github.com/webmachinelearning/webmcp)
 
 ## License

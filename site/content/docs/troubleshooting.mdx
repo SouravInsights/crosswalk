@@ -11,7 +11,7 @@ description: Common errors and how to fix them.
 **Fix:** Your spec's `servers` field tells the generator where the API lives. The generated code now uses absolute URLs automatically. If you generated before this fix, re-run:
 
 ```bash
-npx webmcp-codegen generate
+npx @webmcp-stack/codegen generate
 ```
 
 If your spec has no `servers` field, add one:
@@ -36,7 +36,7 @@ This avoids CORS entirely and is the standard pattern for web+API monorepos.
 
 ## "The dashboard works but DevTools doesn't"
 
-**Symptom:** `npx webmcp-codegen dev` runs a tool successfully, but clicking "Run tool" in Chrome DevTools fails.
+**Symptom:** `npx @webmcp-stack/codegen dev` runs a tool successfully, but clicking "Run tool" in Chrome DevTools fails.
 
 **Cause:** The dashboard makes requests server-side (from your terminal), so it has no browser session. DevTools runs the tool in the browser, where authentication and CORS apply.
 

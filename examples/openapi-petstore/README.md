@@ -9,7 +9,7 @@ read it without running anything).
 ```bash
 cd examples/openapi-petstore
 
-# config already exists (created by `npx webmcp-codegen init`). Preview first:
+# config already exists (created by `npx @webmcp-stack/codegen init`). Preview first:
 node ../../packages/codegen/dist/cli.js generate --dry-run
 
 # then for real:

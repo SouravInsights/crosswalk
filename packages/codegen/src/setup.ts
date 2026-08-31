@@ -10,7 +10,7 @@
  *   4. auto-detection: the spec by filename, the web app by its package.json
  *
  * Branches 2-4 build the config right here, which is what makes
- * `npx webmcp-codegen generate` work without installing the package: the
+ * `npx @webmcp-stack/codegen generate` work without installing the package: the
  * user's project never has to resolve a webmcp-codegen import.
  */
 
@@ -55,7 +55,7 @@ export interface Setup {
  *   4. auto-detection: the spec by filename, the web app by its package.json
  *
  * Branches 2-4 build the config right here inside the CLI, which is what
- * makes `npx webmcp-codegen generate` work without installing the package:
+ * makes `npx @webmcp-stack/codegen generate` work without installing the package:
  * the user's project never has to resolve a webmcp-codegen import.
  */
 export async function resolveSetup(cwd: string, flags: GenerateFlags): Promise<Setup> {
@@ -144,14 +144,14 @@ async function detectSpec(cwd: string): Promise<string> {
   if (specs.length === 0) {
     throw new Error(
       "No OpenAPI spec found in this project.\n" +
-        "Point at one:  npx webmcp-codegen generate --spec path/to/openapi.json",
+        "Point at one:  npx @webmcp-stack/codegen generate --spec path/to/openapi.json",
     );
   }
   if (specs.length > 1) {
     const list = specs.map((spec) => `  - ${spec}`).join("\n");
     throw new Error(
       `Found ${specs.length} API specs:\n${list}\n\n` +
-        `Pick one:  npx webmcp-codegen generate --spec ${specs[0]}`,
+        `Pick one:  npx @webmcp-stack/codegen generate --spec ${specs[0]}`,
     );
   }
 

@@ -1,5 +1,5 @@
 /**
- * Spec auto-detection: the reason `npx webmcp-codegen generate` works with
+ * Spec auto-detection: the reason `npx @webmcp-stack/codegen generate` works with
  * zero arguments, zero config, and zero install.
  *
  * The rule is deliberately boring: walk the project (skipping the obvious

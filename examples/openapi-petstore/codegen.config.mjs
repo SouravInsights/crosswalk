@@ -1,6 +1,6 @@
-import { defineConfig } from "webmcp-codegen";
-import { openapi } from "webmcp-codegen/sources";
-import { js } from "webmcp-codegen/generators";
+import { defineConfig } from "@webmcp-stack/codegen";
+import { openapi } from "@webmcp-stack/codegen/sources";
+import { js } from "@webmcp-stack/codegen/generators";
 
 export default defineConfig({
   sources: [openapi({ spec: "./openapi.yaml" })],

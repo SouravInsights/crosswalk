@@ -6,7 +6,7 @@
  * step, no extra dependencies. If you want types while authoring, that is
  * what `defineConfig` is for:
  *
- *   import { defineConfig } from "webmcp-codegen";
+ *   import { defineConfig } from "@webmcp-stack/codegen";
  *   export default defineConfig({ ... });
  */
 
@@ -49,7 +49,7 @@ export async function loadConfig(
   throw new Error(
     explicitPath
       ? `No config file at "${explicitPath}".`
-      : `No codegen.config.mjs found in ${cwd}. Run \`npx webmcp-codegen init\` to create one.`,
+      : `No codegen.config.mjs found in ${cwd}. Run \`npx @webmcp-stack/codegen init\` to create one.`,
   );
 }
 

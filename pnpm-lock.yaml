@@ -32,7 +32,7 @@ importers:
 
   examples/openapi-petstore:
     devDependencies:
-      webmcp-codegen:
+      '@webmcp-stack/codegen':
         specifier: workspace:*
         version: link:../../packages/codegen
 

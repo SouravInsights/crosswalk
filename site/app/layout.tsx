@@ -10,8 +10,8 @@ const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jet
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | webmcp-codegen",
-    default: "webmcp-codegen: generate WebMCP tools from the API spec you already have",
+    template: "%s | webmcp-stack",
+    default: "webmcp-stack: generate WebMCP tools from the API spec you already have",
   },
   description:
     "Turn an OpenAPI spec into safe, typed, human-reviewed WebMCP tools. Real files in your repo: contracts regenerate, your code survives, safety audit built in.",

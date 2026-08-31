@@ -5,6 +5,6 @@
   "type": "module",
   "description": "Example: generate WebMCP tools from an OpenAPI spec with webmcp-codegen",
   "devDependencies": {
-    "webmcp-codegen": "workspace:*"
+    "@webmcp-stack/codegen": "workspace:*"
   }
 }

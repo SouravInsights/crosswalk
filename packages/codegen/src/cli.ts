@@ -35,7 +35,7 @@ const HELP = `
 webmcp-codegen — generate WebMCP tools from your OpenAPI spec
 
 Usage
-  npx webmcp-codegen [command] [flags]
+  npx @webmcp-stack/codegen [command] [flags]
 
 Commands
   generate    Generate tool files from your spec (default when no command given)
@@ -54,13 +54,13 @@ Flags
   --help         Show this help
 
 Examples
-  npx webmcp-codegen generate              # detect spec, generate tools
-  npx webmcp-codegen generate --dry-run    # preview without writing
-  npx webmcp-codegen dev                   # open the dashboard
-  npx webmcp-codegen generate --verbose    # see all 72 tools listed
+  npx @webmcp-stack/codegen generate              # detect spec, generate tools
+  npx @webmcp-stack/codegen generate --dry-run    # preview without writing
+  npx @webmcp-stack/codegen dev                   # open the dashboard
+  npx @webmcp-stack/codegen generate --verbose    # see all 72 tools listed
 
 Docs
-  https://webmcp-codegen.vercel.app/docs
+  https://webmcp-stack.vercel.app/docs
 `;
 
 export interface CliFlags {
@@ -143,9 +143,9 @@ async function init(): Promise<number> {
 
   await writeFile(
     configPath,
-    `import { defineConfig } from "webmcp-codegen";
-import { openapi } from "webmcp-codegen/sources";
-import { js } from "webmcp-codegen/generators";
+    `import { defineConfig } from "@webmcp-stack/codegen";
+import { openapi } from "@webmcp-stack/codegen/sources";
+import { js } from "@webmcp-stack/codegen/generators";
 
 export default defineConfig({
   sources: [openapi({ spec: "${specPath}" })],
@@ -162,7 +162,7 @@ export default defineConfig({
 
   console.log(`\n✔ Wrote ${configFile}\n`);
   console.log("Edit it to add sources, change the output directory, or set safety options.");
-  console.log("Docs: https://webmcp-codegen.vercel.app/docs/configuration\n");
+  console.log("Docs: https://webmcp-stack.vercel.app/docs/configuration\n");
   return 0;
 }
 
@@ -235,7 +235,7 @@ main().then(
   (code) => process.exit(code),
   (error) => {
     console.error("\n✖ Unexpected error:", error instanceof Error ? error.message : error);
-    console.error("\nPlease report this: https://github.com/SouravInsights/crosswalk/issues\n");
+    console.error("\nPlease report this: https://github.com/SouravInsights/webmcp-stack/issues\n");
     process.exit(1);
   },
 );
