@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CopyCommand } from "@/components/copy-command";
 import { LiveDemo } from "@/components/live-demo";
 import { Logo } from "@/components/logo";
+import { SiteFooter } from "@/components/site-footer";
 
 const COMMAND = "npx @webmcp-stack/codegen generate";
 
@@ -226,51 +227,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer: metadata and the honest status note, small and quiet. */}
-      <footer className="border-t border-line">
-        <div className="mx-auto max-w-6xl px-5 py-8 sm:px-6">
-          <p className="mx-auto mb-6 max-w-xl text-center text-[12.5px] leading-relaxed text-faint">
-            WebMCP itself is still early: tools run today in Chrome behind a flag, or anywhere with
-            a small polyfill. OpenAPI is supported now; tRPC, Zod, and Prisma are on the roadmap.
-          </p>
-          <div className="flex flex-col items-center justify-between gap-3 font-mono text-[12px] text-faint sm:flex-row">
-            <span className="flex items-center gap-4">
-              <Logo />
-              <span>MIT · node 20+ · zero runtime dependencies</span>
-            </span>
-            <span className="flex items-center gap-5">
-              <Link
-                href="/docs"
-                className="transition-colors duration-150 hover:text-ink"
-                style={{ transitionTimingFunction: "var(--ease-reading)" }}
-              >
-                docs
-              </Link>
-              <Link
-                href="/about"
-                className="transition-colors duration-150 hover:text-ink"
-                style={{ transitionTimingFunction: "var(--ease-reading)" }}
-              >
-                about
-              </Link>
-              <Link
-                href="/brand"
-                className="transition-colors duration-150 hover:text-ink"
-                style={{ transitionTimingFunction: "var(--ease-reading)" }}
-              >
-                brand
-              </Link>
-              <a
-                href="https://github.com/SouravInsights/webmcp-stack"
-                className="transition-colors duration-150 hover:text-ink"
-                style={{ transitionTimingFunction: "var(--ease-reading)" }}
-              >
-                github
-              </a>
-            </span>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }

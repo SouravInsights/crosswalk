@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Logo, LogoWord } from "@/components/logo";
+import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
   title: "About",
@@ -124,8 +125,8 @@ export default function AboutPage() {
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-[15.5px] leading-relaxed text-dim sm:text-[16.5px]">
             Today, an agent that wants to use your app reads the screen and simulates clicks.
-            WebMCP gives it a better path: your app exposes typed tools, and the agent calls them.
-            webmcp-stack is the tooling for building that surface, and for keeping it safe.
+            WebMCP gives it a better path: your app exposes typed tools, and the agent calls them.{" "}
+            <LogoWord /> is the tooling for building that surface, and for keeping it safe.
           </p>
         </div>
       </section>
@@ -151,7 +152,7 @@ export default function AboutPage() {
               and who decided.
             </p>
             <p>
-              webmcp-stack exists to make WebMCP practical for real applications. Not a single
+              <LogoWord /> exists to make WebMCP practical for real applications. Not a single
               tool, but the tooling for the whole lifecycle of an agent-facing surface, built so
               developers stay in control of what agents can actually do.
             </p>
@@ -318,7 +319,7 @@ export default function AboutPage() {
               problem this stack exists to solve.
             </p>
             <p>
-              webmcp-stack is open source and open in direction. If you are building with WebMCP,
+              <LogoWord /> is open source and open in direction. If you are building with WebMCP,
               or figuring out what agents should be allowed to do in production,{" "}
               <a
                 href={`${REPO}/issues`}
@@ -332,6 +333,7 @@ export default function AboutPage() {
         </div>
       </section>
 
+      <SiteFooter />
     </main>
   );
 }

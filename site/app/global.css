@@ -81,6 +81,27 @@ body {
   }
 }
 
+/* Footer mark: the stack settles apart on hover, staggered per layer. */
+.footer-mark path {
+  transition: transform 0.4s var(--ease-reading);
+}
+
+.footer-mark:hover path:nth-child(2) {
+  transform: translateY(2px);
+  transition-delay: 30ms;
+}
+
+.footer-mark:hover path:nth-child(3) {
+  transform: translateY(4px);
+  transition-delay: 60ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .footer-mark:hover path {
+    transform: none;
+  }
+}
+
 ::selection {
   background-color: var(--color-accent);
   color: var(--color-baseline);

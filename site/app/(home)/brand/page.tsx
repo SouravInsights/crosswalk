@@ -2,7 +2,8 @@ import { Download } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ColorSwatch } from "@/components/color-swatch";
-import { Logo, LogoMark } from "@/components/logo";
+import { Logo, LogoMark, LogoWord } from "@/components/logo";
+import { SiteFooter } from "@/components/site-footer";
 
 export const metadata: Metadata = {
   title: "Brand guidelines",
@@ -122,8 +123,8 @@ export default function BrandPage() {
               Brand guidelines
             </h1>
             <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-dim">
-              Everything you need to reference webmcp-stack in your project: the mark, the wordmark,
-              and the colors. Click any hex value to copy it.
+              Everything you need to reference <LogoWord /> in your project: the mark, the
+              wordmark, and the colors. Click any hex value to copy it.
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <a
@@ -150,24 +151,18 @@ export default function BrandPage() {
               <Prose>
                 <p>
                   &ldquo;webmcp-stack&rdquo; is written lowercase with a hyphen in prose, URLs, and
-                  package scopes. The wordmark renders it as one word,{" "}
-                  <span className="font-mono text-ink">
-                    webmcp<span className="text-accent">stack</span>
-                  </span>
-                  , with the color split at the family boundary. Both spellings are the same name;
-                  never &ldquo;WebMCP Stack&rdquo; in body copy unless it starts a sentence, and
-                  never &ldquo;WMCP&rdquo; or &ldquo;the stack&rdquo; alone.
+                  package scopes. The wordmark renders it as one word, <LogoWord />, with the
+                  color split at the family boundary. Both spellings are the same name; never
+                  &ldquo;WebMCP Stack&rdquo; in body copy unless it starts a sentence, and never
+                  &ldquo;WMCP&rdquo; or &ldquo;the stack&rdquo; alone.
                 </p>
                 <p>
                   Products are functional names under the scope:{" "}
                   <span className="font-mono text-ink">@webmcp-stack/codegen</span>, and later{" "}
                   <span className="font-mono text-ink">@webmcp-stack/audit</span>,{" "}
                   <span className="font-mono text-ink">@webmcp-stack/telemetry</span>. On a surface
-                  that belongs to one product, the lockup adds a dim suffix:{" "}
-                  <span className="font-mono text-ink">
-                    webmcpstack <span className="text-faint">/ codegen</span>
-                  </span>
-                  .
+                  that belongs to one product, the lockup adds a dim suffix: <LogoWord />{" "}
+                  <span className="font-mono text-faint">/ codegen</span>.
                 </p>
               </Prose>
             </section>
@@ -308,6 +303,8 @@ export default function BrandPage() {
           </aside>
         </div>
       </div>
+
+      <SiteFooter />
     </main>
   );
 }
