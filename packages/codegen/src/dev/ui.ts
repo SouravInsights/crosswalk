@@ -1,17 +1,39 @@
 /**
- * The dashboard UI: one self-contained HTML page (inline CSS and JS), served
- * by the dev server. No framework, no build step, no CDN: the page must work
- * offline and add zero dependencies to the package.
+ * The dashboard's UI: a single HTML page with embedded CSS and JS.
+ * Design goals: professional, scannable, no visual noise.
  *
- * Design bar (per the first-run spec): this is a product surface, in the
- * idiom of Storybook / Mintlify / Scalar. Same tokens as the site: dark
- * neutral surfaces, one accent blue, hairline borders, system sans for prose
- * and mono for names and code. Keyboard navigation throughout: up/down move
- * through tools, ⌘K focuses search, ⌘S saves an edit.
+ * Layout:
+ *   - Left sidebar: search + tool list, grouped by risk
+ *   - Right panel: tool detail with edit, toggle, and test sections
+ *
+ * No framework, no build step. Plain HTML/CSS/JS shipped as a string.
  */
 
+interface UiTool {
+  name: string;
+  description: string;
+  sideEffect: string;
+  enabled: boolean;
+  endpointRole: string;
+  piiInOutput: string[];
+  findings: { level: string; message: string }[];
+  inputSchema?: Record<string, unknown>;
+  serverUrl?: string;
+  requiresAuth?: boolean;
+  verb?: string;
+  path?: string;
+}
+
+interface UiState {
+  label: string;
+  outDir?: string;
+  tools: UiTool[];
+  skipped: { ref: string; reason: string }[];
+  notes: string[];
+}
+
 export function dashboardHtml(): string {
-  return `<!doctype html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -20,16 +42,20 @@ export function dashboardHtml(): string {
 <style>
   :root {
     --baseline: #0a0b0f;
-    --panel: #0f1117;
-    --panel-raised: #151822;
-    --line: #20242f;
+    --surface: #10131a;
+    --surface-raised: #161a23;
+    --line: #1e2330;
+    --line-subtle: #161a23;
     --ink: #e9ecf2;
     --dim: #9aa3b2;
     --faint: #5d6575;
     --ghost: #3b4150;
     --accent: #58a6ff;
+    --accent-dim: rgba(88, 166, 255, 0.15);
     --signal: #e3b341;
+    --signal-dim: rgba(227, 179, 65, 0.15);
     --fault: #f47067;
+    --fault-dim: rgba(244, 112, 103, 0.15);
     --sans: ui-sans-serif, system-ui, -apple-system, sans-serif;
     --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
@@ -41,168 +67,513 @@ export function dashboardHtml(): string {
     font-family: var(--sans);
     font-size: 14px;
     -webkit-font-smoothing: antialiased;
+    overflow: hidden;
   }
   ::selection { background: var(--accent); color: var(--baseline); }
-  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
-  input, textarea { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
-  input:focus-visible, textarea:focus-visible, button:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 
-  #app { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
-
-  /* ── Sidebar ─────────────────────────────────────────────── */
-  aside {
+  /* Layout */
+  .app { display: flex; height: 100vh; }
+  .sidebar {
+    width: 320px;
+    min-width: 320px;
     border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    background: var(--surface);
+  }
+  .main {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--baseline);
+  }
+
+  /* Sidebar header */
+  .sidebar-header {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--line-subtle);
   }
   .brand {
-    display: flex; align-items: center; gap: 10px;
-    padding: 16px 16px 12px;
-    font-family: var(--mono); font-size: 13px; letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 4px;
   }
-  .brand::before { content: ""; width: 8px; height: 8px; background: var(--accent); }
-  .brand .meta { color: var(--faint); font-size: 11px; margin-left: auto; }
-  .search { padding: 0 12px 12px; }
-  .search input {
-    width: 100%; padding: 7px 10px; font-family: var(--mono); font-size: 12px;
+  .brand-mark {
+    width: 24px;
+    height: 24px;
+    background: linear-gradient(135deg, var(--accent), #7c3aed);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: white;
   }
-  .search input::placeholder { color: var(--ghost); }
-  .tools { overflow-y: auto; flex: 1; padding: 4px 8px 16px; }
+  .brand-sub {
+    color: var(--faint);
+    font-size: 12px;
+  }
+
+  /* Search */
+  .search-wrap {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line-subtle);
+  }
+  .search {
+    width: 100%;
+    background: var(--surface-raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 12px 8px 32px;
+    color: var(--ink);
+    font-size: 13px;
+    font-family: inherit;
+    position: relative;
+  }
+  .search:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .search-icon {
+    position: absolute;
+    left: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--faint);
+    pointer-events: none;
+  }
+  .search-wrap { position: relative; }
+
+  /* Tool list */
+  .tool-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  .tool-group {
+    padding: 8px 16px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--faint);
+  }
   .tool {
-    display: flex; align-items: center; gap: 8px; width: 100%;
-    padding: 7px 8px; border-radius: 6px; text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 16px;
+    border: none;
+    background: none;
+    color: var(--ink);
+    font-size: 13px;
+    font-family: var(--mono);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .tool:hover { background: var(--surface-raised); }
+  .tool[aria-selected="true"] {
+    background: var(--accent-dim);
+    border-right: 2px solid var(--accent);
+  }
+  .tool-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .tool-indicator.read { background: var(--accent); }
+  .tool-indicator.write { background: var(--signal); }
+  .tool-indicator.destructive { background: var(--fault); }
+  .tool-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tool-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--surface-raised);
     color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
   }
-  .tool:hover { background: var(--panel); color: var(--ink); }
-  .tool[aria-selected="true"] { background: var(--panel-raised); color: var(--ink); }
-  .tool .name { font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tool .verb {
-    margin-left: auto; font-family: var(--mono); font-size: 10px;
-    padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line);
-    color: var(--faint); flex-shrink: 0;
-  }
-  .tool .verb.read { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
-  .tool .verb.write { color: var(--signal); border-color: color-mix(in srgb, var(--signal) 35%, transparent); }
-  .tool .verb.destructive { color: var(--fault); border-color: color-mix(in srgb, var(--fault) 35%, transparent); }
-  .tool .off {
-    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-    background: var(--ghost);
-  }
-  .tool .off[title] { cursor: help; }
-  .empty { padding: 24px 16px; color: var(--faint); font-size: 13px; line-height: 1.6; }
+  .tool-badge.disabled { color: var(--signal); }
 
-  /* ── Detail pane ─────────────────────────────────────────── */
-  main { overflow-y: auto; min-width: 0; }
-  .detail { max-width: 780px; padding: 32px 40px 80px; }
-  .crumb { font-family: var(--mono); font-size: 11px; color: var(--ghost); margin-bottom: 10px; }
-  h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 6px; font-family: var(--mono); }
-  .route { font-family: var(--mono); font-size: 12px; color: var(--faint); margin-bottom: 24px; }
-  .badges { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+  /* Main content */
+  .detail {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 32px 40px;
+  }
+  .placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--faint);
+    text-align: center;
+    padding: 40px;
+  }
+  .placeholder-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--surface-raised);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    color: var(--ghost);
+  }
+  .placeholder kbd {
+    background: var(--surface-raised);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  /* Detail header */
+  .detail-header {
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line-subtle);
+  }
+  .detail-crumb {
+    font-size: 12px;
+    color: var(--faint);
+    margin-bottom: 8px;
+    font-family: var(--mono);
+  }
+  .detail-title {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 8px;
+    font-family: var(--mono);
+  }
+  .detail-route {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .verb {
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+  .verb.read { color: var(--accent); background: var(--accent-dim); }
+  .verb.write { color: var(--signal); background: var(--signal-dim); }
+  .verb.destructive { color: var(--fault); background: var(--fault-dim); }
+
+  /* Badges */
+  .badges {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
   .badge {
-    font-family: var(--mono); font-size: 11px; padding: 3px 8px;
-    border: 1px solid var(--line); border-radius: 999px; color: var(--dim);
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 500;
   }
-  .badge.accent { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
-  .badge.warn { color: var(--signal); border-color: color-mix(in srgb, var(--signal) 35%, transparent); }
-  .badge.err { color: var(--fault); border-color: color-mix(in srgb, var(--fault) 35%, transparent); }
+  .badge.read { color: var(--accent); background: var(--accent-dim); }
+  .badge.write { color: var(--signal); background: var(--signal-dim); }
+  .badge.destructive { color: var(--fault); background: var(--fault-dim); }
+  .badge.disabled { color: var(--signal); background: var(--signal-dim); }
+  .badge.auth { color: var(--fault); background: var(--fault-dim); }
 
-  .field-label {
-    font-family: var(--mono); font-size: 10px; text-transform: uppercase;
-    letter-spacing: 0.18em; color: var(--faint); margin: 28px 0 8px;
+  /* Sections */
+  .section {
+    margin-bottom: 28px;
   }
-  textarea#desc {
-    width: 100%; min-height: 70px; padding: 10px 12px; font-size: 14px;
-    line-height: 1.55; resize: vertical;
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--faint);
+    margin-bottom: 10px;
   }
-  .hint { color: var(--faint); font-size: 12px; margin-top: 6px; line-height: 1.5; }
-  .auth-note { background: color-mix(in srgb, var(--signal) 10%, transparent); border: 1px solid var(--signal); color: var(--signal); padding: 10px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 14px; line-height: 1.5; }
-  .row { display: flex; align-items: center; gap: 12px; }
-  .save {
-    margin-top: 10px; padding: 7px 14px; border: 1px solid var(--line);
-    border-radius: 6px; font-size: 13px; color: var(--ink); background: var(--panel-raised);
+
+  /* Description edit */
+  .description-edit {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 12px;
+    color: var(--ink);
+    font-size: 14px;
+    font-family: inherit;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 80px;
   }
-  .save:hover { border-color: var(--accent); }
-  .save[disabled] { opacity: 0.4; cursor: default; }
-  .saved { color: var(--accent); font-size: 12px; font-family: var(--mono); }
+  .description-edit:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .btn:hover { background: var(--surface-raised); border-color: var(--ghost); }
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--baseline);
+  }
+  .btn-primary:hover { background: #4a95ee; border-color: #4a95ee; }
+  .saved-indicator {
+    font-size: 12px;
+    color: var(--accent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .saved-indicator.show { opacity: 1; }
+  .edit-hint {
+    font-size: 12px;
+    color: var(--faint);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
 
   /* Toggle */
-  .toggle-row { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-top: 28px; }
-  .switch { position: relative; width: 34px; height: 20px; border-radius: 999px; background: var(--ghost); transition: background 150ms; flex-shrink: 0; }
-  .switch[aria-checked="true"] { background: var(--accent); }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .switch {
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    background: var(--surface-raised);
+    border: 1px solid var(--line);
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
   .switch::after {
-    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
-    border-radius: 50%; background: var(--ink); transition: left 150ms;
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--dim);
+    top: 2px;
+    left: 2px;
+    transition: all 0.2s;
   }
-  .switch[aria-checked="true"]::after { left: 16px; }
-  .toggle-copy { font-size: 13px; color: var(--dim); line-height: 1.5; }
-  .toggle-copy strong { color: var(--ink); font-weight: 600; }
-
-  /* Findings */
-  .finding {
-    display: flex; gap: 8px; padding: 10px 12px; border: 1px solid var(--line);
-    border-radius: 6px; font-size: 12.5px; line-height: 1.5; color: var(--dim);
-    margin-bottom: 8px; background: var(--panel);
+  .switch[aria-checked="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
   }
-  .finding.warn { border-color: color-mix(in srgb, var(--signal) 30%, transparent); }
-  .finding.error { border-color: color-mix(in srgb, var(--fault) 30%, transparent); }
-  .finding .icon { color: var(--signal); }
-  .finding.error .icon { color: var(--fault); }
+  .switch[aria-checked="true"]::after {
+    left: 20px;
+    background: white;
+  }
+  .toggle-copy { font-size: 13px; line-height: 1.5; }
+  .toggle-copy strong { display: block; margin-bottom: 2px; }
 
   /* Try it */
-  .try { margin-top: 28px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
-  .try > header { padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
-  .try > header h2 { font-size: 13px; margin: 0; font-weight: 600; }
-  .try > header .note { color: var(--faint); font-size: 11.5px; margin-left: auto; }
-  .try .body { padding: 16px; }
-  .param { display: grid; grid-template-columns: 180px 1fr; gap: 12px; align-items: center; margin-bottom: 10px; }
-  .param label { font-family: var(--mono); font-size: 12px; color: var(--dim); }
-  .param label .req { color: var(--fault); }
-  .param input { padding: 7px 10px; font-family: var(--mono); font-size: 12px; width: 100%; }
-  .base-url { margin-bottom: 14px; }
-  .base-url input { width: 100%; padding: 7px 10px; font-family: var(--mono); font-size: 12px; }
-  .run {
-    margin-top: 6px; padding: 8px 16px; border-radius: 6px; font-size: 13px;
-    background: var(--accent); color: var(--baseline); font-weight: 600;
+  .try-section {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
   }
-  .run[disabled] { opacity: 0.5; cursor: default; }
-  pre.result {
-    margin: 14px 0 0; padding: 12px 14px; background: var(--baseline);
-    border: 1px solid var(--line); border-radius: 6px; font-family: var(--mono);
-    font-size: 12px; line-height: 1.55; overflow-x: auto; max-height: 320px;
-    color: var(--dim); white-space: pre-wrap; word-break: break-word;
+  .try-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
-  pre.result.ok { border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
-  pre.result.err { border-color: color-mix(in srgb, var(--fault) 35%, transparent); }
+  .try-header h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .try-note {
+    font-size: 11px;
+    color: var(--faint);
+  }
+  .try-body { padding: 16px; }
+  .auth-note {
+    background: var(--signal-dim);
+    border: 1px solid var(--signal);
+    color: var(--signal);
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  .base-url-input {
+    width: 100%;
+    background: var(--baseline);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: var(--ink);
+    font-size: 13px;
+    font-family: var(--mono);
+    margin-bottom: 14px;
+  }
+  .base-url-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .param-list { margin-bottom: 14px; }
+  .param {
+    margin-bottom: 12px;
+  }
+  .param-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: var(--dim);
+  }
+  .param-label .req { color: var(--fault); }
+  .param-hint {
+    font-size: 11px;
+    color: var(--faint);
+    margin-top: 2px;
+  }
+  .param-input {
+    width: 100%;
+    background: var(--baseline);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: var(--ink);
+    font-size: 13px;
+    font-family: var(--mono);
+  }
+  .param-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .run-btn {
+    width: 100%;
+    padding: 10px;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: var(--baseline);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .run-btn:hover { background: #4a95ee; }
+  .run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .result {
+    margin-top: 14px;
+    padding: 12px;
+    background: var(--baseline);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .result.ok { border-color: var(--accent); }
+  .result.err { border-color: var(--fault); }
 
-  .placeholder { max-width: 480px; margin: 20vh auto 0; text-align: center; color: var(--faint); line-height: 1.7; }
-  .placeholder kbd {
-    font-family: var(--mono); font-size: 11px; border: 1px solid var(--line);
-    border-radius: 4px; padding: 1px 5px; color: var(--dim);
+  /* Findings */
+  .findings {
+    margin-bottom: 20px;
   }
-  .toast {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-    background: var(--panel-raised); border: 1px solid var(--line); color: var(--ink);
-    padding: 8px 14px; border-radius: 6px; font-size: 12.5px; opacity: 0;
-    transition: opacity 150ms; pointer-events: none;
+  .finding {
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    line-height: 1.5;
   }
-  .toast.show { opacity: 1; }
+  .finding.warning { border-left: 3px solid var(--signal); }
+  .finding.error { border-left: 3px solid var(--fault); }
+  .finding-icon { flex-shrink: 0; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ghost); }
 </style>
 </head>
 <body>
-<div id="app">
-  <aside>
-    <div class="brand">webmcp-codegen <span class="meta" id="tool-count"></span></div>
-    <div class="search"><input id="search" type="text" placeholder="filter tools  (⌘K)" spellcheck="false" /></div>
-    <div class="tools" id="tool-list" role="listbox" aria-label="Tools"></div>
-  </aside>
-  <main id="detail">
-    <div class="placeholder">
-      <p>Loading your tools…</p>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="brand-mark">W</div>
+        <span>webmcp-codegen</span>
+      </div>
+      <div class="brand-sub" id="tool-count"></div>
     </div>
+    <div class="search-wrap">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="m21 21-4.35-4.35"></path>
+      </svg>
+      <input type="text" class="search" id="search" placeholder="Search tools..." spellcheck="false" />
+    </div>
+    <div class="tool-list" id="tool-list"></div>
+  </aside>
+  <main class="main" id="main">
+    <div class="placeholder" id="placeholder">
+      <div class="placeholder-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+        </svg>
+      </div>
+      <p>Select a tool to view details</p>
+      <p style="font-size: 12px; margin-top: 8px;">
+        <kbd>↑</kbd> <kbd>↓</kbd> to navigate &nbsp;·&nbsp; <kbd>⌘K</kbd> to search
+      </p>
+    </div>
+    <div class="detail" id="detail" hidden></div>
   </main>
 </div>
-<div class="toast" id="toast"></div>
 
 <script>
 (function () {
@@ -212,67 +583,79 @@ export function dashboardHtml(): string {
 
   var listEl = document.getElementById("tool-list");
   var detailEl = document.getElementById("detail");
+  var placeholderEl = document.getElementById("placeholder");
   var searchEl = document.getElementById("search");
-  var toastEl = document.getElementById("toast");
+  var countEl = document.getElementById("tool-count");
 
   function esc(text) {
-    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
-
-  function toast(message) {
-    toastEl.textContent = message;
-    toastEl.classList.add("show");
-    setTimeout(function () { toastEl.classList.remove("show"); }, 2200);
+    var div = document.createElement("div");
+    div.textContent = text == null ? "" : String(text);
+    return div.innerHTML;
   }
 
   function api(path, options) {
     return fetch(path, options).then(function (res) {
-      return res.json().then(function (body) {
-        if (!res.ok) throw new Error(body.error || ("Request failed: " + res.status));
-        return body;
-      });
+      if (!res.ok) throw new Error("Request failed: " + res.status);
+      return res.json();
     });
   }
 
   function load() {
-    return api("/api/state").then(function (next) {
-      state = next;
-      if (!selected && state.tools.length > 0) selected = state.tools[0].name;
+    api("/api/state").then(function (data) {
+      state = data;
+      countEl.textContent = data.tools.length + " tools from " + data.label;
       renderList();
       renderDetail();
-    }).catch(function (error) {
-      detailEl.innerHTML = '<div class="placeholder"><p>Could not load tools.</p><p>' + esc(error.message) + "</p></div>";
     });
   }
 
   function visibleTools() {
-    if (!filter) return state.tools;
-    var needle = filter.toLowerCase();
+    if (!state) return [];
+    var f = filter.toLowerCase();
     return state.tools.filter(function (tool) {
-      return tool.name.indexOf(needle) !== -1 ||
-        (tool.path || "").toLowerCase().indexOf(needle) !== -1 ||
-        tool.description.toLowerCase().indexOf(needle) !== -1;
+      return tool.name.toLowerCase().indexOf(f) !== -1 ||
+        (tool.description && tool.description.toLowerCase().indexOf(f) !== -1);
     });
   }
 
+  function groupTools(tools) {
+    var groups = { read: [], write: [], destructive: [] };
+    tools.forEach(function (tool) {
+      var key = tool.sideEffect || "read";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(tool);
+    });
+    return groups;
+  }
+
   function renderList() {
-    document.getElementById("tool-count").textContent = state.tools.length + " tools";
     var tools = visibleTools();
+    var groups = groupTools(tools);
+    var html = "";
+
+    ["read", "write", "destructive"].forEach(function (risk) {
+      var group = groups[risk];
+      if (!group || group.length === 0) return;
+      html += '<div class="tool-group">' + risk + ' (' + group.length + ')</div>';
+      group.forEach(function (tool) {
+        var isSelected = tool.name === selected;
+        html += '<button class="tool" data-name="' + esc(tool.name) + '" aria-selected="' + isSelected + '">' +
+          '<span class="tool-indicator ' + risk + '"></span>' +
+          '<span class="tool-name">' + esc(tool.name) + "</span>" +
+          (!tool.enabled ? '<span class="tool-badge disabled">off</span>' : "") +
+          "</button>";
+      });
+    });
+
     if (tools.length === 0) {
-      listEl.innerHTML = '<div class="empty">No tools match.</div>';
-      return;
+      html = '<div style="padding: 20px; text-align: center; color: var(--faint);">No tools match your search</div>';
     }
-    listEl.innerHTML = tools.map(function (tool) {
-      var disabled = tool.enabled ? "" : '<span class="off" title="starts disabled"></span>';
-      return '<button class="tool" role="option" aria-selected="' + (tool.name === selected) + '" data-name="' + esc(tool.name) + '">' +
-        disabled +
-        '<span class="name">' + esc(tool.name) + "</span>" +
-        '<span class="verb ' + esc(tool.sideEffect) + '">' + esc(tool.verb || "") + "</span>" +
-        "</button>";
-    }).join("");
-    Array.prototype.forEach.call(listEl.children, function (child) {
-      child.addEventListener("click", function () {
-        selected = child.getAttribute("data-name");
+
+    listEl.innerHTML = html;
+
+    Array.prototype.forEach.call(listEl.querySelectorAll(".tool"), function (btn) {
+      btn.addEventListener("click", function () {
+        selected = btn.getAttribute("data-name");
         renderList();
         renderDetail();
       });
@@ -280,26 +663,31 @@ export function dashboardHtml(): string {
   }
 
   function currentTool() {
+    if (!state || !selected) return null;
     return state.tools.find(function (tool) { return tool.name === selected; });
   }
 
   function renderDetail() {
     var tool = currentTool();
     if (!tool) {
-      detailEl.innerHTML = '<div class="placeholder"><p>Select a tool on the left.</p><p><kbd>↑</kbd> <kbd>↓</kbd> to move, <kbd>⌘K</kbd> to search.</p></div>';
+      detailEl.hidden = true;
+      placeholderEl.hidden = false;
       return;
     }
 
+    placeholderEl.hidden = true;
+    detailEl.hidden = false;
+
     var badges = [
-      '<span class="badge accent">' + esc(tool.sideEffect) + "</span>",
-      tool.enabled ? '<span class="badge">enabled</span>' : '<span class="badge warn">starts disabled</span>',
-      tool.endpointRole !== "endpoint" ? '<span class="badge err">' + esc(tool.endpointRole) + " endpoint</span>" : "",
-      tool.piiInOutput.length > 0 ? '<span class="badge warn">pii: ' + esc(tool.piiInOutput.join(", ")) + "</span>" : "",
+      '<span class="badge ' + tool.sideEffect + '">' + tool.sideEffect + "</span>",
+      !tool.enabled ? '<span class="badge disabled">starts disabled</span>' : "",
+      tool.endpointRole !== "endpoint" ? '<span class="badge auth">' + tool.endpointRole + "</span>" : "",
+      tool.piiInOutput.length > 0 ? '<span class="badge write">pii: ' + esc(tool.piiInOutput.join(", ")) + "</span>" : "",
     ].filter(Boolean).join("");
 
     var findings = tool.findings.map(function (finding) {
       var icon = finding.level === "error" ? "✖" : "⚠";
-      return '<div class="finding ' + esc(finding.level) + '"><span class="icon">' + icon + "</span><span>" + esc(finding.message) + "</span></div>";
+      return '<div class="finding ' + finding.level + '"><span class="finding-icon">' + icon + "</span><span>" + esc(finding.message) + "</span></div>";
     }).join("");
 
     var schema = tool.inputSchema || {};
@@ -309,44 +697,60 @@ export function dashboardHtml(): string {
       var field = properties[key];
       var type = field.type === "number" || field.type === "integer" ? "number" : "text";
       var req = required.indexOf(key) !== -1 ? ' <span class="req">*</span>' : "";
-      var label = esc(key) + req + (field.description ? '<div class="hint">' + esc(field.description) + "</div>" : "");
-      return '<div class="param"><label for="f-' + esc(key) + '">' + label + '</label>' +
-        '<input id="f-' + esc(key) + '" data-field="' + esc(key) + '" data-type="' + esc(field.type || "string") + '" type="' + type + '" spellcheck="false" /></div>';
+      var hint = field.description ? '<div class="param-hint">' + esc(field.description) + "</div>" : "";
+      return '<div class="param"><label class="param-label">' + esc(key) + req + '</label>' +
+        '<input class="param-input" data-field="' + esc(key) + '" data-type="' + esc(field.type || "string") + '" type="' + type + '" spellcheck="false" />' +
+        hint + "</div>";
     }).join("");
 
     var baseUrl = "";
     try { baseUrl = localStorage.getItem("webmcp-codegen:baseUrl") || tool.serverUrl || ""; } catch (e) {}
 
     detailEl.innerHTML =
-      '<div class="detail">' +
-      '<div class="crumb">' + esc(state.label) + (state.outDir ? " → " + esc(state.outDir) : "") + "</div>" +
-      "<h1>" + esc(tool.name) + "</h1>" +
-      '<div class="route">' + esc((tool.verb || "") + " " + (tool.path || "")) + "</div>" +
+      '<div class="detail-header">' +
+      '<div class="detail-crumb">' + esc(state.label) + (state.outDir ? " → " + esc(state.outDir) : "") + "</div>" +
+      '<h1 class="detail-title">' + esc(tool.name) + "</h1>" +
+      '<div class="detail-route">' +
+      '<span class="verb ' + tool.sideEffect + '">' + esc(tool.verb || "GET") + "</span>" +
+      "<span>" + esc(tool.path || "") + "</span>" +
+      "</div>" +
       '<div class="badges">' + badges + "</div>" +
+      "</div>" +
 
-      (findings ? '<div class="field-label">audit findings</div>' + findings : "") +
+      (findings ? '<div class="section"><div class="section-label">Audit findings</div>' + findings + "</div>" : "") +
 
-      '<div class="field-label">description</div>' +
-      '<textarea id="desc" spellcheck="false">' + esc(tool.description) + "</textarea>" +
-      '<div class="row"><button class="save" id="save-desc">save description</button><span class="saved" id="saved-desc"></span></div>' +
-      '<div class="hint">Agents pick tools by this text. Saved to .webmcp-codegen.json, so it survives regeneration. ⌘S to save.</div>' +
+      '<div class="section">' +
+      '<div class="section-label">Description</div>' +
+      '<textarea class="description-edit" id="desc" spellcheck="false">' + esc(tool.description) + "</textarea>" +
+      '<div class="edit-actions">' +
+      '<button class="btn btn-primary" id="save-desc">Save</button>' +
+      '<span class="saved-indicator" id="saved">Saved</span>' +
+      "</div>" +
+      '<div class="edit-hint">Agents pick tools by this text. Saved to .webmcp-codegen.json, so it survives regeneration. ⌘S to save.</div>' +
+      "</div>" +
 
+      '<div class="section">' +
+      '<div class="section-label">Status</div>' +
       '<div class="toggle-row">' +
       '<button class="switch" id="toggle-enabled" role="switch" aria-checked="' + tool.enabled + '" aria-label="Enabled"></button>' +
-      '<div class="toggle-copy"><strong>' + (tool.enabled ? "Enabled" : "Disabled") + ".</strong> " +
+      '<div class="toggle-copy"><strong>' + (tool.enabled ? "Enabled" : "Disabled") + "</strong>" +
       (tool.enabled
         ? "This tool works as soon as the app registers it."
         : "The generated code is there, commented out. Flipping this regenerates it enabled on the next run.") +
       "</div></div>" +
+      "</div>" +
 
-      '<div class="try"><header><h2>try it</h2><span class="note">direct call, server-side</span></header>' +
-      '<div class="body">' +
+      '<div class="section">' +
+      '<div class="section-label">Test</div>' +
+      '<div class="try-section">' +
+      '<div class="try-header"><h3>Run this tool</h3><span class="try-note">server-side, no browser session</span></div>' +
+      '<div class="try-body">' +
       (tool.requiresAuth
         ? '<div class="auth-note">⚠ This endpoint requires a browser session. The dashboard runs server-side, so you will get a 401. Test it in Chrome DevTools where you are signed in.</div>'
         : "") +
-      '<div class="base-url"><input id="base-url" type="text" placeholder="base URL, e.g. http://localhost:3000" value="' + esc(baseUrl) + '" spellcheck="false" /></div>' +
-      (fields || '<div class="hint">This tool takes no inputs.</div>') +
-      '<button class="run" id="run">run</button>' +
+      '<input class="base-url-input" id="base-url" type="text" placeholder="Base URL (e.g. http://localhost:3000)" value="' + esc(baseUrl) + '" spellcheck="false" />' +
+      (fields || '<div style="color: var(--faint); font-size: 13px; margin-bottom: 14px;">This tool takes no inputs.</div>') +
+      '<button class="run-btn" id="run">Run tool</button>' +
       '<pre class="result" id="result" hidden></pre>' +
       "</div></div>" +
       "</div>";
@@ -369,8 +773,10 @@ export function dashboardHtml(): string {
       body: JSON.stringify({ name: tool.name, description: desc }),
     }).then(function () {
       tool.description = desc;
-      toast("saved to .webmcp-codegen.json");
-    }).catch(function (error) { toast(error.message); });
+      var saved = document.getElementById("saved");
+      saved.classList.add("show");
+      setTimeout(function () { saved.classList.remove("show"); }, 2000);
+    }).catch(function (error) { alert(error.message); });
   }
 
   function toggleEnabled() {
@@ -385,8 +791,7 @@ export function dashboardHtml(): string {
       tool.enabled = next;
       renderList();
       renderDetail();
-      toast(next ? "enabled on next generate" : "disabled on next generate");
-    }).catch(function (error) { toast(error.message); });
+    }).catch(function (error) { alert(error.message); });
   }
 
   function runTool() {
@@ -408,6 +813,7 @@ export function dashboardHtml(): string {
     var resultEl = document.getElementById("result");
     var runEl = document.getElementById("run");
     runEl.disabled = true;
+    runEl.textContent = "Running...";
     resultEl.hidden = true;
     api("/api/run", {
       method: "POST",
@@ -417,7 +823,7 @@ export function dashboardHtml(): string {
       resultEl.hidden = false;
       resultEl.className = "result " + (result.ok ? "ok" : "err");
       resultEl.textContent =
-        (result.status ? "HTTP " + result.status + "\\n\\n" : "") +
+        (result.status ? "HTTP " + result.status + "\n\n" : "") +
         (result.error ? result.error : JSON.stringify(result.body, null, 2));
     }).catch(function (error) {
       resultEl.hidden = false;
@@ -425,11 +831,11 @@ export function dashboardHtml(): string {
       resultEl.textContent = error.message;
     }).finally(function () {
       runEl.disabled = false;
+      runEl.textContent = "Run tool";
     });
   }
 
-  /* Keyboard: up/down moves through the visible tools, cmd-K focuses
-     search, cmd-S saves the description being edited. */
+  /* Keyboard navigation */
   document.addEventListener("keydown", function (event) {
     if ((event.metaKey || event.ctrlKey) && event.key === "k") {
       event.preventDefault();

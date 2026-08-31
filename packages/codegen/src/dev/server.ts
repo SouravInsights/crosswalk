@@ -53,6 +53,7 @@ interface DashboardState {
     pathTemplate?: string;
     paramLocations?: { path: string[]; query: string[]; body: string[] };
     serverUrl?: string;
+    requiresAuth?: boolean;
     findings: { level: string; message: string }[];
   }[];
   skipped: { ref: string; reason: string }[];
@@ -177,6 +178,7 @@ function toUiTool(
     ...(tool.pathTemplate ? { pathTemplate: tool.pathTemplate } : {}),
     ...(tool.paramLocations ? { paramLocations: tool.paramLocations } : {}),
     ...(tool.serverUrl ? { serverUrl: tool.serverUrl } : {}),
+    requiresAuth: tool.requiresAuth,
     findings: findings
       .filter((finding) => finding.tool === tool.name)
       .map((finding) => ({ level: finding.level, message: finding.message })),

@@ -45,10 +45,12 @@ keeps tools in sync while you edit the spec. The watcher ignores its own outputs
 Opens the tools dashboard on `http://localhost:4700` (override with `--port N`). A local
 control panel for what was generated:
 
-- Browse and search every tool, with its route, risk label, and audit findings.
+![The webmcp-codegen dashboard](/images/dev-server-dashboard.png)
+
+- Browse and search every tool, grouped by risk level
 - Edit descriptions and toggle tools on or off. Edits save to `.webmcp-codegen.json` and
-  survive regeneration.
-- Run any tool directly to check the wiring, without opening the app.
+  survive regeneration
+- Run any tool directly to check the wiring, without opening the app
 
 The dashboard serves a localhost page from inside the CLI. Nothing is added to your app,
 and it stops existing when you Ctrl+C.
