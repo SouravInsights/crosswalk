@@ -2,8 +2,9 @@ import { Download } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ColorSwatch } from "@/components/color-swatch";
-import { Logo, LogoMark, LogoWord } from "@/components/logo";
+import { LogoMark, LogoWord } from "@/components/logo";
 import { SiteFooter } from "@/components/site-footer";
+import { SiteNav } from "@/components/site-nav";
 
 export const metadata: Metadata = {
   title: "Brand guidelines",
@@ -92,25 +93,7 @@ const TOC = [
 export default function BrandPage() {
   return (
     <main className="dark flex-1 bg-baseline font-sans text-ink">
-      {/* Nav */}
-      <header className="border-b border-line">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-6">
-          <Link href="/" aria-label="webmcp-stack home">
-            <Logo />
-          </Link>
-          <nav className="flex items-center gap-5 font-mono text-[13px] text-dim sm:gap-6">
-            <Link href="/docs" className="transition-colors duration-150 hover:text-ink">
-              docs
-            </Link>
-            <Link href="/about" className="transition-colors duration-150 hover:text-ink">
-              about
-            </Link>
-            <a href={REPO} className="transition-colors duration-150 hover:text-ink">
-              github
-            </a>
-          </nav>
-        </div>
-      </header>
+      <SiteNav />
 
       <div className="mx-auto max-w-6xl px-5 sm:px-6">
         <div className="lg:grid lg:grid-cols-[1fr_160px] lg:gap-12">

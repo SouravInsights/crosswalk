@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Logo, LogoWord } from "@/components/logo";
+import { LogoWord } from "@/components/logo";
 import { SiteFooter } from "@/components/site-footer";
+import { SiteNav } from "@/components/site-nav";
 
 export const metadata: Metadata = {
   title: "About",
@@ -90,25 +91,7 @@ const PRINCIPLES = [
 export default function AboutPage() {
   return (
     <main className="dark flex-1 bg-baseline font-sans text-ink">
-      {/* Nav */}
-      <header className="border-b border-line">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-6">
-          <Link href="/" aria-label="webmcp-stack home">
-            <Logo />
-          </Link>
-          <nav className="flex items-center gap-5 font-mono text-[13px] text-dim sm:gap-6">
-            <Link href="/docs" className="transition-colors duration-150 hover:text-ink">
-              docs
-            </Link>
-            <Link href="/brand" className="transition-colors duration-150 hover:text-ink">
-              brand
-            </Link>
-            <a href={REPO} className="transition-colors duration-150 hover:text-ink">
-              github
-            </a>
-          </nav>
-        </div>
-      </header>
+      <SiteNav />
 
       {/* Hero: the claim and the mark, taken apart. */}
       <section className="relative overflow-hidden">

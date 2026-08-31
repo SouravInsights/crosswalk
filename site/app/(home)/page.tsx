@@ -1,31 +1,62 @@
 import Link from "next/link";
 import { CopyCommand } from "@/components/copy-command";
 import { LiveDemo } from "@/components/live-demo";
-import { Logo } from "@/components/logo";
+import { LogoWord } from "@/components/logo";
 import { SiteFooter } from "@/components/site-footer";
+import { SiteNav } from "@/components/site-nav";
 
 const COMMAND = "npx @webmcp-stack/codegen generate";
 
-/* Why now, as three plain statements: what agents can do once your app
-   exposes tools. Each is an outcome for the app, not a feature of the CLI. */
+/* The logo, taken apart: three layers settling into a stack on load,
+   top layer last. Same motion as the about page hero. */
+function HeroMark() {
+  return (
+    <svg viewBox="0 0 24 27" fill="none" aria-hidden="true" className="size-16 text-dim sm:size-20">
+      <path
+        d="M3 19.5 L12 24 L21 19.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+        className="layer-in"
+        style={{ animationDelay: "0ms" }}
+      />
+      <path
+        d="M3 13.5 L12 18 L21 13.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+        className="layer-in"
+        style={{ animationDelay: "140ms" }}
+      />
+      <path
+        d="M12 5 L21 9.5 L12 14 L3 9.5 Z"
+        fill="var(--color-accent)"
+        className="layer-in"
+        style={{ animationDelay: "280ms" }}
+      />
+    </svg>
+  );
+}
 
-const UNLOCKS: Array<{ title: string; body: string }> = [
-  {
-    title: "Agents finish tasks, not just read pages",
-    body: '"Rebook my flight", "export my data", "add this to my cart". With tools, a user\'s agent can actually do these inside your app, with the user\'s session.',
-  },
-  {
-    title: "Agents prefer apps that have tools",
-    body: "Given a choice between clicking around a DOM and calling a well-described tool, agents pick the tool. Every time. Apps without tools get driven clumsily, or skipped.",
-  },
-  {
-    title: "Your spec is already the hard part",
-    body: "Names, types, descriptions: the information agents need is information you already maintain. The missing piece was getting it into the browser. That piece is a command now.",
-  },
+/* Safety is the product's spine: what the audit refuses to ship. */
+const AUDIT_CATCHES: Array<[string, string]> = [
+  [
+    "webhook receivers",
+    "Endpoints that exist for other servers, not for users. An agent holding a tool that fires your payment-webhook route is a breach waiting for a curious prompt.",
+  ],
+  [
+    "admin operations",
+    "Anything under admin-only paths, role-gated actions, destructive-by-default routes. Flagged as errors: generation stops until a human decides.",
+  ],
+  [
+    "auth boundaries",
+    "Login, signup, token refresh. An agent should never carry your user's credentials into a model context. Blocked, always.",
+  ],
 ];
 
-/* The codegen objection, answered as behavior. */
-
+/* The objection, answered as behavior. */
 const RULES: Array<[string, string]> = [
   ["an endpoint is added", "a new file appears, with space for your code"],
   ["the spec changed", "only the part generated from the spec updates"],
@@ -34,9 +65,7 @@ const RULES: Array<[string, string]> = [
 ];
 
 /* "What's the catch?" — answered as a checklist of the usual ones
-   that aren't here. The engineering story, told as what you never
-   have to think about. */
-
+   that aren't here. */
 const GUARANTEES: Array<[string, string]> = [
   [
     "The files are yours",
@@ -55,45 +84,19 @@ const GUARANTEES: Array<[string, string]> = [
 export default function HomePage() {
   return (
     <main className="dark flex-1 overflow-x-clip bg-baseline font-sans text-ink">
-      {/* Nav */}
-      <header className="absolute inset-x-0 top-0 z-10">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-6">
-          <Logo product="codegen" />
-          <nav className="flex items-center gap-5 font-mono text-[13px] text-dim sm:gap-6">
-            <Link
-              href="/docs"
-              className="transition-colors duration-150 hover:text-ink"
-              style={{ transitionTimingFunction: "var(--ease-reading)" }}
-            >
-              docs
-            </Link>
-            <Link
-              href="/about"
-              className="transition-colors duration-150 hover:text-ink"
-              style={{ transitionTimingFunction: "var(--ease-reading)" }}
-            >
-              about
-            </Link>
-            <a
-              href="https://github.com/SouravInsights/webmcp-stack"
-              className="transition-colors duration-150 hover:text-ink"
-              style={{ transitionTimingFunction: "var(--ease-reading)" }}
-            >
-              github
-            </a>
-          </nav>
-        </div>
-      </header>
+      <SiteNav overlay product="codegen" />
 
-      {/* Hero: the claim, the command, the proof. */}
+      {/* Hero: the mark settles, then the claim, the command, the proof. */}
       <section className="relative overflow-hidden">
-        <div className="grid-bg absolute inset-0" aria-hidden="true" />
         <div
           className="absolute left-1/2 top-[-260px] size-[720px] -translate-x-1/2 rounded-full bg-accent/[0.07] blur-[130px]"
           aria-hidden="true"
         />
-        <div className="relative mx-auto max-w-6xl px-5 pb-20 pt-36 sm:px-6 sm:pb-28 sm:pt-44">
+        <div className="relative mx-auto max-w-6xl px-5 pb-20 pt-32 sm:px-6 sm:pb-28 sm:pt-40">
           <div className="mx-auto max-w-2xl text-center">
+            <div className="mb-7 flex justify-center">
+              <HeroMark />
+            </div>
             <h1 className="mb-6 font-display text-[clamp(2.4rem,7vw,4.6rem)] font-medium leading-[1.03] tracking-[-0.02em]">
               Turn your API into tools AI agents can call.
             </h1>
@@ -120,25 +123,25 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Why now: the eventual goal. What tools unlock for your app. */}
+      {/* Safety: what the audit refuses to ship. */}
       <section className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
           <h2 className="mb-3 font-display text-[clamp(1.5rem,3vw,2.1rem)] font-medium tracking-[-0.015em]">
-            What happens when the user is an agent?
+            Not a dumb API → WebMCP converter.
           </h2>
-          <p className="mb-10 max-w-xl text-[15px] leading-relaxed text-dim sm:mb-14">
-            Today, an agent that wants to use your app does it the hard way: it reads the screen and
-            simulates clicks. WebMCP, now shipping in Chrome, gives agents a better path. Your app
-            exposes tools; agents call them. The question stops being whether your app works for
-            agents and starts being whether it has anything for them to call.
+          <p className="mb-10 max-w-2xl text-[15px] leading-relaxed text-dim sm:mb-14">
+            Point a generator at an API without thinking and you ship every route as something an
+            agent can call. The interesting problem was never <em className="not-italic text-ink">can</em> an
+            agent call your app; it is what it should be allowed to call. So every generation runs
+            an audit, and the audit has opinions.
           </p>
           <div className="grid gap-10 sm:grid-cols-3 sm:gap-8">
-            {UNLOCKS.map((unlock) => (
-              <div key={unlock.title} className="border-l-2 border-accent/40 pl-5">
-                <h3 className="mb-2 text-[15.5px] font-medium leading-snug text-ink">
-                  {unlock.title}
+            {AUDIT_CATCHES.map(([title, body]) => (
+              <div key={title} className="border-l-2 border-fault/50 pl-5">
+                <h3 className="mb-2 font-mono text-[13.5px] font-medium leading-snug text-ink">
+                  ✕ {title}
                 </h3>
-                <p className="text-[13.5px] leading-relaxed text-dim">{unlock.body}</p>
+                <p className="text-[13.5px] leading-relaxed text-dim">{body}</p>
               </div>
             ))}
           </div>
@@ -205,6 +208,33 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* The stack: codegen today, the rest of the loop next. */}
+      <section className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
+          <p className="mb-3 font-mono text-[12px] uppercase tracking-[0.2em] text-faint">
+            The stack
+          </p>
+          <h2 className="mb-3 font-display text-[clamp(1.5rem,3vw,2.1rem)] font-medium tracking-[-0.015em]">
+            One product of a stack.
+          </h2>
+          <p className="max-w-2xl text-[15px] leading-relaxed text-dim">
+            codegen is the first product of <LogoWord />: the layer that turns contracts into
+            tools. The rest of the loop is on the roadmap:{" "}
+            <span className="font-mono text-[13px] text-dim">@webmcp-stack/telemetry</span> to see
+            how agents actually use your tools, and{" "}
+            <span className="font-mono text-[13px] text-dim">@webmcp-stack/audit</span> to check any
+            site&rsquo;s WebMCP surface with a URL.
+          </p>
+          <Link
+            href="/about"
+            className="mt-6 inline-block font-mono text-[13px] text-dim transition-colors duration-150 hover:text-ink"
+            style={{ transitionTimingFunction: "var(--ease-reading)" }}
+          >
+            why the stack exists →
+          </Link>
         </div>
       </section>
 

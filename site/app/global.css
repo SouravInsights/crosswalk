@@ -96,9 +96,107 @@ body {
   transition-delay: 60ms;
 }
 
+/* Nav/footer logo: same settle-apart on hover of the whole lockup. */
+.logo-mark path {
+  transition: transform 0.4s var(--ease-reading);
+}
+
+.group\/logo:hover .logo-mark path:nth-child(2),
+.footer-mark:hover .logo-mark path:nth-child(2) {
+  transform: translateY(1.5px);
+  transition-delay: 30ms;
+}
+
+.group\/logo:hover .logo-mark path:nth-child(3),
+.footer-mark:hover .logo-mark path:nth-child(3) {
+  transform: translateY(3px);
+  transition-delay: 60ms;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .footer-mark:hover path {
+  .footer-mark:hover path,
+  .group\/logo:hover .logo-mark path {
     transform: none;
+  }
+}
+
+/* Mobile menu: the button strokes morph (the stack flattens into an ✕),
+   the panel fades in, links arrive staggered. */
+.menu-stroke {
+  transition:
+    d 0.35s var(--ease-reading),
+    opacity 0.25s var(--ease-reading),
+    transform 0.3s var(--ease-reading);
+}
+
+.menu-panel-open {
+  animation: menu-in 0.25s var(--ease-reading) both;
+}
+
+.menu-link {
+  opacity: 0;
+}
+
+.menu-panel-open .menu-link {
+  animation: menu-link-in 0.4s var(--ease-reading) both;
+}
+
+/* The sheet: slides down and slightly unfolds, like a layer being placed. */
+.menu-sheet {
+  transform-origin: top center;
+}
+
+.menu-panel-open .menu-sheet {
+  animation: menu-sheet-in 0.35s var(--ease-reading) both;
+}
+
+@keyframes menu-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scaleY(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes menu-link-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-stroke,
+  .menu-panel-open,
+  .menu-panel-open .menu-link {
+    animation: none;
+    transition: none;
+  }
+
+  .menu-panel-open {
+    opacity: 1;
+  }
+
+  .menu-link {
+    opacity: 1;
   }
 }
 

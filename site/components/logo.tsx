@@ -21,7 +21,12 @@ import {
  */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={["logo-mark", className].filter(Boolean).join(" ")}
+    >
       <path d="M12 2.5 L21 7 L12 11.5 L3 7 Z" fill="var(--color-accent)" />
       <path
         d="M3 12 L12 16.5 L21 12"
@@ -70,13 +75,13 @@ export function Logo({ product, className }: { product?: string; className?: str
   return (
     <span
       className={[
-        "flex items-center gap-2 font-mono text-sm tracking-tight text-ink",
+        "group/logo flex items-center gap-2 font-mono text-[15px] tracking-tight text-ink",
         className,
       ]
         .filter(Boolean)
         .join(" ")}
     >
-      <LogoMark className="size-3.5 shrink-0" />
+      <LogoMark className="size-5 shrink-0" />
       <span>
         webmcp<span className="text-accent">stack</span>
         {product ? <span className="text-faint"> / {product}</span> : null}
