@@ -606,6 +606,10 @@ export function dashboardHtml(): string {
       countEl.textContent = data.tools.length + " tools from " + data.label;
       renderList();
       renderDetail();
+    }).catch(function (error) {
+      console.error("Failed to load tools:", error);
+      countEl.textContent = "Failed to load";
+      listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--fault);">Error loading tools: ' + esc(error.message) + '</div>';
     });
   }
 

@@ -251,7 +251,9 @@ function sendJson(
   status: number,
   body: unknown,
 ): void {
-  response.writeHead(status, { "content-type": "application/json" });
+  response.writeHead(status, {
+    "content-type": "application/json",
+  });
   response.end(JSON.stringify(body));
 }
 
