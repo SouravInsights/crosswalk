@@ -28,7 +28,7 @@ The client is a tiny wrapper around tool registration (one import by hand, or em
 
 1. **Validation failures per tool.** Agents inventing arguments means your schema or descriptions are unclear. This is the killer metric because it closes the loop: it tells you exactly what to regenerate in codegen. Nobody else can do this, because nobody else owns the generator.
 2. **Never-called tools.** Registered but never invoked: prune them, they cost context on every page load (the spec community's known pain, nobody tools for it).
-3. **Live error rate per tool.** Tool rot in production, caught the day a refactor ships. This is `doctor` from the old SDK, reborn as a live check.
+3. **Live error rate per tool.** Tool rot in production, caught the day a refactor ships. Nobody else watches for this.
 4. **Agent breakdown.** Which agents call you (Claude, ChatGPT, Gemini-in-Chrome). When native consumers ship, users watch the shift on their own dashboard.
 5. **Agent-assisted conversion.** Sessions where a tool call preceded the business event (purchase, booking, export). This is the number that justifies WebMCP investment to a whole team, and the one that makes the product legible to non-engineers.
 
@@ -50,5 +50,5 @@ Build order after the hackathon: (1) the client + local-first dashboard, cheap a
 
 ## Later, same monorepo
 
-- **Conformance checker**: does your live site still match the current spec draft (spec churn is constant; the old SDK's adapter idea becomes a checker).
+- **Conformance checker**: does your live site still match the current spec draft. Spec churn is constant, and nobody tools for it.
 - **Skills authoring** (spec issue #161: tools say what a site can do, skills say how to do it well): unoccupied, and codegen's descriptions are half the artifact already.

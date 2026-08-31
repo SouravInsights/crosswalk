@@ -35,7 +35,7 @@ Everything else in this doc pulls *against* simplicity — more sources, more ge
 When a proposed feature and simplicity conflict, simplicity wins by default; the feature has to earn its way in with real evidence of need, not hypothetical completeness.
 
 ### 2.3 You own the output
-Generated files are yours. Edit them, delete the toolkit, keep the files — everything still works. No runtime dependency on a Groundstate package is required at execution time beyond a small, optional helper library (and even that should be inlineable).
+Generated files are yours. Edit them, delete the toolkit, keep the files — everything still works. No runtime dependency on this package is required at execution time beyond a small, optional helper library (and even that should be inlineable).
 
 ### 2.4 Schema-first, type-safe end to end
 Every tool's `inputSchema` is derived from a real type (Zod, TypeBox, a Prisma model, an OpenAPI schema, a tRPC procedure) and the generated `execute()` signature is fully typed against it. If the source schema changes, regeneration should surface a diff, not silently drift.
@@ -328,7 +328,7 @@ The honest positioning: **the codegen sits upstream of everything else in the ec
 
 ---
 
-## 10. Suggested project structure (inside the existing Groundstate monorepo)
+## 10. Suggested project structure (inside the monorepo)
 
 One package; sources and generators ship as subpath exports, not a dozen npm packages. The multi-package split from earlier drafts is deferred per §2.2 — do it only if external contributors start publishing their own sources or generators.
 
@@ -389,7 +389,7 @@ docs/                     # section of the existing site, not a second site
 
 **`webmcp-codegen`** — package, binary, and product share one name. Says exactly what it does; searchable; indexes cleanly. Availability checked 2026-08-29: npm name unclaimed, zero GitHub repos with the name, `webmcp-codegen.dev` / `.com` not resolving (confirm at a registrar before relying on the domains — DNS absence isn't proof of availability).
 
-Namespace note: the `@groundstate` npm scope is owned by an unrelated project (`@groundstate/react` is published by user `ninjawolff`, repo `SmashJaw/groundstate`), and unscoped `groundstate` is taken too. Unscoped names are the practical path for everything this repo ships unless that scope is transferred — this affects the core SDK packages (`@groundstate/core`, …) as much as this one.
+Namespace note: ship unscoped, functional names for every product (`webmcp-codegen`, and the same pattern for what comes next). Product names say what the thing does; the Crosswalk brand stays the umbrella, not a package prefix.
 
 Tagline: *"Generate the tool. Review the tool. You own the tool."*
 
