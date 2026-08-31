@@ -31,7 +31,8 @@ like better-auth/Drizzle docs: plain words, short sentences, say what the thing 
 | `packages/codegen/src/generators` | — | Output generators, named after what they produce. `js` today. |
 | `packages/codegen/src/dev` | — | The local tools dashboard (`webmcp-codegen dev`). |
 | `examples/openapi-petstore` | private | Example app with tools generated from the Petstore spec. |
-| `site/` | private | Landing page and docs (Next.js + Fumadocs). |
+| `site/` | private | Landing page, docs (Next.js + Fumadocs), and the brand page (`/brand`). |
+| `brand/` | — | Logo and brand assets: SVG variants, avatar PNGs, the wordmark generator (`wordmark.js`), and the downloadable kit zip. Served mirror in `site/public/brand/`. |
 
 ## Architecture invariants
 

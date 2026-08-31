@@ -16,6 +16,7 @@
   <p>
     <a href="https://webmcp-stack.vercel.app/docs">Docs</a> |
     <a href="https://www.npmjs.com/package/@webmcp-stack/codegen">npm</a> |
+    <a href="https://webmcp-stack.vercel.app/brand">Brand</a> |
     <a href="./docs/about.md">About</a>
   </p>
 </div>

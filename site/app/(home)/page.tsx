@@ -66,6 +66,13 @@ export default function HomePage() {
             >
               docs
             </Link>
+            <Link
+              href="/about"
+              className="transition-colors duration-150 hover:text-ink"
+              style={{ transitionTimingFunction: "var(--ease-reading)" }}
+            >
+              about
+            </Link>
             <a
               href="https://github.com/SouravInsights/webmcp-stack"
               className="transition-colors duration-150 hover:text-ink"
@@ -238,6 +245,20 @@ export default function HomePage() {
                 style={{ transitionTimingFunction: "var(--ease-reading)" }}
               >
                 docs
+              </Link>
+              <Link
+                href="/about"
+                className="transition-colors duration-150 hover:text-ink"
+                style={{ transitionTimingFunction: "var(--ease-reading)" }}
+              >
+                about
+              </Link>
+              <Link
+                href="/brand"
+                className="transition-colors duration-150 hover:text-ink"
+                style={{ transitionTimingFunction: "var(--ease-reading)" }}
+              >
+                brand
               </Link>
               <a
                 href="https://github.com/SouravInsights/webmcp-stack"

@@ -1,3 +1,11 @@
+import {
+  WORDMARK_CAP,
+  WORDMARK_DESC,
+  WORDMARK_PATH_LEFT,
+  WORDMARK_PATH_RIGHT,
+  WORDMARK_WIDTH,
+} from "@/lib/wordmark-paths";
+
 /**
  * The webmcp-stack logo.
  *
@@ -27,6 +35,33 @@ export function LogoMark({ className }: { className?: string }) {
         strokeWidth="2"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+/**
+ * The wordmark as inline type: JetBrains Mono Medium converted to paths
+ * (see brand/wordmark.js), sized in em so it sits inside running text.
+ * The cap height reads at about 0.8em of the surrounding text and the
+ * descender hangs below the baseline, so it composes like a word, not
+ * an image dropped on the line.
+ */
+export function LogoWord({ className }: { className?: string }) {
+  const total = WORDMARK_CAP + WORDMARK_DESC;
+  return (
+    <svg
+      viewBox={`0 ${-WORDMARK_CAP} ${WORDMARK_WIDTH} ${total}`}
+      role="img"
+      aria-label="webmcpstack"
+      className={className}
+      style={{
+        display: "inline-block",
+        height: "1em",
+        verticalAlign: `-${(WORDMARK_DESC / total).toFixed(3)}em`,
+      }}
+    >
+      <path d={WORDMARK_PATH_LEFT} fill="var(--color-ink)" />
+      <path d={WORDMARK_PATH_RIGHT} fill="var(--color-accent)" />
     </svg>
   );
 }
