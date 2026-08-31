@@ -158,4 +158,3 @@ async function detectSpec(cwd: string): Promise<string> {
   console.log(`Detected ${specs[0]} (override with --spec)`);
   return specs[0] as string;
 }
-

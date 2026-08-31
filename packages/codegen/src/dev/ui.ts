@@ -116,6 +116,7 @@ export function dashboardHtml(): string {
     line-height: 1.55; resize: vertical;
   }
   .hint { color: var(--faint); font-size: 12px; margin-top: 6px; line-height: 1.5; }
+  .auth-note { background: color-mix(in srgb, var(--signal) 10%, transparent); border: 1px solid var(--signal); color: var(--signal); padding: 10px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 14px; line-height: 1.5; }
   .row { display: flex; align-items: center; gap: 12px; }
   .save {
     margin-top: 10px; padding: 7px 14px; border: 1px solid var(--line);
@@ -338,8 +339,11 @@ export function dashboardHtml(): string {
         : "The generated code is there, commented out. Flipping this regenerates it enabled on the next run.") +
       "</div></div>" +
 
-      '<div class="try"><header><h2>try it</h2><span class="note">direct call, server-side. no browser session here.</span></header>' +
+      '<div class="try"><header><h2>try it</h2><span class="note">direct call, server-side</span></header>' +
       '<div class="body">' +
+      (tool.requiresAuth
+        ? '<div class="auth-note">⚠ This endpoint requires a browser session. The dashboard runs server-side, so you will get a 401. Test it in Chrome DevTools where you are signed in.</div>'
+        : "") +
       '<div class="base-url"><input id="base-url" type="text" placeholder="base URL, e.g. http://localhost:3000" value="' + esc(baseUrl) + '" spellcheck="false" /></div>' +
       (fields || '<div class="hint">This tool takes no inputs.</div>') +
       '<button class="run" id="run">run</button>' +

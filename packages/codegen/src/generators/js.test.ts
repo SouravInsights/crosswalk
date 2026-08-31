@@ -167,7 +167,9 @@ describe("js generator", () => {
     const tool = files.find((file) => file.path.includes("get-order-status"));
     // The generated call goes to the API's absolute URL, not a relative path.
     // biome-ignore lint/suspicious/noTemplateCurlyInString: asserting on generated source
-    expect(tool?.contents).toContain("await callApi(`http://localhost:3001${`/orders/${input.orderId}`}`");
+    expect(tool?.contents).toContain(
+      "await callApi(`http://localhost:3001${`/orders/${input.orderId}`}`",
+    );
   });
 
   it("falls back to an honest TODO when the source knows no route", async () => {

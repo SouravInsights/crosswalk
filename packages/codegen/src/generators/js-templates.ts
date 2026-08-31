@@ -149,10 +149,7 @@ export function ownedRegionScaffold(tool: ReviewedTool): string {
   ];
 
   if (tool.serverUrl) {
-    lines.push(
-      ` *`,
-      ` * Calls the API at ${tool.serverUrl} (from your spec's servers list).`,
-    );
+    lines.push(` *`, ` * Calls the API at ${tool.serverUrl} (from your spec's servers list).`);
   }
 
   if (tool.riskTier !== "safe-read") {

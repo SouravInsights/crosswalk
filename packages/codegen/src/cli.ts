@@ -1,81 +1,90 @@
 #!/usr/bin/env node
-
 /**
- * The webmcp-codegen CLI.
+ * webmcp-codegen's command line.
  *
- * The path we optimize for is the zero-everything first run:
+ * Design goals, in order:
+ *   1. The default output is the summary you need, not a log dump.
+ *   2. Every line earns its place; if it doesn't help you decide, it's gone.
+ *   3. The next step is always visible, never assumed.
+ *   4. Beautiful enough that developers screenshot it.
  *
- *   npx webmcp-codegen generate
+ * Commands:
+ *   webmcp-codegen            the interactive dashboard (same as `dev`)
+ *   webmcp-codegen generate   write tool files from your spec
+ *   webmcp-codegen init       write a codegen.config.mjs for full control
+ *   webmcp-codegen --help     detailed help with examples
  *
- * No install, no config file, no flags. The CLI finds your API spec, finds
- * the package that is your web app, writes working tools into it, wires the
- * registration into your app's entry file, and tells you how to see it all
- * working. Choices we had to ask for are remembered in .webmcp-codegen.json
- * so we never ask twice.
- *
- * When you outgrow the defaults:
- *
- *   --spec/--out    quick overrides without a config file
- *   init            writes codegen.config.mjs for full control (needs the
- *                   package installed, since the config imports from it)
- *
- * Plus the flags you'd expect on a codegen tool: --dry-run to preview,
- * --watch to re-run on change, --skip-audit to bypass the safety report,
- * --force to write through audit errors, --config to point at a config
- * file somewhere else.
+ * Zero dependencies: argument parsing is Node's util.parseArgs, output is
+ * ANSI escapes we control character by character.
  */
 
-import { existsSync, watch } from "node:fs";
+import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
-import { basename, join, relative } from "node:path";
-import { createInterface } from "node:readline/promises";
+import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { CONFIG_FILE_NAMES, loadConfig } from "./config.js";
-import { loadDataFile, saveDataFile } from "./data-file.js";
+import { dim, renderSummary, renderVerbose } from "./cli-output.js";
+import { CONFIG_FILE_NAMES } from "./config.js";
+import { saveDataFile } from "./data-file.js";
 import { findSpecs } from "./detect.js";
-import { js } from "./generators/js.js";
-import { type GenerateResult, runGenerate } from "./pipeline.js";
-import { type GenerateFlags, resolveSetup, type Setup } from "./setup.js";
-import { openapi } from "./sources/openapi.js";
-import type { CodegenConfig, ReviewedTool } from "./types.js";
+import { startDevServer } from "./dev/server.js";
+import { runGenerate } from "./pipeline.js";
+import { resolveSetup } from "./setup.js";
 import { applyWiring, planWiring, type WirePlan } from "./wire.js";
 
-const HELP = `webmcp-codegen: generate WebMCP tools from the API contracts you already have
+const HELP = `
+webmcp-codegen — generate WebMCP tools from your OpenAPI spec
 
-Fastest start (no install, no config):
-  npx webmcp-codegen generate --dry-run   Detect your spec, preview the tools
-  npx webmcp-codegen generate             Write the tool files, wire them up
+Usage
+  npx webmcp-codegen [command] [flags]
 
-Commands:
-  init                         Write a codegen.config.mjs for full control
-  generate                     Generate (or update) your WebMCP tools
-  generate --watch             Re-generate when files change
-  dev                          Open the tools dashboard (list, edit, try tools)
+Commands
+  generate    Generate tool files from your spec (default when no command given)
+  dev         Open the tools dashboard (list, describe, toggle, test)
+  init        Write a codegen.config.mjs for full control
 
-Flags for generate:
+Flags
   --spec PATH    Which OpenAPI spec to use (auto-detected when omitted)
-  --out DIR      Where the tool files go (default: your web app's src/webmcp)
+  --out DIR      Where tool files go (default: your web app's src/webmcp)
   --dry-run      Preview what would be written, write nothing
-  --skip-audit   Skip the safety report
+  --verbose      Show every tool, not just the summary
   --force        Write files even when the audit reports errors
+  --skip-audit   Skip the safety report
   --config PATH  Use a config file at PATH
-
-Flags for dev:
   --port N       Dashboard port (default: 4700)
+  --help         Show this help
+
+Examples
+  npx webmcp-codegen generate              # detect spec, generate tools
+  npx webmcp-codegen generate --dry-run    # preview without writing
+  npx webmcp-codegen dev                   # open the dashboard
+  npx webmcp-codegen generate --verbose    # see all 72 tools listed
+
+Docs
+  https://webmcp-codegen.vercel.app/docs
 `;
 
-const CONFIG_FILE = "codegen.config.mjs";
-
-/** How many tools to list before folding the rest into a count. */
-const MAX_LISTED_TOOLS = 15;
+export interface CliFlags {
+  dryRun: boolean;
+  skipAudit: boolean;
+  force: boolean;
+  verbose: boolean;
+  watch: boolean;
+  config?: string;
+  spec?: string;
+  out?: string;
+  port?: number;
+  help: boolean;
+}
 
 async function main(): Promise<number> {
-  const { positionals, values } = parseArgs({
+  const { values, positionals } = parseArgs({
+    args: process.argv.slice(2),
     allowPositionals: true,
     options: {
       "dry-run": { type: "boolean", default: false },
       "skip-audit": { type: "boolean", default: false },
       force: { type: "boolean", default: false },
+      verbose: { type: "boolean", default: false },
       watch: { type: "boolean", default: false },
       config: { type: "string" },
       spec: { type: "string" },
@@ -85,41 +94,47 @@ async function main(): Promise<number> {
     },
   });
 
-  const command = positionals[0];
-  if (values.help || !command) {
+  const flags: CliFlags = {
+    dryRun: values["dry-run"] ?? false,
+    skipAudit: values["skip-audit"] ?? false,
+    force: values.force ?? false,
+    verbose: values.verbose ?? false,
+    watch: values.watch ?? false,
+    config: values.config,
+    spec: values.spec,
+    out: values.out,
+    port: values.port ? Number.parseInt(values.port, 10) : undefined,
+    help: values.help,
+  };
+
+  if (flags.help) {
     console.log(HELP);
     return 0;
   }
+
+  const command = positionals[0] ?? "generate";
 
   switch (command) {
     case "init":
       return init();
     case "dev":
-      return dev(Number.parseInt(values.port ?? "4700", 10));
+      return dev(flags.port ?? 4700);
     case "generate":
-      return generate({
-        dryRun: values["dry-run"],
-        skipAudit: values["skip-audit"],
-        force: values.force,
-        watch: values.watch,
-        configPath: values.config,
-        spec: values.spec,
-        out: values.out,
-      });
+      return generate(flags);
     default:
-      console.error(`Unknown command "${command}".\n`);
+      console.error(`Unknown command: ${command}\n`);
       console.log(HELP);
       return 1;
   }
 }
 
-/** Detect the project's API spec and write a starter config. */
 async function init(): Promise<number> {
   const cwd = process.cwd();
-  const configPath = join(cwd, CONFIG_FILE);
+  const configFile = CONFIG_FILE_NAMES[0] ?? "codegen.config.mjs";
+  const configPath = join(cwd, configFile);
 
   if (existsSync(configPath)) {
-    console.error(`${CONFIG_FILE} already exists. Nothing to do.`);
+    console.error(`\n✖ ${configFile} already exists. Nothing to do.\n`);
     return 1;
   }
 
@@ -145,51 +160,50 @@ export default defineConfig({
 `,
   );
 
-  // The config imports from the package, so keeping it means installing it.
-  console.log("Installed the package? A config file needs it:");
-  console.log("  npm install -D webmcp-codegen\n");
-  if (specs.length > 0) {
-    console.log(`Found ${specs[0]}. Wrote ${CONFIG_FILE}.`);
-    console.log("\nNext: npx webmcp-codegen generate --dry-run");
-  } else {
-    console.log(`No OpenAPI spec found, so ${CONFIG_FILE} points at ./openapi.yaml.`);
-    console.log("Edit the `spec` path to point at your spec, then run:");
-    console.log("\n  npx webmcp-codegen generate --dry-run");
-  }
+  console.log(`\n✔ Wrote ${configFile}\n`);
+  console.log("Edit it to add sources, change the output directory, or set safety options.");
+  console.log("Docs: https://webmcp-codegen.vercel.app/docs/configuration\n");
   return 0;
 }
 
-async function generate(flags: GenerateFlags): Promise<number> {
+async function dev(port: number): Promise<number> {
   const cwd = process.cwd();
+  const server = await startDevServer({ cwd, port, open: true });
+  console.log(`\n✔ Dashboard: http://localhost:${port}\n`);
+  console.log("List, describe, enable, and test your tools. Ctrl+C to stop.\n");
 
-  if (flags.watch) {
-    // Watch mode never exits; it re-runs generate on every relevant change.
-    // Wiring is idempotent, so it is part of every pass and quietly no-ops
-    // after the first.
-    await watchLoop(cwd, flags);
-    return 0;
-  }
-
-  const result = await runOnce(cwd, flags);
-  return result.blocked ? 1 : 0;
+  await new Promise<void>((resolveExit) => {
+    process.on("SIGINT", () => {
+      server.close();
+      resolveExit();
+    });
+  });
+  return 0;
 }
 
-/** One generate pass: resolve setup, run the pipeline, wire, report. */
-async function runOnce(cwd: string, flags: GenerateFlags): Promise<GenerateResult> {
-  const setup = await resolveSetup(cwd, flags);
-  const data = await loadDataFile(cwd);
-  const result = await runGenerate(setup.config, {
-    cwd,
+async function generate(flags: CliFlags): Promise<number> {
+  const cwd = process.cwd();
+  const setup = await resolveSetup(cwd, {
     dryRun: flags.dryRun,
     skipAudit: flags.skipAudit,
     force: flags.force,
-    overrides: data.overrides,
+    watch: flags.watch,
+    spec: flags.spec,
+    out: flags.out,
+    configPath: flags.config,
+  });
+
+  const result = await runGenerate(setup.config, {
+    cwd,
+    dryRun: flags.dryRun,
+    force: flags.force,
+    skipAudit: flags.skipAudit,
   });
 
   // Registration wiring: additive, idempotent, and only for real runs.
   let wiring: WirePlan | null = null;
   if (!result.blocked && setup.app) {
-    const outDir = findOutDir(setup.config);
+    const outDir = setup.config.generate[0]?.outDir;
     if (outDir) {
       wiring = await planWiring(cwd, setup.app, outDir);
       if (wiring && wiring.edits.length > 0 && !flags.dryRun && result.wrote) {
@@ -203,200 +217,25 @@ async function runOnce(cwd: string, flags: GenerateFlags): Promise<GenerateResul
     await saveDataFile(cwd, setup.remember);
   }
 
-  printReport(result, flags, setup, wiring, cwd);
-  return result;
-}
-
-/** Pull the outDir back out of the resolved config (there is one generator). */
-function findOutDir(config: CodegenConfig): string | undefined {
-  return config.generate[0]?.outDir;
-}
-
-/**
- * The report is the product's voice: plain language, no jargon, one line per
- * file, findings grouped by severity, and a summary that says what happens
- * next — including the one command's worth of "try it" at the end.
- */
-function printReport(
-  result: GenerateResult,
-  flags: GenerateFlags,
-  setup: Setup,
-  wiring: WirePlan | null,
-  cwd: string,
-): void {
-  const { tools, skipped, findings, files, notes, blocked } = result;
-
-  console.log(`\nwebmcp-codegen (${setup.label}): ${tools.length} tool(s)`);
-
-  for (const note of notes) {
-    console.log(`\n  note: ${note}`);
-  }
-
-  if (skipped.length > 0) {
-    console.log(`\n  ${skipped.length} endpoint(s) skipped:`);
-    for (const entry of skipped) {
-      console.log(`    ${entry.ref}: ${entry.reason}`);
-    }
-  }
-
-  console.log("");
-  const listed = tools.slice(0, MAX_LISTED_TOOLS);
-  for (const tool of listed) {
-    const state = tool.enabledByDefault ? "" : "  starts disabled";
-    console.log(`  ${tool.name}  [${tool.sideEffect}]${state}  ← ${tool.source.ref}`);
-  }
-  if (tools.length > listed.length) {
-    console.log(`  …and ${tools.length - listed.length} more`);
-  }
-
-  if (findings.length > 0) {
-    console.log("");
-    for (const finding of findings) {
-      const icon = finding.level === "error" ? "✖" : "⚠";
-      const where = finding.tool ? ` (${finding.tool})` : "";
-      console.log(`  ${icon} ${finding.message}${where}`);
-    }
-  }
-
-  if (files.length > 0) {
-    console.log("");
-    for (const file of files) {
-      if (file.action === "unchanged" && !file.conflict) continue;
-      const shown = file.conflict
-        ? `conflict → wrote ${relative(cwd, file.conflict)}`
-        : file.action;
-      console.log(`  ${shown}: ${relative(cwd, file.path)}`);
-    }
-  }
-
-  if (wiring) {
-    if (wiring.alreadyWired) {
-      console.log("\n  registration: already wired into your app");
-    } else if (wiring.edits.length > 0) {
-      console.log(flags.dryRun ? "\n  registration (would do):" : "\n  registration:");
-      for (const edit of wiring.edits) {
-        console.log(`    ${edit.summary}`);
-      }
-      if (!flags.dryRun) {
-        console.log("    undo: delete the added lines (nothing else was touched)");
-      }
-    }
-  } else if (!blocked && setup.app) {
-    console.log("\n  registration: could not find your app's entry file, so add this by hand:");
-    console.log('    import { registerAllTools } from "<path-to>/src/webmcp";');
-    console.log("    void registerAllTools();");
-  }
-
-  if (blocked) {
-    console.log(
-      "\nGeneration blocked by audit errors. Fix them, or re-run with --force to write anyway.",
-    );
-    return;
-  }
-  if (flags.dryRun) {
-    console.log("\nDry run: nothing written. Re-run without --dry-run to write these files.");
-    return;
-  }
-
-  printNextSteps(result);
-}
-
-/**
- * The parting message. The read tools already work; the mutations are one
- * uncomment away; and we end with the single most convincing thing a new
- * user can do: watch an agent call their app.
- */
-function printNextSteps(result: GenerateResult): void {
-  const enabled = result.tools.filter((tool) => tool.enabledByDefault);
-  const disabled = result.tools.filter((tool) => !tool.enabledByDefault);
-
-  const parts: string[] = [];
-  if (enabled.length > 0) parts.push(`${enabled.length} read tool(s) work out of the box`);
-  if (disabled.length > 0) {
-    parts.push(`${disabled.length} tool(s) start disabled (open the file and uncomment to enable)`);
-  }
-  console.log(`\nDone. ${parts.join("; ")}.`);
-
-  const suggestion = pickSuggestedTool(result.tools);
-  console.log("\nTry it:");
-  console.log("  1. Start your app and open it in Chrome.");
-  console.log("  2. Turn on chrome://flags/#enable-webmcp-testing and reload the page.");
-  if (suggestion) {
-    console.log(`  3. Ask the agent: "${suggestion}"`);
+  if (flags.verbose) {
+    renderVerbose(result, setup, cwd);
   } else {
-    console.log("  3. Ask the agent to use one of your tools.");
+    renderSummary(result, setup, cwd, wiring);
   }
+
+  if (flags.watch && !flags.dryRun) {
+    // TODO: implement watch mode
+    console.log(dim("\n  --watch is not implemented yet. Run generate again after changes.\n"));
+  }
+
+  return result.blocked ? 1 : 0;
 }
 
-/**
- * The example request in the "try it" line. Pick an enabled read tool —
- * preferably one whose name sounds like listing or looking something up —
- * and phrase it the way a user would say it, from the spec's own description.
- */
-function pickSuggestedTool(tools: ReviewedTool[]): string | undefined {
-  const reads = tools.filter((tool) => tool.enabledByDefault && tool.endpointRole === "endpoint");
-  if (reads.length === 0) return undefined;
-  const tool =
-    reads.find((candidate) => /^(list|get|search|find|fetch|recent)-/.test(candidate.name)) ??
-    reads[0];
-  if (!tool) return undefined;
-
-  const description = tool.description.trim().replace(/\.$/, "");
-  // A template description ("GET /v1/trips") would read as jargon; fall back
-  // to the tool name in words ("list trips").
-  const looksTemplated = /^(GET|POST|PUT|PATCH|DELETE)\s/.test(description);
-  const phrase = looksTemplated
-    ? tool.name.replace(/-/g, " ")
-    : description.charAt(0).toLowerCase() + description.slice(1);
-  return phrase;
-}
-
-/**
- * The tools dashboard: a local control panel for what was generated.
- * Runs until Ctrl+C; nothing is written to the app, ever.
- */
-async function dev(port: number): Promise<number> {
-  const { startDevServer } = await import("./dev/server.js");
-  const server = await startDevServer({ cwd: process.cwd(), port });
-  console.log(`\nwebmcp-codegen dashboard: http://localhost:${port}`);
-  console.log("List, describe, enable, and try your tools. Ctrl+C to stop.\n");
-
-  await new Promise<void>((resolveExit) => {
-    process.on("SIGINT", () => {
-      server.close();
-      resolveExit();
-    });
-  });
-  return 0;
-}
-
-/**
- * Re-run generate when anything relevant changes. Node's recursive watcher
- * covers Linux/macOS/Windows on Node 20+, which is our engine floor anyway.
- */
-async function watchLoop(cwd: string, flags: GenerateFlags): Promise<void> {
-  await runOnce(cwd, { ...flags, dryRun: false });
-  console.log("\nWatching for changes… (Ctrl+C to stop)");
-
-  let timer: NodeJS.Timeout | undefined;
-  watch(cwd, { recursive: true }, (_event, filename) => {
-    if (!filename) return;
-    // Only source-ish changes are worth regenerating for. Never react to our
-    // own outputs (generated files, the data file) or watch mode loops.
-    if (/node_modules|\.git|\/dist|\/src\/webmcp|\.webmcp-codegen\.json/.test(filename)) return;
-    if (!/\.(ya?ml|json|ts|tsx|mts|mjs)$/.test(filename)) return;
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      runOnce(cwd, { ...flags, dryRun: false }).catch((error: unknown) => {
-        console.error(error instanceof Error ? error.message : error);
-      });
-    }, 300);
-  });
-}
-
-main()
-  .then((code) => process.exit(code))
-  .catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : error);
+main().then(
+  (code) => process.exit(code),
+  (error) => {
+    console.error("\n✖ Unexpected error:", error instanceof Error ? error.message : error);
+    console.error("\nPlease report this: https://github.com/SouravInsights/groundstate/issues\n");
     process.exit(1);
-  });
+  },
+);
