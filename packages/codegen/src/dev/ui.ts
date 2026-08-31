@@ -208,6 +208,7 @@ export function dashboardHtml(): string {
     margin: 0 auto;
     padding: 32px 40px;
   }
+  .detail[hidden], .placeholder[hidden] { display: none !important; }
   .placeholder {
     display: flex;
     flex-direction: column;
@@ -685,11 +686,11 @@ export function dashboardHtml(): string {
     var badges = [
       '<span class="badge ' + tool.sideEffect + '">' + tool.sideEffect + "</span>",
       !tool.enabled ? '<span class="badge disabled">starts disabled</span>' : "",
-      tool.endpointRole !== "endpoint" ? '<span class="badge auth">' + tool.endpointRole + "</span>" : "",
-      tool.piiInOutput.length > 0 ? '<span class="badge write">pii: ' + esc(tool.piiInOutput.join(", ")) + "</span>" : "",
+      tool.endpointRole && tool.endpointRole !== "endpoint" ? '<span class="badge auth">' + tool.endpointRole + "</span>" : "",
+      tool.piiInOutput && tool.piiInOutput.length > 0 ? '<span class="badge write">pii: ' + esc(tool.piiInOutput.join(", ")) + "</span>" : "",
     ].filter(Boolean).join("");
 
-    var findings = tool.findings.map(function (finding) {
+    var findings = (tool.findings || []).map(function (finding) {
       var icon = finding.level === "error" ? "✖" : "⚠";
       return '<div class="finding ' + finding.level + '"><span class="finding-icon">' + icon + "</span><span>" + esc(finding.message) + "</span></div>";
     }).join("");
@@ -827,7 +828,7 @@ export function dashboardHtml(): string {
       resultEl.hidden = false;
       resultEl.className = "result " + (result.ok ? "ok" : "err");
       resultEl.textContent =
-        (result.status ? "HTTP " + result.status + "\n\n" : "") +
+        (result.status ? "HTTP " + result.status + "\\n\\n" : "") +
         (result.error ? result.error : JSON.stringify(result.body, null, 2));
     }).catch(function (error) {
       resultEl.hidden = false;
