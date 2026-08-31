@@ -69,7 +69,7 @@ export default function HomePage() {
               docs
             </Link>
             <a
-              href="https://github.com/SouravInsights/webmcp-codegen"
+              href="https://github.com/crosswalk/crosswalk"
               className="transition-colors duration-150 hover:text-ink"
               style={{ transitionTimingFunction: "var(--ease-reading)" }}
             >
@@ -239,7 +239,7 @@ export default function HomePage() {
                 docs
               </Link>
               <a
-                href="https://github.com/SouravInsights/webmcp-codegen"
+                href="https://github.com/crosswalk/crosswalk"
                 className="transition-colors duration-150 hover:text-ink"
                 style={{ transitionTimingFunction: "var(--ease-reading)" }}
               >
