@@ -1,8 +1,23 @@
-# @webmcp-stack/codegen
+<div align="center">
+  <a href="https://webmcp-stack.vercel.app">
+    <img alt="webmcp-stack" src="https://raw.githubusercontent.com/SouravInsights/webmcp-stack/main/brand/logo-mark-tile.svg" width="72" height="72">
+  </a>
+  <h1>@webmcp-stack/codegen</h1>
+  <p><strong>Generate safe, typed, human-reviewed WebMCP tools from the API contract you already have.</strong></p>
+  <p>
+    <a href="https://www.npmjs.com/package/@webmcp-stack/codegen"><img alt="npm version" src="https://img.shields.io/npm/v/@webmcp-stack/codegen?style=flat-square&labelColor=0a0b0f&color=58a6ff"></a>
+    <a href="https://github.com/SouravInsights/webmcp-stack/blob/main/LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square&labelColor=0a0b0f&color=58a6ff"></a>
+  </p>
+  <p>
+    <a href="https://webmcp-stack.vercel.app/docs">Docs</a> |
+    <a href="https://github.com/SouravInsights/webmcp-stack">GitHub</a> |
+    <a href="https://github.com/SouravInsights/webmcp-stack/issues">Issues</a>
+  </p>
+</div>
 
-Generate safe, typed, human-reviewed [WebMCP](https://github.com/webmachinelearning/webmcp) tools from the API contracts you already have, instead of hand-writing `registerTool()` calls for every action. Part of [webmcp-stack](https://github.com/SouravInsights/webmcp-stack).
+---
 
-> Your spec already knows your tools. One command writes them, wires them into your app, and gets out of the way.
+Your spec already knows your tools. One command writes them, wires them into your app, and gets out of the way. Part of [webmcp-stack](https://github.com/SouravInsights/webmcp-stack), the open-source developer stack for [WebMCP](https://github.com/webmachinelearning/webmcp).
 
 ## Quick start
 
@@ -26,13 +41,17 @@ npx @webmcp-stack/codegen generate --dry-run
 
 Then start your app, open it in Chrome with `#enable-webmcp-testing`, and ask the agent to use one of your tools.
 
+## Safety is part of generation
+
+This is not a dumb API → WebMCP converter. Giving agents access to application actions is a new security surface, so the generator analyzes what every endpoint actually is: read-only, write, destructive, auth-boundary, or sensitive/PII-related. Every tool gets a safety classification and WebMCP hints, the audit pass runs inside `generate` (errors block, exit codes for CI), and higher-risk tools are generated disabled so you explicitly decide what agents can touch. The goal is that you stay in control of the agent-facing surface instead of blindly exposing every endpoint.
+
 ## The dashboard
 
 ```bash
 npx @webmcp-stack/codegen dev
 ```
 
-A local control panel for your tools: browse them, edit descriptions, toggle tools on and off, and run any tool directly to check it works. Edits save to `.webmcp-codegen.json` and survive regeneration. Nothing is added to your app.
+A local control panel for your WebMCP surface, the way Scalar is for APIs or Storybook is for components: browse your tools, inspect and edit metadata, toggle tools on and off, and run any tool directly to check it works. Edits save to `.webmcp-codegen.json` and survive regeneration. Nothing is added to your app.
 
 ## What a generated tool looks like
 
