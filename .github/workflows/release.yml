@@ -1,31 +1,46 @@
 name: Release
 
+# Manual releases only: Actions tab → Release → Run workflow.
+# One run consumes every pending changeset, bumps versions, updates the
+# changelog, publishes to npm (with the access setting from
+# .changeset/config.json), and pushes the release commit and tags back
+# to main. Never runs on its own.
 on:
-  push:
-    branches: [main]
-
-concurrency: release-${{ github.ref }}
+  workflow_dispatch:
 
 jobs:
   release:
-    # Publishes via Changesets: opens/updates a "Version Packages" PR, and
-    # publishes to npm when that PR is merged. Requires the NPM_TOKEN secret.
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
+          # Writes the auth line into ~/.npmrc so pnpm publish can use
+          # NPM_TOKEN; the env var alone is not picked up.
+          registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - uses: changesets/action@v1
-        with:
-          publish: pnpm release
+      - run: pnpm test
+      - name: Version packages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          pnpm changeset version
+          git add -A
+          git commit -m "chore: release packages" || echo "no pending changesets"
+      - name: Publish to npm
+        # pnpm publish mis-sends the package name as a header for scoped
+        # packages and npm rejects it (E404). npm publish does not.
+        run: npx changeset publish --no-git-tag
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Push the release commit and tags
+        run: git push origin HEAD:main --follow-tags

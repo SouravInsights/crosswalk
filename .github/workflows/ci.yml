@@ -1,8 +1,8 @@
 name: CI
 
+# Pull requests only. Day-to-day pushes to main do not run CI; open a PR
+# when a change should be verified before it lands.
 on:
-  push:
-    branches: [main]
   pull_request:
 
 jobs:
