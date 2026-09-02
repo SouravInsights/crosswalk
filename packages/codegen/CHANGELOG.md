@@ -1,5 +1,15 @@
 # webmcp-codegen
 
+## 0.4.0
+
+### Minor Changes
+
+- cf2f1d4: The dev dashboard now shows each tool's generated source. Every tool's detail
+  pane has a "view source" disclosure that opens the real `<name>.webmcp.ts`
+  file in place — the same progressive disclosure the site's demo has, wired to
+  the live pipeline output.
+- f403059: Rename the package to `@webmcp-stack/codegen`, published under the webmcp-stack npm org. Same CLI, same features; the unscoped `webmcp-codegen` package is deprecated. The zero-install command is now `npx @webmcp-stack/codegen generate`. Also points the error-report URL at the renamed repo.
+
 ## 0.3.4
 
 ### Patch Changes
