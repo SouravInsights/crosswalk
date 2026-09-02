@@ -12,6 +12,7 @@
     "demo:build": "node scripts/build-demo-data.mjs"
   },
   "dependencies": {
+    "@webmcp-stack/codegen": "workspace:*",
     "fumadocs-core": "^15.0.0",
     "fumadocs-mdx": "^11.5.0",
     "fumadocs-ui": "^15.0.0",

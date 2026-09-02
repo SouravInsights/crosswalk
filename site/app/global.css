@@ -242,3 +242,15 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #2c313d;
 }
+
+/* The dashboard demo mounts the real dashboard in a shadow root; the host
+   owns the height so the app's internal panes scroll, not the page. */
+.dashboard-demo-host {
+  display: block;
+}
+
+@media (max-width: 640px) {
+  .dashboard-demo-host {
+    height: 28rem;
+  }
+}

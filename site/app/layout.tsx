@@ -1,6 +1,6 @@
 import "./global.css";
 import { RootProvider } from "fumadocs-ui/provider";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 
@@ -41,6 +41,15 @@ export const metadata: Metadata = {
     images: ["/og-image.png"],
   },
   robots: { index: true, follow: true },
+};
+
+// Lock the page to the viewport so the embedded dashboard reads as an app,
+// not a document that pans under a pinch.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function Layout({ children }: { children: ReactNode }) {

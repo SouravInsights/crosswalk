@@ -14,10 +14,11 @@
 
 import { spawn } from "node:child_process";
 import { createServer, type Server } from "node:http";
+import { basename } from "node:path";
 import { loadDataFile, saveDataFile } from "../data-file.js";
 import { runGenerate } from "../pipeline.js";
 import { resolveSetup } from "../setup.js";
-import type { JsonSchema, ReviewedTool } from "../types.js";
+import type { GeneratedFile, JsonSchema, ReviewedTool } from "../types.js";
 import { dashboardHtml } from "./ui.js";
 
 export interface DevServerOptions {
@@ -54,6 +55,8 @@ interface DashboardState {
     paramLocations?: { path: string[]; query: string[]; body: string[] };
     serverUrl?: string;
     requiresAuth?: boolean;
+    /** The generated file, shown on demand in the detail pane. */
+    source?: { fileName: string; code: string };
     findings: { level: string; message: string }[];
   }[];
   skipped: { ref: string; reason: string }[];
@@ -80,7 +83,7 @@ export async function startDevServer(options: DevServerOptions): Promise<Server>
     return {
       label: setup.label,
       outDir: setup.config.generate[0]?.outDir,
-      tools: result.tools.map((tool) => toUiTool(tool, result.findings)),
+      tools: result.tools.map((tool) => toUiTool(tool, result.findings, result.files)),
       skipped: result.skipped,
       notes: result.notes,
     };
@@ -162,8 +165,13 @@ export async function startDevServer(options: DevServerOptions): Promise<Server>
 function toUiTool(
   tool: ReviewedTool,
   findings: { level: string; tool?: string; message: string }[],
+  files: GeneratedFile[],
 ): DashboardState["tools"][number] {
   const [verb, ...rest] = tool.source.ref.split(" ");
+  // The dry run already holds every file's contents in memory, so the
+  // dashboard can show the real generated source per tool — the same
+  // progressive disclosure the site's demo has, against live output.
+  const file = files.find((f) => basename(f.path) === `${tool.name}.webmcp.ts`);
   return {
     name: tool.name,
     verb,
@@ -179,6 +187,7 @@ function toUiTool(
     ...(tool.paramLocations ? { paramLocations: tool.paramLocations } : {}),
     ...(tool.serverUrl ? { serverUrl: tool.serverUrl } : {}),
     requiresAuth: tool.requiresAuth,
+    ...(file ? { source: { fileName: basename(file.path), code: file.contents } } : {}),
     findings: findings
       .filter((finding) => finding.tool === tool.name)
       .map((finding) => ({ level: finding.level, message: finding.message })),

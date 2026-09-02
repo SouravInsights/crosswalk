@@ -22,6 +22,8 @@ interface UiTool {
   requiresAuth?: boolean;
   verb?: string;
   path?: string;
+  /** The generated file, shown on demand. The dashboard is the disclosure. */
+  source?: { fileName: string; code: string };
 }
 
 interface UiState {
@@ -32,15 +34,61 @@ interface UiState {
   notes: string[];
 }
 
-export function dashboardHtml(): string {
+/**
+ * The dashboard page. With no argument it boots by fetching /api/state
+ * (the dev server path). Pass `embeddedState` and the page boots from it
+ * instead, with no network: the site's landing demo mounts this exact UI
+ * statically, so the demo can never drift from the product.
+ */
+export function dashboardHtml(embeddedState?: UiState, opts?: { scoped?: boolean }): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>webmcpstack / codegen</title>
 <style>
-  :root {
+  /* Narrow screens: master-detail navigation instead of a split pane.
+     The list is the default screen; selecting a tool slides the detail
+     pane over it, and a back button pops back. Applies to the real
+     dashboard on a phone and the embedded demo alike. */
+  @media (max-width: 640px) {
+    .app { display: block; position: relative; }
+    .sidebar { width: 100% !important; min-width: 0; max-width: none; border-right: 0; height: 100%; }
+    .sidebar-resize { display: none; }
+    .tool-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .main {
+      position: absolute;
+      inset: 0;
+      transform: translateX(100%);
+      transition: transform 0.28s cubic-bezier(0.32, 0.72, 0.24, 1);
+      box-shadow: -12px 0 32px rgba(0, 0, 0, 0.45);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .app.detail-open .main { transform: translateX(0); }
+    .main .placeholder { display: none; }
+    /* The back control is a bare chevron — a tap target, not a button. It
+       sits inline at the left of the title row, so no vertical space is
+       spent on navigation. */
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: 0;
+      padding: 6px;
+      margin: 0 0 0 -6px;
+      color: var(--faint);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.15s;
+    }
+    .back-btn:active { color: var(--ink); }
+    .back-btn svg { display: block; }
+  }
+  @media (min-width: 641px) { .back-btn { display: none; } }
+  ${opts?.scoped ? ":root, :host" : ":root"} {
     --baseline: #0a0b0f;
     --surface: #10131a;
     --surface-raised: #161a23;
@@ -61,6 +109,7 @@ export function dashboardHtml(): string {
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
+  html { overflow: hidden; overscroll-behavior: none; }
   body {
     background: var(--baseline);
     color: var(--ink);
@@ -72,24 +121,61 @@ export function dashboardHtml(): string {
   ::selection { background: var(--accent); color: var(--baseline); }
 
   /* Layout */
-  .app { display: flex; height: 100vh; }
+  .app { display: flex; height: 100vh; height: 100dvh; }
   .sidebar {
+    position: relative;
     width: 320px;
-    min-width: 320px;
+    min-width: 240px;
+    max-width: 480px;
+    flex-shrink: 0;
     border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
     background: var(--surface);
   }
+  /* The drag handle on the sidebar's right edge. Invisible until you
+     hover near it, then a 2px accent line — the Vercel/Linear idiom. */
+  .sidebar-resize {
+    position: absolute;
+    top: 0;
+    right: -3px;
+    width: 7px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 20;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .sidebar-resize::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 2px;
+    width: 2px;
+    height: 100%;
+    background: transparent;
+    transition: background 0.15s;
+  }
+  .sidebar-resize:hover::after,
+  body.resizing .sidebar-resize::after {
+    background: var(--accent);
+  }
+  body.resizing { cursor: col-resize; user-select: none; -webkit-user-select: none; }
   .main {
     flex: 1;
+    min-width: 0;
     overflow-y: auto;
     background: var(--baseline);
   }
 
   /* Sidebar header */
   .sidebar-header {
-    padding: 20px 20px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 16px 14px;
     border-bottom: 1px solid var(--line-subtle);
   }
   .brand {
@@ -98,7 +184,7 @@ export function dashboardHtml(): string {
     gap: 10px;
     font-weight: 600;
     font-size: 15px;
-    margin-bottom: 4px;
+    min-width: 0;
   }
   .brand-mark {
     width: 20px;
@@ -112,18 +198,18 @@ export function dashboardHtml(): string {
     color: var(--faint);
     font-weight: 400;
   }
-  .brand-sub {
-    color: var(--faint);
-    font-size: 12px;
-  }
 
   /* Search */
   .search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     padding: 12px 16px;
     border-bottom: 1px solid var(--line-subtle);
   }
   .search {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     background: var(--surface-raised);
     border: 1px solid var(--line);
     border-radius: 6px;
@@ -176,6 +262,8 @@ export function dashboardHtml(): string {
     cursor: pointer;
     transition: background 0.1s;
   }
+  /* The dot is a leading status marker that shares the 16px axis with the
+     group labels; the name follows a fixed gap. One column, no drift. */
   .tool:hover { background: var(--surface-raised); }
   .tool[aria-selected="true"] {
     background: var(--accent-dim);
@@ -240,9 +328,16 @@ export function dashboardHtml(): string {
 
   /* Detail header */
   .detail-header {
-    margin-bottom: 24px;
-    padding-bottom: 20px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
     border-bottom: 1px solid var(--line-subtle);
+  }
+  /* One row: back chevron, then the name. No wasted rows. */
+  .detail-toprow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
   }
   .detail-crumb {
     font-size: 12px;
@@ -251,10 +346,12 @@ export function dashboardHtml(): string {
     font-family: var(--mono);
   }
   .detail-title {
-    font-size: 24px;
+    font-size: 17px;
     font-weight: 600;
-    margin: 0 0 8px;
+    margin: 0;
     font-family: var(--mono);
+    word-break: break-word;
+    line-height: 1.3;
   }
   .detail-route {
     font-family: var(--mono);
@@ -296,6 +393,54 @@ export function dashboardHtml(): string {
   /* Sections */
   .section {
     margin-bottom: 28px;
+  }
+
+  /* The per-tool source disclosure: the generated file, revealed on demand.
+     A quiet row that expands into the code — the dashboard is the disclosure,
+     not a separate view. */
+  .source-disclosure {
+    margin-bottom: 28px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .source-disclosure summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    list-style: none;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--dim);
+    user-select: none;
+    -webkit-user-select: none;
+    transition: color 0.15s, background 0.15s;
+  }
+  .source-disclosure summary::-webkit-details-marker { display: none; }
+  .source-disclosure summary:hover { color: var(--ink); background: var(--surface-raised); }
+  .source-chevron {
+    display: inline-flex;
+    color: var(--faint);
+    transition: transform 0.2s cubic-bezier(0.32, 0.72, 0.24, 1);
+  }
+  .source-disclosure[open] .source-chevron { transform: rotate(90deg); }
+  .source-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .source-hint { font-size: 11px; color: var(--ghost); }
+  .source-code {
+    margin: 0;
+    padding: 14px 16px;
+    border-top: 1px solid var(--line);
+    background: var(--baseline);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--dim);
+    overflow-x: auto;
+    max-height: 340px;
+    overflow-y: auto;
   }
   .section-label {
     font-size: 11px;
@@ -539,6 +684,43 @@ export function dashboardHtml(): string {
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--ghost); }
+
+  /* Narrow-screen content density. This block comes after the base .detail
+     so it actually wins on source order — an earlier media query lost to the
+     desktop rule, which is why the padding never changed. */
+  @media (max-width: 640px) {
+    .detail { padding: 14px 16px; max-width: none; }
+    .detail-header { margin-bottom: 16px; padding-bottom: 12px; }
+    .section { margin-bottom: 20px; }
+    .sidebar-header { padding: 14px 16px 10px; }
+  }
+  ${opts?.scoped ? `
+  /* Scoped mode: mounted inside a shadow root on the marketing site, where
+     document-level selectors never match and vh/dvh would measure the page
+     viewport, not the host — which is exactly what clipped the demo's scroll
+     region before. This block comes LAST so it overrides the base rules:
+     :host plays the body role and the app fills it, not the viewport. */
+  :host {
+    display: block;
+    height: 100%;
+    overflow: hidden;
+    background: var(--baseline);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app {
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+  /* The demo's default sidebar width — narrower than the real dashboard's
+     320px, so the detail pane gets the room in the embedded frame. The drag
+     handle sets an inline width, which still wins over this; the mobile
+     full-width sidebar rule carries !important and is unaffected. */
+  .sidebar { width: 264px; }
+  ` : ""}
 </style>
 </head>
 <body>
@@ -553,16 +735,16 @@ export function dashboardHtml(): string {
         </svg>
         <span>webmcp<span class="brand-accent">stack</span><span class="brand-product"> / codegen</span></span>
       </div>
-      <div class="brand-sub" id="tool-count"></div>
     </div>
     <div class="search-wrap">
       <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8"></circle>
         <path d="m21 21-4.35-4.35"></path>
       </svg>
-      <input type="text" class="search" id="search" placeholder="Search tools..." spellcheck="false" />
+      <input type="text" class="search" id="search" placeholder="Search tools" spellcheck="false" />
     </div>
     <div class="tool-list" id="tool-list"></div>
+    <div class="sidebar-resize" id="sidebar-resize" title="Drag to resize · double-click to reset"></div>
   </aside>
   <main class="main" id="main">
     <div class="placeholder" id="placeholder">
@@ -581,6 +763,7 @@ export function dashboardHtml(): string {
 </div>
 
 <script>
+var EMBEDDED_STATE = ${embeddedState ? JSON.stringify(embeddedState) : "null"};
 (function () {
   var state = null;
   var selected = null;
@@ -590,7 +773,7 @@ export function dashboardHtml(): string {
   var detailEl = document.getElementById("detail");
   var placeholderEl = document.getElementById("placeholder");
   var searchEl = document.getElementById("search");
-  var countEl = document.getElementById("tool-count");
+  var appEl = document.querySelector(".app");
 
   function esc(text) {
     var div = document.createElement("div");
@@ -606,14 +789,18 @@ export function dashboardHtml(): string {
   }
 
   function load() {
+    if (EMBEDDED_STATE) {
+      state = EMBEDDED_STATE;
+      renderList();
+      renderDetail();
+      return;
+    }
     api("/api/state").then(function (data) {
       state = data;
-      countEl.textContent = data.tools.length + " tools from " + data.label;
       renderList();
       renderDetail();
     }).catch(function (error) {
       console.error("Failed to load tools:", error);
-      countEl.textContent = "Failed to load";
       listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--fault);">Error loading tools: ' + esc(error.message) + '</div>';
     });
   }
@@ -667,6 +854,8 @@ export function dashboardHtml(): string {
         selected = btn.getAttribute("data-name");
         renderList();
         renderDetail();
+        // On narrow screens the detail slides over the list.
+        if (appEl) appEl.classList.add("detail-open");
       });
     });
   }
@@ -687,8 +876,9 @@ export function dashboardHtml(): string {
     placeholderEl.hidden = true;
     detailEl.hidden = false;
 
+    // The verb chip carries read/write/destructive (color-coded). Badges
+    // only surface what changes what you do: disabled state, role, PII.
     var badges = [
-      '<span class="badge ' + tool.sideEffect + '">' + tool.sideEffect + "</span>",
       !tool.enabled ? '<span class="badge disabled">starts disabled</span>' : "",
       tool.endpointRole && tool.endpointRole !== "endpoint" ? '<span class="badge auth">' + tool.endpointRole + "</span>" : "",
       tool.piiInOutput && tool.piiInOutput.length > 0 ? '<span class="badge write">pii: ' + esc(tool.piiInOutput.join(", ")) + "</span>" : "",
@@ -717,16 +907,29 @@ export function dashboardHtml(): string {
 
     detailEl.innerHTML =
       '<div class="detail-header">' +
-      '<div class="detail-crumb">' + esc(state.label) + (state.outDir ? " → " + esc(state.outDir) : "") + "</div>" +
+      '<div class="detail-toprow">' +
+      '<button type="button" class="back-btn" id="detail-back" aria-label="Back to tools">' +
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>' +
+      "</button>" +
       '<h1 class="detail-title">' + esc(tool.name) + "</h1>" +
+      "</div>" +
       '<div class="detail-route">' +
       '<span class="verb ' + tool.sideEffect + '">' + esc(tool.verb || "GET") + "</span>" +
       "<span>" + esc(tool.path || "") + "</span>" +
       "</div>" +
-      '<div class="badges">' + badges + "</div>" +
+      (badges ? '<div class="badges">' + badges + "</div>" : "") +
       "</div>" +
 
       (findings ? '<div class="section"><div class="section-label">Audit findings</div>' + findings + "</div>" : "") +
+
+      (tool.source
+        ? '<details class="source-disclosure" id="source-disclosure">' +
+          '<summary><span class="source-chevron" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>' +
+          '<span class="source-label">' + esc(tool.source.fileName) + "</span>" +
+          '<span class="source-hint">view source</span></summary>' +
+          '<pre class="source-code"><code>' + esc(tool.source.code) + "</code></pre>" +
+          "</details>"
+        : "") +
 
       '<div class="section">' +
       '<div class="section-label">Description</div>' +
@@ -765,6 +968,12 @@ export function dashboardHtml(): string {
       "</div>";
 
     document.getElementById("save-desc").addEventListener("click", saveDescription);
+    var backBtn = document.getElementById("detail-back");
+    if (backBtn) {
+      backBtn.addEventListener("click", function () {
+        if (appEl) appEl.classList.remove("detail-open");
+      });
+    }
     document.getElementById("toggle-enabled").addEventListener("click", toggleEnabled);
     document.getElementById("run").addEventListener("click", runTool);
     document.getElementById("base-url").addEventListener("change", function (event) {
@@ -876,6 +1085,45 @@ export function dashboardHtml(): string {
     filter = event.target.value;
     renderList();
   });
+
+  // Resizable sidebar: drag the handle, double-click to reset. Pointer
+  // capture on the handle routes every move/up to it, which keeps working
+  // even inside a shadow root (where window-level listeners miss retargeted
+  // events). The width is clamped between the sidebar's min and max.
+  (function () {
+    var handle = document.getElementById("sidebar-resize");
+    var sidebar = document.querySelector(".sidebar");
+    if (!handle || !sidebar) return;
+    var startX = 0;
+    var startWidth = 0;
+
+    function onMove(event) {
+      var width = Math.min(480, Math.max(240, startWidth + (event.clientX - startX)));
+      sidebar.style.width = width + "px";
+    }
+    function onUp(event) {
+      document.body.classList.remove("resizing");
+      try { handle.releasePointerCapture(event.pointerId); } catch (e) {}
+      handle.removeEventListener("pointermove", onMove, true);
+      handle.removeEventListener("pointerup", onUp, true);
+      handle.removeEventListener("pointercancel", onUp, true);
+    }
+    handle.addEventListener("pointerdown", function (event) {
+      startX = event.clientX;
+      startWidth = sidebar.getBoundingClientRect().width;
+      document.body.classList.add("resizing");
+      try { handle.setPointerCapture(event.pointerId); } catch (e) {}
+      // Capture phase: with pointer capture the move/up are targeted at the
+      // handle, and capture-phase listeners are the reliable way to see them.
+      handle.addEventListener("pointermove", onMove, true);
+      handle.addEventListener("pointerup", onUp, true);
+      handle.addEventListener("pointercancel", onUp, true);
+      event.preventDefault();
+    });
+    handle.addEventListener("dblclick", function () {
+      sidebar.style.width = "";
+    });
+  })();
 
   load();
 })();

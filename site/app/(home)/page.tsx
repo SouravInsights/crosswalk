@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CopyCommand } from "@/components/copy-command";
-import { LiveDemo } from "@/components/live-demo";
+import { DashboardDemo } from "@/components/dashboard-demo";
 import { LogoWord } from "@/components/logo";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
@@ -116,9 +116,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* The proof: click an endpoint, see the file the CLI writes. */}
+          {/* The proof: the dashboard itself. The only WebMCP CLI that has one. */}
           <div className="mx-auto mt-16 max-w-5xl sm:mt-20">
-            <LiveDemo />
+            <DashboardDemo />
           </div>
         </div>
       </section>
