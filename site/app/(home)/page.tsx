@@ -1,3 +1,4 @@
+import { ArrowDown } from "lucide-react";
 import Link from "next/link";
 import { CopyCommand } from "@/components/copy-command";
 import { DashboardDemo } from "@/components/dashboard-demo";
@@ -92,7 +93,7 @@ export default function HomePage() {
           className="absolute left-1/2 top-[-260px] size-[720px] -translate-x-1/2 rounded-full bg-accent/[0.07] blur-[130px]"
           aria-hidden="true"
         />
-        <div className="relative mx-auto max-w-6xl px-5 pb-20 pt-32 sm:px-6 sm:pb-28 sm:pt-40">
+        <div className="relative mx-auto max-w-6xl px-5 pb-16 pt-32 sm:px-6 sm:pb-20 sm:pt-40">
           <div className="mx-auto max-w-2xl text-center">
             <div className="mb-7 flex justify-center">
               <HeroMark />
@@ -102,7 +103,8 @@ export default function HomePage() {
             </h1>
             <p className="mx-auto mb-10 max-w-xl text-[16px] leading-relaxed text-dim sm:text-[17px]">
               One command reads your OpenAPI spec and writes a WebMCP tool for every endpoint:
-              typed, checked for safety, and committed to your repo as code you own.
+              typed, checked for safety, and committed to your repo as code you own. It comes with a
+              local playground to review and test them.
             </p>
             <div className="flex flex-col items-center gap-4">
               <CopyCommand command={COMMAND} />
@@ -116,8 +118,16 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* The proof: the dashboard itself. The only WebMCP CLI that has one. */}
-          <div className="mx-auto mt-16 max-w-5xl sm:mt-20">
+          {/* The proof: the dashboard itself. The only WebMCP CLI that has one.
+              The chip tells first-time visitors what they're looking at. */}
+          <div className="mx-auto mt-10 max-w-5xl sm:mt-12">
+            <div className="mb-5 flex justify-center">
+              <span className="flex items-center gap-2 border border-line bg-panel px-3.5 py-1.5 font-mono text-[12px] text-dim">
+                <span className="size-1.5 rounded-full bg-accent" aria-hidden="true" />
+                the built-in playground
+                <ArrowDown className="size-3 text-faint" aria-hidden="true" />
+              </span>
+            </div>
             <DashboardDemo />
           </div>
         </div>

@@ -52,18 +52,11 @@ export function DashboardDemo() {
   return (
     <div className="overflow-hidden border border-line bg-panel">
       {/* Browser chrome: just the localhost bar. The dashboard lives here. */}
-      <div className="flex items-center gap-3 border-b border-line bg-panel-raised/60 px-4 py-2.5">
-        <span className="flex items-center gap-1.5" aria-hidden="true">
-          <span className="size-2 rounded-full bg-line" />
-          <span className="size-2 rounded-full bg-line" />
-          <span className="size-2 rounded-full bg-line" />
-        </span>
-        <span className="flex min-w-0 flex-1 justify-center">
-          <span className="truncate border border-line bg-baseline px-3 py-1 font-mono text-[11px] text-faint">
-            localhost:7654
-          </span>
-        </span>
-        <span className="flex w-[52px] items-center justify-end" aria-hidden="true" />
+      {/* The toolbar: what this is, and where it runs. No browser cosplay —
+          the label is the context. */}
+      <div className="flex items-center justify-between gap-3 border-b border-line bg-panel-raised/60 px-4 py-2.5">
+        <span className="font-mono text-[11px] text-ghost">webmcp-codegen dev</span>
+        <span className="truncate font-mono text-[11px] text-faint">localhost:7654</span>
       </div>
 
       {/* The dashboard fills the frame. Code is revealed per-tool, inside the
