@@ -1,7 +1,19 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
   "files": {
-    "includes": ["**", "!**/dist", "!**/node_modules", "!**/.turbo", "!**/.next", "!**/.source", "!**/src/webmcp"]
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/.turbo",
+      "!**/.next",
+      "!**/.source",
+      "!**/src/webmcp",
+      "!brand",
+      "!site/public",
+      "!site/lib/wordmark-paths.ts",
+      "!site/lib/demo-data.ts"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -19,6 +31,11 @@
     "formatter": {
       "quoteStyle": "double",
       "semicolons": "always"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
     }
   }
 }

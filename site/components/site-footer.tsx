@@ -10,8 +10,12 @@ const REPO = "https://github.com/SouravInsights/webmcp-stack";
  */
 function FooterMark() {
   return (
-    <span className="footer-mark inline-flex text-faint" aria-hidden="true" title="the stack, at rest">
-      <svg viewBox="0 0 24 24" fill="none" className="size-6">
+    <span
+      className="footer-mark inline-flex text-faint"
+      aria-hidden="true"
+      title="the stack, at rest"
+    >
+      <svg viewBox="0 0 24 24" fill="none" className="size-6" aria-hidden="true">
         <path d="M12 2.5 L21 7 L12 11.5 L3 7 Z" fill="var(--color-accent)" />
         <path
           d="M3 12 L12 16.5 L21 12"
@@ -48,7 +52,10 @@ export function SiteFooter() {
             <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-ghost">product</p>
             <ul className="mt-4 space-y-2.5 text-[13.5px]">
               <li>
-                <Link href="/docs" className="text-dim transition-colors duration-150 hover:text-ink">
+                <Link
+                  href="/docs"
+                  className="text-dim transition-colors duration-150 hover:text-ink"
+                >
                   docs
                 </Link>
               </li>
@@ -90,10 +97,7 @@ export function SiteFooter() {
                 </Link>
               </li>
               <li>
-                <a
-                  href={REPO}
-                  className="text-dim transition-colors duration-150 hover:text-ink"
-                >
+                <a href={REPO} className="text-dim transition-colors duration-150 hover:text-ink">
                   github
                 </a>
               </li>

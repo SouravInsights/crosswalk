@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { dashboardHtml } from "@webmcp-stack/codegen/dev-ui";
+import { useEffect, useRef } from "react";
 import { DASHBOARD_STATE } from "@/lib/demo-data";
 
 /* The demo is the product: the real dashboard UI from

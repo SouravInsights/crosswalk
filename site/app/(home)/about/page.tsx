@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Image from "next/image";
 import { LogoWord } from "@/components/logo";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
@@ -49,12 +49,7 @@ function ExplodedStack() {
     />,
   ];
   return (
-    <svg
-      viewBox="0 0 24 27"
-      fill="none"
-      aria-hidden="true"
-      className="size-20 text-dim sm:size-24"
-    >
+    <svg viewBox="0 0 24 27" fill="none" aria-hidden="true" className="size-20 text-dim sm:size-24">
       {layers}
     </svg>
   );
@@ -107,8 +102,8 @@ export default function AboutPage() {
             Agents are learning to use the web the hard way.
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-[15.5px] leading-relaxed text-dim sm:text-[16.5px]">
-            Today, an agent that wants to use your app reads the screen and simulates clicks.
-            WebMCP gives it a better path: your app exposes typed tools, and the agent calls them.{" "}
+            Today, an agent that wants to use your app reads the screen and simulates clicks. WebMCP
+            gives it a better path: your app exposes typed tools, and the agent calls them.{" "}
             <LogoWord /> is the tooling for building that surface, and for keeping it safe.
           </p>
         </div>
@@ -122,21 +117,20 @@ export default function AboutPage() {
           </p>
           <div className="mt-5 space-y-5 text-[15px] leading-[1.75] text-dim sm:text-[15.5px]">
             <p>
-              WebMCP is early. It runs today in Chrome behind a flag, and most apps have nothing
-              for an agent to call yet. But the direction is clear: apps will expose tools, and
-              agents will use them the way people use interfaces.
+              WebMCP is early. It runs today in Chrome behind a flag, and most apps have nothing for
+              an agent to call yet. But the direction is clear: apps will expose tools, and agents
+              will use them the way people use interfaces.
             </p>
             <p>
               The catch is that someone has to author those tools, and the naive version of that
               goes badly. Point a generator at an API without thinking and you ship payment
-              webhooks, admin endpoints, and auth flows as things an agent can call. The
-              interesting problem was never <span className="text-ink">can</span> an agent call
-              your app. It is <span className="text-ink">what</span> it should be allowed to call,
-              and who decided.
+              webhooks, admin endpoints, and auth flows as things an agent can call. The interesting
+              problem was never <span className="text-ink">can</span> an agent call your app. It is{" "}
+              <span className="text-ink">what</span> it should be allowed to call, and who decided.
             </p>
             <p>
-              <LogoWord /> exists to make WebMCP practical for real applications. Not a single
-              tool, but the tooling for the whole lifecycle of an agent-facing surface, built so
+              <LogoWord /> exists to make WebMCP practical for real applications. Not a single tool,
+              but the tooling for the whole lifecycle of an agent-facing surface, built so
               developers stay in control of what agents can actually do.
             </p>
           </div>
@@ -191,9 +185,7 @@ export default function AboutPage() {
       {/* Principles */}
       <section className="border-t border-line">
         <div className="mx-auto max-w-3xl px-5 py-16 sm:px-6 sm:py-20">
-          <p className="font-mono text-[12px] uppercase tracking-[0.2em] text-faint">
-            Principles
-          </p>
+          <p className="font-mono text-[12px] uppercase tracking-[0.2em] text-faint">Principles</p>
           <div className="mt-8 space-y-0">
             {PRINCIPLES.map((p) => (
               <div
@@ -225,10 +217,11 @@ export default function AboutPage() {
               className="block shrink-0"
               aria-label="Sourav's website"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src="/avatar.jpeg"
                 alt="Sourav"
+                width={80}
+                height={80}
                 className="size-16 rounded-full border border-line object-cover shadow-sm transition-transform duration-300 ease-out group-hover/author:-rotate-3 group-hover/author:scale-105 sm:size-20"
               />
             </a>
@@ -297,13 +290,13 @@ export default function AboutPage() {
             <p>
               I started <LogoWord /> while making BeenThere agent-native. Generating tools from a
               spec turned out to be the easy part. The harder problem is everything around the
-              generation: knowing which endpoints should never become tools, reviewing what an
-              agent will see, and staying in control of the surface after you ship. That is the
-              problem this stack exists to solve.
+              generation: knowing which endpoints should never become tools, reviewing what an agent
+              will see, and staying in control of the surface after you ship. That is the problem
+              this stack exists to solve.
             </p>
             <p>
-              <LogoWord /> is open source and open in direction. If you are building with WebMCP,
-              or figuring out what agents should be allowed to do in production,{" "}
+              <LogoWord /> is open source and open in direction. If you are building with WebMCP, or
+              figuring out what agents should be allowed to do in production,{" "}
               <a
                 href={`${REPO}/issues`}
                 className="text-ink underline decoration-line underline-offset-4 transition-colors hover:decoration-accent"

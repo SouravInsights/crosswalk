@@ -1,7 +1,9 @@
+import type { TOCItemType } from "fumadocs-core/server";
 import { createRelativeLink } from "fumadocs-ui/mdx";
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/page";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import type { ComponentType } from "react";
 import { getMDXComponents } from "@/components/mdx";
 import { source } from "@/lib/source";
 
@@ -11,8 +13,8 @@ export default async function Page(props: { params: Promise<{ slug?: string[] }>
   if (!page) notFound();
 
   const data = page.data as {
-    body: any;
-    toc?: any[];
+    body: ComponentType<{ components?: ReturnType<typeof getMDXComponents> }>;
+    toc?: TOCItemType[];
     full?: boolean;
     title?: string;
     description?: string;

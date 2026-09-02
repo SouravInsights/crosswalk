@@ -131,8 +131,8 @@ describe("js generator", () => {
     const tool = files.find((file) => file.path.includes("cancel-order"));
     // Disabled notice first, the working call right below it, commented out.
     expect(tool?.contents).toContain('return toolDisabled("cancel-order.webmcp.ts");');
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: asserting on generated source, which contains a template literal
     expect(tool?.contents).toContain(
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: asserting on generated source, which contains a template literal
       "// const data = await callApi(`/orders/${input.orderId}/cancel`",
     );
     // The consent gate is generated, not left as a comment for humans to remember.
@@ -166,8 +166,8 @@ describe("js generator", () => {
     );
     const tool = files.find((file) => file.path.includes("get-order-status"));
     // The generated call goes to the API's absolute URL, not a relative path.
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: asserting on generated source
     expect(tool?.contents).toContain(
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: asserting on generated source
       "await callApi(`http://localhost:3001${`/orders/${input.orderId}`}`",
     );
   });

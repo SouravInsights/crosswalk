@@ -34,9 +34,7 @@ export function SiteNav({ overlay = false, product }: { overlay?: boolean; produ
 
   return (
     <header
-      className={
-        overlay ? "absolute inset-x-0 top-0 z-30" : "relative z-30 border-b border-line"
-      }
+      className={overlay ? "absolute inset-x-0 top-0 z-30" : "relative z-30 border-b border-line"}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-6">
         <Link
@@ -112,7 +110,10 @@ export function SiteNav({ overlay = false, product }: { overlay?: boolean; produ
         aria-hidden={!open}
       >
         <nav className="menu-sheet border border-line bg-panel shadow-xl shadow-black/50">
-          <p className="menu-link border-b border-line px-4 pb-2 pt-3 font-mono text-[10px] uppercase tracking-[0.22em] text-ghost" style={{ animationDelay: "40ms" }}>
+          <p
+            className="menu-link border-b border-line px-4 pb-2 pt-3 font-mono text-[10px] uppercase tracking-[0.22em] text-ghost"
+            style={{ animationDelay: "40ms" }}
+          >
             menu
           </p>
           {LINKS.map((l, i) => {
@@ -132,11 +133,23 @@ export function SiteNav({ overlay = false, product }: { overlay?: boolean; produ
               </>
             );
             return l.external ? (
-              <a key={l.label} href={l.href} className={cls} style={style} onClick={() => setOpen(false)}>
+              <a
+                key={l.label}
+                href={l.href}
+                className={cls}
+                style={style}
+                onClick={() => setOpen(false)}
+              >
                 {inner}
               </a>
             ) : (
-              <Link key={l.label} href={l.href} className={cls} style={style} onClick={() => setOpen(false)}>
+              <Link
+                key={l.label}
+                href={l.href}
+                className={cls}
+                style={style}
+                onClick={() => setOpen(false)}
+              >
                 {inner}
               </Link>
             );

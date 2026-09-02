@@ -1,6 +1,5 @@
 import { Download } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { ColorSwatch } from "@/components/color-swatch";
 import { LogoMark, LogoWord } from "@/components/logo";
 import { SiteFooter } from "@/components/site-footer";
@@ -22,7 +21,9 @@ function SectionHeading({ id, children }: { id: string; children: string }) {
 }
 
 function Prose({ children }: { children: React.ReactNode }) {
-  return <div className="mt-3 max-w-2xl space-y-3 text-[14px] leading-relaxed text-dim">{children}</div>;
+  return (
+    <div className="mt-3 max-w-2xl space-y-3 text-[14px] leading-relaxed text-dim">{children}</div>
+  );
 }
 
 function DownloadButton({ href, children }: { href: string; children: string }) {
@@ -106,8 +107,8 @@ export default function BrandPage() {
               Brand guidelines
             </h1>
             <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-dim">
-              Everything you need to reference <LogoWord /> in your project: the mark, the
-              wordmark, and the colors. Click any hex value to copy it.
+              Everything you need to reference <LogoWord /> in your project: the mark, the wordmark,
+              and the colors. Click any hex value to copy it.
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <a
@@ -134,8 +135,8 @@ export default function BrandPage() {
               <Prose>
                 <p>
                   &ldquo;webmcp-stack&rdquo; is written lowercase with a hyphen in prose, URLs, and
-                  package scopes. The wordmark renders it as one word, <LogoWord />, with the
-                  color split at the family boundary. Both spellings are the same name; never
+                  package scopes. The wordmark renders it as one word, <LogoWord />, with the color
+                  split at the family boundary. Both spellings are the same name; never
                   &ldquo;WebMCP Stack&rdquo; in body copy unless it starts a sentence, and never
                   &ldquo;WMCP&rdquo; or &ldquo;the stack&rdquo; alone.
                 </p>
@@ -189,7 +190,7 @@ export default function BrandPage() {
                   png="/brand/png/wordmark-light-on-dark-1024.png"
                   dark
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {/* biome-ignore lint/performance/noImgElement: previews of downloadable SVG brand assets — next/image does not optimize SVGs */}
                   <img
                     src="/brand/wordmark-light-on-dark.svg"
                     alt="webmcp-stack wordmark, light on dark"
@@ -201,7 +202,7 @@ export default function BrandPage() {
                   svg="/brand/wordmark-dark-on-light.svg"
                   png="/brand/png/wordmark-dark-on-light-1024.png"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {/* biome-ignore lint/performance/noImgElement: previews of downloadable SVG brand assets — next/image does not optimize SVGs */}
                   <img
                     src="/brand/wordmark-dark-on-light.svg"
                     alt="webmcp-stack wordmark, dark on light"
@@ -222,16 +223,38 @@ export default function BrandPage() {
                 </p>
               </Prose>
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                <AssetCard label="Light on dark" svg="/brand/logo-mark.svg" png="/brand/png/mark-dark-512.png" dark>
+                <AssetCard
+                  label="Light on dark"
+                  svg="/brand/logo-mark.svg"
+                  png="/brand/png/mark-dark-512.png"
+                  dark
+                >
                   <LogoMark className="size-12 text-ink" />
                 </AssetCard>
-                <AssetCard label="Dark on light" svg="/brand/logo-mark-light.svg" png="/brand/png/mark-light-512.png">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/brand/logo-mark-light.svg" alt="webmcp-stack mark, dark on light" className="size-12" />
+                <AssetCard
+                  label="Dark on light"
+                  svg="/brand/logo-mark-light.svg"
+                  png="/brand/png/mark-light-512.png"
+                >
+                  {/* biome-ignore lint/performance/noImgElement: previews of downloadable SVG brand assets — next/image does not optimize SVGs */}
+                  <img
+                    src="/brand/logo-mark-light.svg"
+                    alt="webmcp-stack mark, dark on light"
+                    className="size-12"
+                  />
                 </AssetCard>
-                <AssetCard label="Avatar tile" svg="/brand/logo-mark-tile.svg" png="/brand/png/avatar-tile-512.png" dark>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/brand/logo-mark-tile.svg" alt="webmcp-stack avatar tile" className="size-12 rounded-md" />
+                <AssetCard
+                  label="Avatar tile"
+                  svg="/brand/logo-mark-tile.svg"
+                  png="/brand/png/avatar-tile-512.png"
+                  dark
+                >
+                  {/* biome-ignore lint/performance/noImgElement: previews of downloadable SVG brand assets — next/image does not optimize SVGs */}
+                  <img
+                    src="/brand/logo-mark-tile.svg"
+                    alt="webmcp-stack avatar tile"
+                    className="size-12 rounded-md"
+                  />
                 </AssetCard>
               </div>
             </section>
@@ -241,9 +264,9 @@ export default function BrandPage() {
               <SectionHeading id="colors">Colors</SectionHeading>
               <Prose>
                 <p>
-                  A dark neutral surface palette with a single blue accent, the blue GitHub ships
-                  on its dark theme. Token names describe the role, not the hue. Click any card to
-                  copy its hex value.
+                  A dark neutral surface palette with a single blue accent, the blue GitHub ships on
+                  its dark theme. Token names describe the role, not the hue. Click any card to copy
+                  its hex value.
                 </p>
               </Prose>
               <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">

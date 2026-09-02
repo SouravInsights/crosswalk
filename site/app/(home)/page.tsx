@@ -131,9 +131,10 @@ export default function HomePage() {
           </h2>
           <p className="mb-10 max-w-2xl text-[15px] leading-relaxed text-dim sm:mb-14">
             Point a generator at an API without thinking and you ship every route as something an
-            agent can call. The interesting problem was never <em className="not-italic text-ink">can</em> an
-            agent call your app; it is what it should be allowed to call. So every generation runs
-            an audit, and the audit has opinions.
+            agent can call. The interesting problem was never{" "}
+            <em className="not-italic text-ink">can</em> an agent call your app; it is what it
+            should be allowed to call. So every generation runs an audit, and the audit has
+            opinions.
           </p>
           <div className="grid gap-10 sm:grid-cols-3 sm:gap-8">
             {AUDIT_CATCHES.map(([title, body]) => (
@@ -221,8 +222,8 @@ export default function HomePage() {
             One product of a stack.
           </h2>
           <p className="max-w-2xl text-[15px] leading-relaxed text-dim">
-            codegen is the first product of <LogoWord />: the layer that turns contracts into
-            tools. The rest of the loop is on the roadmap:{" "}
+            codegen is the first product of <LogoWord />: the layer that turns contracts into tools.
+            The rest of the loop is on the roadmap:{" "}
             <span className="font-mono text-[13px] text-dim">@webmcp-stack/telemetry</span> to see
             how agents actually use your tools, and{" "}
             <span className="font-mono text-[13px] text-dim">@webmcp-stack/audit</span> to check any

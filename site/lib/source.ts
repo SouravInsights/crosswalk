@@ -1,4 +1,4 @@
-import { loader } from "fumadocs-core/source";
+import { loader, type VirtualFile } from "fumadocs-core/source";
 import { docs } from "@/.source";
 
 const raw = docs.toFumadocsSource() as unknown as {
@@ -10,6 +10,6 @@ const raw = docs.toFumadocsSource() as unknown as {
 export const source = loader({
   baseUrl: "/docs",
   source: {
-    files: typeof raw.files === "function" ? raw.files() : raw.files,
-  } as any,
+    files: (typeof raw.files === "function" ? raw.files() : raw.files) as VirtualFile[],
+  },
 });

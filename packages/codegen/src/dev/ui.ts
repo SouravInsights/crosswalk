@@ -694,7 +694,9 @@ export function dashboardHtml(embeddedState?: UiState, opts?: { scoped?: boolean
     .section { margin-bottom: 20px; }
     .sidebar-header { padding: 14px 16px 10px; }
   }
-  ${opts?.scoped ? `
+  ${
+    opts?.scoped
+      ? `
   /* Scoped mode: mounted inside a shadow root on the marketing site, where
      document-level selectors never match and vh/dvh would measure the page
      viewport, not the host — which is exactly what clipped the demo's scroll
@@ -720,7 +722,9 @@ export function dashboardHtml(embeddedState?: UiState, opts?: { scoped?: boolean
      handle sets an inline width, which still wins over this; the mobile
      full-width sidebar rule carries !important and is unaffected. */
   .sidebar { width: 264px; }
-  ` : ""}
+  `
+      : ""
+  }
 </style>
 </head>
 <body>

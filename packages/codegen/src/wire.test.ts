@@ -52,7 +52,7 @@ describe("planWiring", () => {
     );
     expect(plan?.edits).toHaveLength(2);
 
-    if (!plan || plan.edits.length !== 2) throw new Error("expected exactly two edits");
+    if (plan?.edits.length !== 2) throw new Error("expected exactly two edits");
     const [register, layout] = plan.edits;
     expect(register?.action).toBe("create");
     expect(register?.contents).toContain('"use client"');
@@ -71,7 +71,7 @@ describe("planWiring", () => {
     await writeFile(join(cwd, "src/main.tsx"), VITE_MAIN);
 
     const plan = await planWiring(cwd, { dir: ".", framework: "vite-react" }, "./src/webmcp");
-    if (!plan || plan.edits.length !== 1) throw new Error("expected exactly one edit");
+    if (plan?.edits.length !== 1) throw new Error("expected exactly one edit");
     const [edit] = plan.edits;
     expect(edit?.contents).toContain('import { registerAllTools } from "./webmcp";');
     expect(edit?.contents).toContain("void registerAllTools();");

@@ -2,9 +2,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { startDevServer } from "./server.js";
 
-const PETSTORE = fileURLToPath(
-  new URL("../../../../examples/openapi-petstore", import.meta.url),
-);
+const PETSTORE = fileURLToPath(new URL("../../../../examples/openapi-petstore", import.meta.url));
 
 describe("dev server", () => {
   it("serves each tool's generated source in /api/state", async () => {

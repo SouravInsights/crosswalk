@@ -69,9 +69,6 @@ export function renderSummary(
   wiring?: WirePlan | null,
 ): void {
   const { tools, findings, skipped } = result;
-  const reads = tools.filter((t) => t.sideEffect === "read").length;
-  const writes = tools.filter((t) => t.sideEffect === "write").length;
-  const destructives = tools.filter((t) => t.sideEffect === "destructive").length;
   const enabled = tools.filter((t) => t.enabledByDefault).length;
 
   const findingCounts = summarizeFindings(findings);
@@ -93,18 +90,36 @@ export function renderSummary(
 
   // Safety notes — human-readable
   if (totalFindings > 0) {
-    console.log(`  ${c("yellow", "!")} ${bold(`${totalFindings} safety note${totalFindings === 1 ? "" : "s"}`)}`);
+    console.log(
+      `  ${c("yellow", "!")} ${bold(`${totalFindings} safety note${totalFindings === 1 ? "" : "s"}`)}`,
+    );
     if (findingCounts.auth > 0) {
-      console.log(dim(`    ${findingCounts.auth} auth endpoint${findingCounts.auth === 1 ? "" : "s"} disabled (agents shouldn't sign in)`));
+      console.log(
+        dim(
+          `    ${findingCounts.auth} auth endpoint${findingCounts.auth === 1 ? "" : "s"} disabled (agents shouldn't sign in)`,
+        ),
+      );
     }
     if (findingCounts.admin > 0) {
-      console.log(dim(`    ${findingCounts.admin} admin endpoint${findingCounts.admin === 1 ? "" : "s"} disabled (review each before enabling)`));
+      console.log(
+        dim(
+          `    ${findingCounts.admin} admin endpoint${findingCounts.admin === 1 ? "" : "s"} disabled (review each before enabling)`,
+        ),
+      );
     }
     if (findingCounts.pii > 0) {
-      console.log(dim(`    ${findingCounts.pii} endpoint${findingCounts.pii === 1 ? "" : "s"} may return personal data`));
+      console.log(
+        dim(
+          `    ${findingCounts.pii} endpoint${findingCounts.pii === 1 ? "" : "s"} may return personal data`,
+        ),
+      );
     }
     if (findingCounts.postAsRead > 0) {
-      console.log(dim(`    ${findingCounts.postAsRead} POST endpoint${findingCounts.postAsRead === 1 ? "" : "s"} treated as read-only (verify this is correct)`));
+      console.log(
+        dim(
+          `    ${findingCounts.postAsRead} POST endpoint${findingCounts.postAsRead === 1 ? "" : "s"} treated as read-only (verify this is correct)`,
+        ),
+      );
     }
     console.log(dim(`    Run with --verbose to see all details`));
     console.log("");
