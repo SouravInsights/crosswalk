@@ -2,7 +2,7 @@
 
 > Reviews only beenthere's core app UI, scoped to one complete flow. Repo:
 > `beenthere-apps/beenthere`, web app `apps/web`, Sep 3 2026. Findings are
-> folded into `docs/specs/schema-source.md`; see §4.
+> folded into `docs/specs/generation-pipeline.md`; see §4.
 
 ---
 

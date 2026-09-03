@@ -1,6 +1,8 @@
 # webmcp-codegen — Design Document
 
 > Generate high-quality, safe, well-typed WebMCP tools from the backend you already have — without magic, without hiding what the tool does, and without taking control away from the developer.
+>
+> The detailed spec for the next version of the generation pipeline (schema source, cross-source merge, description assembly, the `tools`/`form` outputs, 0.5 renames): `docs/specs/generation-pipeline.md`.
 
 ---
 
