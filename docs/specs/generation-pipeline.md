@@ -10,28 +10,148 @@
 >
 > Status: spec, not yet implemented. Target: `@webmcp-stack/codegen` 0.5.
 
+**Read this in one pass.** The problem, the one rule, how it works on a real
+app, then the details. Everything after "What changes for you" is reference.
 
-## What this is
+
+## The problem
 
 Today the codegen reads an OpenAPI spec and writes `.webmcp.ts` tool files.
-This spec defines the next version of that pipeline. Three things change:
+Three gaps keep that from being enough:
 
-1. **More codebases become generatable.** A new `schema` source turns an app's
-   own validation schemas (zod, valibot, arktype) into tools, so apps with no
-   OpenAPI spec, and apps whose raw endpoints would bypass the product, both
-   get a real path.
-2. **Descriptions stop being bare names.** Every field gets constraint-rich
-   text assembled in a fixed order: your words first, synthesized constraints
-   next, optional LLM drafts for what is still empty, your overrides last.
-3. **The vocabulary matches what things are.** `generate:` becomes
-   `outputs:`, the `js` generator becomes the `tools` output, and a new `form`
-   output annotates literal HTML forms.
+**1. Many apps have no spec.** Most React/Next.js apps have route handlers,
+server actions, and forms, but no OpenAPI document. Nothing to point the
+codegen at.
 
-Everything else, the safety review, the audit pass, the marker split that
-protects your edits, the zero-config first run, stays exactly as it is.
+**2. Sometimes the spec exists, but the endpoint is the wrong tool.**
+beenthere has a great spec (73 operations). But an agent calling the raw
+`create-trip` endpoint tool would bypass the app: no cover-photo upload, no
+cache refresh, no navigation into the editor. The endpoint succeeds; the
+product behavior doesn't. Chrome's own docs say tools should use the app's
+existing capabilities, not replace them.
+
+**3. Descriptions reach the agent as bare names.** Most specs and schemas
+carry no field text, so the agent sees `minutes_worked: number`, guesses, and
+fails validation. Chrome's examples put the constraint right in the prose:
+"Minutes worked on this task. A number from 30 to 600."
+
+All three are the same problem underneath: a good tool needs contract,
+behavior, safety, and context, and no single source provides all of them.
+This spec defines the pipeline that assembles them.
 
 
-## Before and after
+## The one rule: contracts, not codebases
+
+Stated once, governing every source:
+
+**Every source consumes a contract you already maintain. The codegen never
+scans or infers application code.**
+
+Markup and fetch calls are the least stable things in a repo, and every
+heuristic miss becomes a silently wrong tool. Contracts are stable and
+machine-readable by design:
+
+| Source | Contract consumed | Answers | Status |
+|---|---|---|---|
+| `openapi` | OpenAPI 3.x spec | "what does the HTTP API expose" | shipped |
+| `schema` | Standard Schema modules (zod, valibot, arktype) | "what should an agent be able to do, in my product's terms" | this spec |
+| `manual` | a small hand-written tools file | "just let me write it" | escape hatch |
+| `trpc` | the router's own schemas | same as openapi, typed end to end | planned |
+
+The sources are not alternatives and are never ranked. They answer different
+questions about the same job, and one app can use several at once.
+
+**Scope boundary, so it can't be misread:** you write the schema, in your
+codebase, for your own reasons (it replaces hand-rolled `if (!title.trim())`
+validation whether or not WebMCP is involved). The codegen only reads it and
+produces tools. It never generates your app's validation logic.
+
+
+## How it works (a real flow, end to end)
+
+Three steps. The running example is beenthere's create-trip flow, which uses
+both sources at once.
+
+**Step 1: you write the schema (once, for your app).** This is app code, not
+ours:
+
+```ts
+// packages/shared/src/schemas/trip.ts
+import { z } from "zod";
+
+export const CreateTripInput = z.object({
+  title: z.string().min(1).max(40)
+    .describe("Name of the trip, e.g. 'Kyoto in autumn'. 40 characters max."),
+  startDate: z.string().optional()
+    .describe("When the trip happened, e.g. '2026-03-14'. Optional."),
+  locationObject: z.record(z.string(), z.unknown()).optional()
+    .describe("Resolved place object. Always get this from the search-places tool; never invent it."),
+});
+```
+
+**Step 2: you point the codegen at it.** One config entry per tool, explicit,
+nothing scanned:
+
+```js
+// codegen.config.mjs
+import { defineConfig } from "@webmcp-stack/codegen";
+import { openapi, schema } from "@webmcp-stack/codegen/sources";
+import { tools } from "@webmcp-stack/codegen/outputs";
+import { CreateTripInput, SearchPlacesInput } from "./src/schemas";
+
+export default defineConfig({
+  sources: [
+    openapi({ spec: "../server/openapi/openapi.json" }),
+    schema({
+      tools: [
+        // operation: fuse with the spec's createTrip endpoint into one tool
+        { name: "create-trip", schema: CreateTripInput, operation: "createTrip" },
+        { name: "search-places", schema: SearchPlacesInput },
+      ],
+    }),
+  ],
+  outputs: [tools({ outDir: "./src/webmcp" })],
+});
+```
+
+**Step 3: you run `generate`.**
+
+```
+$ npx @webmcp-stack/codegen generate
+
+  found spec:     apps/server/openapi/openapi.json (73 operations)
+  found schemas:  2 declared in codegen.config.mjs
+
+  ✓ create-trip     merged: CreateTripInput + POST /v1/trips (write, confirm on)
+  ✓ search-places   from schema (read, enabled)
+  ✓ 70 tools        from openapi (49 read, 17 write, 4 destructive)
+  ✖ 2 webhooks      skipped (they are for servers, not agents)
+  ⚠ create-trip     field "locationObject" needs search-places; declare it or document the source
+  ⚠ list-trips      no output schema; the agent gets unstructured text back
+```
+
+You get a `.webmcp.ts` per tool. The codegen owns the contract (name,
+description, input schema, safety hints, confirmation gate). You own the
+`execute()`: the scaffold is typed against your schema, and you can point it
+at your app's own action layer instead of the raw endpoint, which is what
+beenthere does so the cover upload, cache refresh, and editor navigation all
+happen:
+
+```ts
+// src/webmcp/create-trip.webmcp.ts (your region, regeneration never touches it)
+async execute(input: CreateTripInput) {
+  const trip = await apiClient.createTrip({ id: crypto.randomUUID(), ...input });
+  router.push(`/me/${trip.id}`);
+  return toolResult(`Trip "${input.title}" created and opened in the editor.`);
+}
+```
+
+**What the agent experience becomes:** "Create a trip for my Kyoto week" →
+agent calls `search-places("Kyoto")`, then `create-trip`, you confirm (it's a
+write), and the app does what it always does, ending with the editor open.
+
+
+## The shape, before and after
 
 ```mermaid
 flowchart TB
@@ -61,14 +181,15 @@ flowchart TB
 ```
 
 
-## The pipeline stages, in order
+## Under the hood
 
-1. **Collect.** Each source produces `CandidateTool`s. Nothing else changes
-   here; a new source is a new collector, never a new pipeline.
+### The pipeline stages, in order
+
+1. **Collect.** Each source produces `CandidateTool`s. A new source is a new
+   collector, never a new pipeline.
 2. **Merge.** A `schema` entry that names an OpenAPI operation fuses with it
-   into one candidate. Declared by you, never guessed. (Details below.)
+   into one candidate. Declared by you, never guessed.
 3. **Describe.** Field and tool descriptions are assembled in layers.
-   (Details below.)
 4. **Normalize names.** Version prefixes are stripped and collisions resolved,
    as today. Names you declared in a `schema` entry are used verbatim.
 5. **Safety review.** Classification, hints, PII scan, endpoint roles.
@@ -78,50 +199,7 @@ flowchart TB
    overrides), plus new rules listed below.
 8. **Outputs.** `tools` writes `.webmcp.ts` files; `form` annotates markup.
 
-
-## Sources: contracts, not codebases
-
-The rule that governs every source, stated once:
-
-**Every source consumes a contract you already maintain. The codegen never
-scans or infers application code.**
-
-| Source | Contract consumed | Answers | Status |
-|---|---|---|---|
-| `openapi` | OpenAPI 3.x spec | "what does the HTTP API expose" | shipped |
-| `schema` | Standard Schema modules (zod, valibot, arktype) | "what should an agent be able to do, in my product's terms" | this spec |
-| `manual` | a small hand-written tools file | "just let me write it" | escape hatch |
-| `trpc` | the router's own schemas | same as openapi, typed end to end | planned |
-
-The sources are not alternatives and are never ranked. They answer different
-questions about the same job, and one app can use several at once.
-
 ### The schema source
-
-You declare one tool per entry, pointing at a schema your app owns:
-
-```js
-// codegen.config.mjs
-import { defineConfig } from "@webmcp-stack/codegen";
-import { openapi, schema } from "@webmcp-stack/codegen/sources";
-import { tools } from "@webmcp-stack/codegen/outputs";
-import { CreateTripInput, SearchPlacesInput } from "./src/schemas";
-
-export default defineConfig({
-  sources: [
-    openapi({ spec: "../server/openapi/openapi.json" }),
-    schema({
-      tools: [
-        { name: "create-trip", schema: CreateTripInput, operation: "createTrip" },
-        { name: "search-places", schema: SearchPlacesInput },
-      ],
-    }),
-  ],
-  outputs: [tools({ outDir: "./src/webmcp" })],
-});
-```
-
-Design points:
 
 - **The config imports the schema as a value.** No parsing, no AST work. The
   schema arrives as an object and is converted to JSON Schema at generate
@@ -129,10 +207,6 @@ Design points:
   (see the end).
 - **Explicit, always.** No discovery of exported schemas. What you list is
   what becomes a tool.
-- **Scope boundary.** You write the schema, in your codebase, for your own
-  reasons (it replaces hand-rolled `if (!title.trim())` validation whether or
-  not WebMCP is involved). The codegen only reads it. It never generates your
-  app's validation logic.
 - **Same pipeline.** Each entry becomes an ordinary candidate and flows
   through safety review and audit like any other.
 - **Side effect defaults to write** for standalone schema entries (no HTTP
@@ -180,16 +254,13 @@ Rules and failure modes:
 - **`--dry-run` shows provenance.** A merged tool reports which parts came
   from which source, so review sees the fusion, not just the result.
 
-### A new audit rule this enables
+A new audit rule this enables: when a tool's input is only producible by
+another tool (a resolved place object, a server-assigned id), the declared set
+must contain that producer. `create-trip` without `search-places` is a
+warning: "field `locationObject` is not a value agents can invent; declare the
+tool that produces it or document the source in its description."
 
-When a tool's input is only producible by another tool (a resolved place
-object, a server-assigned id), the declared set must contain that producer.
-`create-trip` without `search-places` is a warning: "field `locationObject` is
-not a value agents can invent; declare the tool that produces it or document
-the source in its description."
-
-
-## How descriptions get assembled
+### How descriptions get assembled
 
 Agents pick tools by description and fill inputs from field text. Most sources
 provide almost none, so the pipeline assembles both in five layers. Each layer
@@ -250,10 +321,10 @@ Outputs are named after what lands in your repo.
 | `reactHooks` | hook-based registration | later |
 | `manifest` | `/.well-known/webmcp.json` | later |
 
-### The form output
+### The form lane (when a literal form exists)
 
-For surfaces that are real `<form>` elements, this output annotates the
-component in place instead of generating a file:
+Some surfaces really are `<form>` elements. For those, the `form` output
+annotates the component in place instead of generating a file:
 
 ```diff
   <form action="/api/timesheets" method="post"
@@ -343,55 +414,19 @@ by content hash, the dashboard accept/reject surface) is the one part left as
 an open question. The boundary above is fixed regardless.
 
 
-## Config, CLI, and the first run
-
-Config keys become `sources:` and `outputs:`:
-
-```js
-export default defineConfig({
-  sources: [openapi({ spec: "./openapi.yaml" }), schema({ tools: [...] })],
-  outputs: [tools({ outDir: "./src/webmcp" })],
-});
-```
-
-CLI commands are unchanged (`generate` default, `init`, `dev`), plus one flag:
-`generate --suggest` runs the LLM proposals.
-
-**Init gets smarter about the new source.** Today `init` detects the OpenAPI
-spec and the framework. It gains two behaviors:
-
-- Detects zod/valibot/arktype in `package.json` and scaffolds a `schema`
-  source block with a comment pointing at your schemas directory.
-- When **no** OpenAPI spec is found, today the first run has nothing to say.
-  Now it scaffolds the schema path instead: "no OpenAPI spec found; if your
-  app validates with schemas, declare them here."
-
-A run on a repo with both sources looks like:
-
-```
-$ npx @webmcp-stack/codegen generate
-
-  found spec:     apps/server/openapi/openapi.json (73 operations)
-  found schemas:  2 declared in codegen.config.mjs
-
-  ✓ create-trip     merged: CreateTripInput + POST /v1/trips (write, confirm on)
-  ✓ search-places   from schema (read, enabled)
-  ✓ 70 tools        from openapi (49 read, 17 write, 4 destructive)
-  ✖ 2 webhooks      skipped (they are for servers, not agents)
-  ⚠ create-trip     field "locationObject" needs search-places
-  ⚠ list-trips      no output schema; the agent gets unstructured text back
-```
-
-
-## What this means for people trying the tool
+## What changes for you
 
 There are no serious users yet, so this is the cheap moment for a breaking
 rename. It stays cheap anyway: three mechanical renames.
 
 **If you are new:** nothing about the first run changes. `npx
 @webmcp-stack/codegen generate` still works with no config when a spec is
-detectable. What is new is that having no OpenAPI spec is no longer a dead
-end: schemas give you a path, and `init` scaffolds it.
+detectable, and CLI commands are unchanged (`generate` default, `init`,
+`dev`), plus one flag: `generate --suggest` runs the LLM proposals. What is
+new is that having no OpenAPI spec is no longer a dead end: `init` detects
+zod/valibot/arktype in `package.json` and scaffolds a `schema` source block,
+and when no spec is found it scaffolds the schema path instead of having
+nothing to say.
 
 **If you tried 0.4:** the rename table:
 
@@ -403,17 +438,18 @@ end: schemas give you a path, and `init` scaffolds it.
 
 Your `.webmcp-codegen.json` keeps working unchanged (the new `fields` key is
 optional). Your generated files keep working unchanged: same layout, same
-marker contract, regeneration after upgrading produces the same files.
-
-The CLI helps with the move: `loadConfig` recognizes the old `generate:` key
-and stops with the exact three-line fix instead of a confusing type error.
-Hard error, honest instructions, no silent dual support.
+marker contract, regeneration after upgrading produces the same files. The CLI
+helps with the move: `loadConfig` recognizes the old `generate:` key and stops
+with the exact three-line fix instead of a confusing type error. Hard error,
+honest instructions, no silent dual support.
 
 Version: 0.5.0 (0.x, so a minor carries the breaking change), with a changelog
 entry showing the rename table.
 
 
-## What stays the same
+## Reference
+
+### What stays the same
 
 Worth listing so review can confirm nothing quiet moved:
 
@@ -425,8 +461,7 @@ Worth listing so review can confirm nothing quiet moved:
 - Zero runtime dependency: generated code belongs to you.
 - The dev dashboard, the `--dry-run` review flow, `--force`.
 
-
-## Implementation map
+### Implementation map
 
 So this can be implemented in one pass, file by file against the current
 codebase:
@@ -451,8 +486,7 @@ codebase:
 | `package.json` | exports `/generators` replaced by `/outputs`; version 0.5.0 |
 | README, docs site, `first-run-experience.md` | config examples updated when the code lands, not before |
 
-
-## Open questions
+### Open questions
 
 - **Loading TypeScript schemas in the CLI.** Config files are plain `.mjs`
   loaded with a dynamic import, zero dependencies. Schema modules are often
