@@ -20,16 +20,20 @@
 
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { dim, renderSummary, renderVerbose } from "./cli-output.js";
-import { CONFIG_FILE_NAMES } from "./config.js";
+import { CONFIG_FILE_NAMES, loadConfig } from "./config.js";
 import { saveDataFile } from "./data-file.js";
 import { findSpecs } from "./detect.js";
 import { startDevServer } from "./dev/server.js";
+import { resolveLlmProvider, runLlmLayer } from "./llm.js";
 import { runGenerate } from "./pipeline.js";
 import { resolveSetup } from "./setup.js";
+import { schemaExportsToJson } from "./sources/schema.js";
 import { applyWiring, planWiring, type WirePlan } from "./wire.js";
+import type { CodegenConfig } from "./types.js";
 
 const HELP = `
 webmcp-codegen — generate WebMCP tools from your OpenAPI spec
@@ -49,6 +53,7 @@ Flags
   --verbose      Show every tool, not just the summary
   --force        Write files even when the audit reports errors
   --skip-audit   Skip the safety report
+  --suggest PATH Ask the LLM layer which schemas in PATH are worth declaring
   --config PATH  Use a config file at PATH
   --port N       Dashboard port (default: 4700)
   --help         Show this help
@@ -73,6 +78,8 @@ export interface CliFlags {
   spec?: string;
   out?: string;
   port?: number;
+  /** `generate --suggest <module>`: LLM proposals for undeclared schemas. */
+  suggest?: string;
   help: boolean;
 }
 
@@ -90,6 +97,7 @@ async function main(): Promise<number> {
       spec: { type: "string" },
       out: { type: "string" },
       port: { type: "string" },
+      suggest: { type: "string" },
       help: { type: "boolean", default: false },
     },
   });
@@ -104,6 +112,7 @@ async function main(): Promise<number> {
     spec: values.spec,
     out: values.out,
     port: values.port ? Number.parseInt(values.port, 10) : undefined,
+    suggest: values.suggest,
     help: values.help,
   };
 
@@ -120,7 +129,7 @@ async function main(): Promise<number> {
     case "dev":
       return dev(flags.port ?? 4700);
     case "generate":
-      return generate(flags);
+      return flags.suggest !== undefined ? suggest(flags.suggest) : generate(flags);
     default:
       console.error(`Unknown command: ${command}\n`);
       console.log(HELP);
@@ -181,8 +190,84 @@ async function dev(port: number): Promise<number> {
   return 0;
 }
 
-async function generate(flags: CliFlags): Promise<number> {
+/**
+ * `generate --suggest <module>`: the LLM layer's tool-worthiness proposals.
+ * A proposal surface only: it reads a schema module, asks, and prints. Nothing
+ * is declared, generated, or written; declaring is the developer's edit.
+ */
+async function suggest(modulePath: string): Promise<number> {
   const cwd = process.cwd();
+
+  // The llm settings live in the config when there is one. A missing config is
+  // fine here: --suggest is itself the explicit opt-in, so env keys are enough.
+  let llm: CodegenConfig["llm"];
+  try {
+    llm = (await loadConfig(cwd)).config.llm;
+  } catch {
+    llm = undefined;
+  }
+  const provider = resolveLlmProvider(llm ?? {});
+  if (!provider) {
+    console.log(
+      "\n◦ The LLM layer is off: no provider configured and no WEBMCP_LLM_API_KEY / " +
+        "OPENAI_API_KEY in the environment. Nothing proposed.\n",
+    );
+    return 0;
+  }
+
+  const moduleExports = await importSchemaModule(cwd, modulePath);
+  const { schemas, skipped } = schemaExportsToJson(moduleExports, cwd);
+  for (const entry of skipped) {
+    console.log(dim(`  skipped ${entry.name}: ${entry.reason}`));
+  }
+  if (schemas.length === 0) {
+    console.log(`\n◦ No Standard Schema exports found in ${modulePath}. Nothing to propose on.\n`);
+    return 0;
+  }
+
+  const suggestions = await runLlmLayer(
+    { sources: [], outputs: [], llm: llm ?? {} },
+    { tools: [], findings: [], suggestExports: schemas },
+  );
+
+  console.log("");
+  if (suggestions.length === 0) {
+    console.log("  ◦ The provider had no proposals. Declare schemas by hand, as usual.");
+  }
+  for (const suggestion of suggestions) {
+    console.log(`  ◦ ${suggestion.message}`);
+  }
+  console.log(
+    dim("\n  Proposals only; nothing was written. Declare what you want in codegen.config.mjs.\n"),
+  );
+  return 0;
+}
+
+/**
+ * Load a user module for --suggest. TypeScript loads only via Node's native
+ * type stripping (22.18+ / 23.6+): the leaning choice from the spec, kept as
+ * the single code path so the CLI stays zero-dependency. The tradeoff lives
+ * here on purpose: older runtimes and extensionless barrel imports get a
+ * clear, actionable error instead of a second loader.
+ */
+async function importSchemaModule(
+  cwd: string,
+  modulePath: string,
+): Promise<Record<string, unknown>> {
+  const absolute = resolve(cwd, modulePath);
+  try {
+    return (await import(pathToFileURL(absolute).href)) as Record<string, unknown>;
+  } catch (error) {
+    throw new Error(
+      `Could not load "${modulePath}". If it is TypeScript, run on Node 22.18+ (or 23.6+) ` +
+        "and import the schema file directly (explicit .ts extension; extensionless barrel " +
+        "re-exports need a bundler), or point --suggest at a plain-JS module.\n" +
+        `Underlying error: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+async function generate(flags: CliFlags): Promise<number> {  const cwd = process.cwd();
   const setup = await resolveSetup(cwd, {
     dryRun: flags.dryRun,
     skipAudit: flags.skipAudit,

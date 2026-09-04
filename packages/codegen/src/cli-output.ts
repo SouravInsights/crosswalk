@@ -88,11 +88,19 @@ export function renderSummary(
   }
   console.log("");
 
+  // Blocking errors get one line each: they stop the write, so they are never
+  // allowed to hide inside a count.
+  const errorFindings = findings.filter((f) => f.level === "error");
+  for (const f of errorFindings) {
+    const where = f.tool ? dim(` (${f.tool})`) : "";
+    console.log(`  ${c("red", "✖")} ${f.message}${where}`);
+  }
+  if (errorFindings.length > 0) console.log("");
+
   // Safety notes — human-readable
-  if (totalFindings > 0) {
-    console.log(
-      `  ${c("yellow", "!")} ${bold(`${totalFindings} safety note${totalFindings === 1 ? "" : "s"}`)}`,
-    );
+  const warnings = totalFindings - errorFindings.length;
+  if (warnings > 0) {
+    console.log(`  ${c("yellow", "!")} ${bold(`${warnings} safety note${warnings === 1 ? "" : "s"}`)}`);
     if (findingCounts.auth > 0) {
       console.log(
         dim(
@@ -131,7 +139,28 @@ export function renderSummary(
   if (wiring && !wiring.alreadyWired) {
     console.log(`  ${c("cyan", "→")} ${bold("Registration")} wired into your app`);
   }
+  // Per-file notes (kept attributes, added names, unmatched controls). Capped
+  // in the summary; --verbose lists them all.
+  const fileNotes = result.files.flatMap((file) => file.notes ?? []);
+  for (const note of fileNotes.slice(0, 6)) {
+    console.log(dim(`    ${note}`));
+  }
+  if (fileNotes.length > 6) {
+    console.log(dim(`    …and ${fileNotes.length - 6} more (run with --verbose)`));
+  }
   console.log("");
+
+  // LLM proposals: visually distinct from findings (◦, cyan), because a
+  // suggestion is not a fact. Nothing here was applied to anything.
+  if (result.suggestions.length > 0) {
+    console.log(
+      `  ${c("cyan", "◦")} ${bold(`${result.suggestions.length} LLM suggestion${result.suggestions.length === 1 ? "" : "s"}`)} ${dim("(proposals only; nothing applied)")}`,
+    );
+    for (const suggestion of result.suggestions) {
+      console.log(dim(`    ◦ ${suggestion.message}`));
+    }
+    console.log("");
+  }
 
   // Next step
   console.log(`  ${bold("Next:")} ${c("cyan", "npx @webmcp-stack/codegen dev")}`);
@@ -191,6 +220,24 @@ export function renderVerbose(result: GenerateResult, setup: Setup, _cwd: string
       const icon = f.level === "error" ? c("red", "✖") : c("yellow", "⚠");
       const where = f.tool ? dim(` (${f.tool})`) : "";
       console.log(`  ${icon} ${f.message}${where}`);
+    }
+    console.log("");
+  }
+
+  // LLM proposals, visually distinct from findings.
+  if (result.suggestions.length > 0) {
+    console.log(bold("LLM suggestions (proposals only; nothing applied):"));
+    for (const suggestion of result.suggestions) {
+      console.log(`  ${c("cyan", "◦")} ${dim(suggestion.message)}`);
+    }
+    console.log("");
+  }
+
+  const notes = result.files.flatMap((file) => file.notes ?? []);
+  if (notes.length > 0) {
+    console.log(bold("File notes:"));
+    for (const note of notes) {
+      console.log(`  ${dim(note)}`);
     }
     console.log("");
   }

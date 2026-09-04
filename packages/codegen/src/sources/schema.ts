@@ -199,8 +199,7 @@ function toJsonSchema(
   return converter.zodToJsonSchema(value);
 }
 
-/** Resolve a package from the app's own node_modules, with an actionable miss. */
-function requireFromApp<T>(packageName: string, anchorDir: string, toolName: string): T {
+/** Resolve a package from the app's own node_modules, with an actionable miss. */function requireFromApp<T>(packageName: string, anchorDir: string, toolName: string): T {
   try {
     return createRequire(join(anchorDir, "codegen.config.mjs"))(packageName) as T;
   } catch {
@@ -209,4 +208,31 @@ function requireFromApp<T>(packageName: string, anchorDir: string, toolName: str
         "Install it in the package that owns your schemas (the one your codegen.config.mjs sits in).",
     );
   }
+}
+
+/**
+ * `generate --suggest` support: filter a module's exports to Standard Schemas
+ * and convert each to JSON Schema text for the proposal prompt. Lives next to
+ * the source so the conversion rules exist exactly once. Exports that are not
+ * schemas are skipped silently (a module may export anything); exports that
+ * look like schemas but fail conversion are reported, never silent.
+ */
+export function schemaExportsToJson(
+  moduleExports: Record<string, unknown>,
+  anchorDir: string,
+): { schemas: { name: string; schemaText: string }[]; skipped: { name: string; reason: string }[] } {
+  const schemas: { name: string; schemaText: string }[] = [];
+  const skipped: { name: string; reason: string }[] = [];
+  for (const [name, value] of Object.entries(moduleExports)) {
+    if (!isStandardSchema(value)) continue;
+    try {
+      schemas.push({
+        name,
+        schemaText: JSON.stringify(toJsonSchema(value, name, "schema", anchorDir)),
+      });
+    } catch (error) {
+      skipped.push({ name, reason: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { schemas, skipped };
 }

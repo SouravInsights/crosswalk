@@ -176,7 +176,7 @@ export interface ToolOverrides {
   };
 }
 
-/** A file the generator wants to write. */
+/** A file an output wants to write. */
 export interface GeneratedFile {
   /** Absolute path on disk. */
   path: string;
@@ -189,6 +189,12 @@ export interface GeneratedFile {
    * so we refused to touch it. The new contents go to a `.new` sibling instead.
    */
   conflict?: string;
+  /**
+   * Plain-language lines about this file that the report must show:
+   * attributes kept because a human edited them, fields no control matched,
+   * names added. Nothing the codegen does to a file is silent.
+   */
+  notes?: string[];
 }
 
 /**
@@ -232,4 +238,51 @@ export interface CodegenConfig {
   sources: Source[];
   outputs: Output[];
   safety?: SafetyOptions;
+  /**
+   * The opt-in LLM layer. Absent means off: the run is then exactly the
+   * deterministic one. The layer only ever proposes (report lines); it never
+   * writes files, never classifies risk, and never changes exit codes.
+   */
+  llm?: LlmOptions;
+}
+
+/** The four things the LLM layer may propose on. */
+export type LlmTask = "describe" | "relationship" | "semantic-review" | "suggest";
+
+/**
+ * A model backend. Bring your own to use any vendor, or configure a key and
+ * use the built-in OpenAI-compatible one. One method, because the layer asks
+ * one kind of question.
+ */
+export interface LlmProvider {
+  name: string;
+  complete(task: LlmTask, prompt: string): Promise<string>;
+}
+
+export interface LlmOptions {
+  /** A custom provider. Wins over apiKey when both are set. */
+  provider?: LlmProvider;
+  /** API key for the built-in provider. Falls back to env WEBMCP_LLM_API_KEY, then OPENAI_API_KEY. */
+  apiKey?: string;
+  /** OpenAI-compatible base URL. Default: https://api.openai.com/v1 */
+  baseUrl?: string;
+  /** Model name for the built-in provider. Default: gpt-4o-mini */
+  model?: string;
+  /** Override the shipped prompt per task, e.g. to match your domain's voice. */
+  prompts?: Partial<Record<LlmTask, string>>;
+}
+
+/**
+ * One proposal from the LLM layer. Rendered as `◦` lines, visually apart from
+ * audit findings, because a suggestion is not a fact: the developer disposes.
+ * Nothing here is ever applied to a file in this version; the acceptance
+ * surface (dashboard accept/reject) is a deliberate follow-up.
+ */
+export interface LlmSuggestion {
+  task: LlmTask;
+  /** The tool (and field, when relevant) this proposal is about. */
+  tool?: string;
+  field?: string;
+  /** The one-line proposal text for the report. */
+  message: string;
 }

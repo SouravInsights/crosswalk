@@ -7,9 +7,10 @@
  * (or what *would* happen, when called with `write: false`).
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { describeCandidateInputs } from "./describe.js";
+import { runLlmLayer } from "./llm.js";
 import { mergeSchemaWithOperations } from "./merge.js";
 import { dedupeNames, stripVersionPrefix } from "./naming.js";
 import { auditTools, reviewTools } from "./safety.js";
@@ -18,6 +19,7 @@ import type {
   AuditFinding,
   CodegenConfig,
   GeneratedFile,
+  LlmSuggestion,
   ReviewedTool,
   SkippedEndpoint,
   ToolOverrides,
@@ -48,6 +50,11 @@ export interface GenerateResult {
   files: GeneratedFile[];
   /** Human-facing pipeline notes, e.g. "stripped the shared v1 prefix". */
   notes: string[];
+  /**
+   * Advisory proposals from the LLM layer (`◦` lines in the report). Empty
+   * unless the layer is explicitly configured; never applied to files.
+   */
+  suggestions: LlmSuggestion[];
   /** True when audit errors stopped any file from being written. */
   blocked: boolean;
   /** True when this run actually wrote files (false for dry runs and blocks). */
@@ -129,11 +136,21 @@ export async function runGenerate(
   }
 
   // 7. Audit. Errors block the write unless --force (or --skip-audit) was passed.
+  //    Declared form pointers are validated here, not in the form output:
+  //    "no <form> at the declared pointer" must be a blocking audit error,
+  //    and blocking semantics belong to the audit, never to file writers.
+  //    Pointers are only validated when the form output is actually configured;
+  //    without it the pointer is inert, and the inertness warning (step 8) is
+  //    the whole story.
+  const formOutput = config.outputs.find((output) => output.kind === "form");
+  const formFindings =
+    options.skipAudit || !formOutput ? [] : await validateFormPointers(tools, options.cwd);
   const findings = options.skipAudit
     ? []
     : [
         ...merge.findings,
         ...auditTools(tools, renames),
+        ...formFindings,
         ...fieldOverrideTypos.map((typo) => ({
           level: "warning" as const,
           tool: typo.tool,
@@ -146,13 +163,18 @@ export async function runGenerate(
   const blocked = errors.length > 0 && !options.force && !options.skipAudit;
 
   if (blocked) {
-    return { tools, skipped, findings, files: [], notes, blocked, wrote: false };
+    return { tools, skipped, findings, files: [], notes, suggestions: [], blocked, wrote: false };
   }
+
+  // 7b. The advisory LLM layer runs after the audit so its relationship
+  //     proposals can react to findings, and before outputs so a slow endpoint
+  //     never sits between the developer and their files. It only proposes:
+  //     report lines, never writes, never exit codes.
+  const suggestions = await runLlmLayer(config, { tools, findings });
 
   // 8. Run the outputs, then write the files (unless this is a dry run).
   //    Tools with a form pointer belong to the form output; without one
   //    configured they generate as ordinary tool files, loudly.
-  const formOutput = config.outputs.find((output) => output.kind === "form");
   const fileOutputs = config.outputs.filter((output) => output.kind !== "form");
   const formTools = tools.filter((tool) => tool.form);
 
@@ -190,7 +212,44 @@ export async function runGenerate(
     wrote = true;
   }
 
-  return { tools, skipped, findings, files, notes, blocked, wrote };
+  return { tools, skipped, findings, files, notes, suggestions, blocked, wrote };
+}
+
+/**
+ * Every declared form pointer must resolve to a file containing a literal
+ * <form> element. A pointer that does not is a clear error, not a guess:
+ * annotating nothing would be silent, and annotating the wrong tag would be
+ * worse.
+ */
+async function validateFormPointers(tools: ReviewedTool[], cwd: string): Promise<AuditFinding[]> {
+  const findings: AuditFinding[] = [];
+  for (const tool of tools) {
+    if (!tool.form) continue;
+    const path = resolve(cwd, tool.form.path);
+    let text: string;
+    try {
+      text = await readFile(path, "utf8");
+    } catch {
+      findings.push({
+        level: "error",
+        tool: tool.name,
+        message:
+          `Declares form "${tool.form.path}", but no file exists there. ` +
+          "Point at the component that renders the form, or remove the pointer.",
+      });
+      continue;
+    }
+    if (!/<form(?=[\s>])/.test(text)) {
+      findings.push({
+        level: "error",
+        tool: tool.name,
+        message:
+          `Declares form "${tool.form.path}", but there is no <form> element in it. ` +
+          "Point at the component that renders the form (or wrap the controls in one).",
+      });
+    }
+  }
+  return findings;
 }
 
 /**

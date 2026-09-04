@@ -36,7 +36,12 @@ export async function loadConfig(
 
   for (const candidate of candidates) {
     if (!(await exists(candidate))) continue;
-    const module = (await import(pathToFileURL(candidate).href)) as { default?: unknown };
+    let module: { default?: unknown };
+    try {
+      module = (await import(pathToFileURL(candidate).href)) as { default?: unknown };
+    } catch (error) {
+      throw new Error(withLoadingGuidance(candidate, error));
+    }
     const config = module.default;
     if (!isCodegenConfig(config)) {
       throw new Error(
@@ -50,6 +55,24 @@ export async function loadConfig(
     explicitPath
       ? `No config file at "${explicitPath}".`
       : `No codegen.config.mjs found in ${cwd}. Run \`npx @webmcp-stack/codegen init\` to create one.`,
+  );
+}
+
+/**
+ * Config imports can pull in the app's TypeScript (schema modules). Node's
+ * native type stripping (22.18+ / 23.6+) is the only TS loader this CLI
+ * ships; anything else gets the recourse spelled out instead of a stack
+ * trace. The tradeoff is deliberate: zero dependencies over a bundled loader.
+ */
+function withLoadingGuidance(candidate: string, error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const looksLikeTs = /\.ts\b|unknown file extension/i.test(message);
+  if (!looksLikeTs) return `Failed to load ${candidate}: ${message}`;
+  return (
+    `Failed to load ${candidate}: it (or something it imports) is TypeScript this runtime cannot load.\n` +
+    "Run on Node 22.18+ (or 23.6+), which loads TypeScript natively, and import schema files directly\n" +
+    "(explicit .ts extension; extensionless barrel re-exports need a bundler), or use plain JS modules.\n" +
+    `Underlying error: ${message}`
   );
 }
 

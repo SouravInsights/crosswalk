@@ -8,3 +8,5 @@
  */
 export { tools } from "./tools.js";
 export type { ToolsOutputOptions } from "./tools.js";
+export { form } from "./form.js";
+export type { FormOutputOptions } from "./form.js";
