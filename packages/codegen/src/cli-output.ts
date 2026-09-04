@@ -24,6 +24,13 @@ const c = {
 const bold = pc.bold;
 export const dim = pc.dim;
 
+/** The webmcp-stack logo. Compact, professional, earns its two lines. */
+export const LOGO = `
+  ╭─────────────────────────────╮
+  │  webmcp-stack               │
+  ╰─────────────────────────────╯
+`;
+
 /** Group findings by what the user needs to know. */
 function summarizeFindings(findings: GenerateResult["findings"]): {
   auth: number;
@@ -64,8 +71,7 @@ export function renderSummary(
   const totalFindings = findings.length;
 
   // Header
-  console.log("");
-  console.log(`  ${bold("webmcp-codegen")}`);
+  console.log(LOGO);
   console.log(dim(`  ${setup.label}`));
   console.log("");
 
@@ -169,7 +175,7 @@ export function renderVerbose(result: GenerateResult, setup: Setup, _cwd: string
   const { tools, findings, skipped } = result;
 
   console.log("");
-  console.log(bold(`webmcp-codegen`));
+  console.log(LOGO);
   console.log(dim(`${tools.length} tools from ${setup.label}`));
   console.log("");
 

@@ -31,6 +31,7 @@ import { findSpecs } from "./detect.js";
 import { findSchemaLibraries } from "./detect-app.js";
 import { startDevServer } from "./dev/server.js";
 import { resolveLlmProvider, runLlmLayer } from "./llm.js";
+import { debug, enableVerbose, error, info, success, warn } from "./logger.js";
 import { runGenerate } from "./pipeline.js";
 import { resolveSetup } from "./setup.js";
 import { schemaExportsToJson } from "./sources/schema.js";
@@ -118,8 +119,10 @@ async function main(): Promise<number> {
     help: values.help,
   };
 
+  if (flags.verbose) enableVerbose();
+
   if (flags.help) {
-    console.log(HELP);
+    info(HELP);
     return 0;
   }
 
@@ -133,8 +136,8 @@ async function main(): Promise<number> {
     case "generate":
       return flags.suggest !== undefined ? suggest(flags.suggest) : generate(flags);
     default:
-      console.error(`Unknown command: ${command}\n`);
-      console.log(HELP);
+      error(`Unknown command: ${command}`);
+      info(HELP);
       return 1;
   }
 }
@@ -145,7 +148,7 @@ async function init(): Promise<number> {
   const configPath = join(cwd, configFile);
 
   if (existsSync(configPath)) {
-    console.error(`\n✖ ${configFile} already exists. Nothing to do.\n`);
+    error(`${configFile} already exists. Nothing to do.`);
     return 1;
   }
 
@@ -161,7 +164,7 @@ async function init(): Promise<number> {
       options: specs.map((s) => ({ value: `./${s}`, label: s })),
     });
     if (clack.isCancel(picked)) {
-      console.log(dim("\n  Cancelled. Run init again when you're ready.\n"));
+      info(dim("\n  Cancelled. Run init again when you're ready.\n"));
       return 0;
     }
     spec = picked as string;
@@ -171,20 +174,19 @@ async function init(): Promise<number> {
 
   await writeFile(configPath, initTemplate(spec, schemaLibs));
 
-  console.log(`\n✔ Wrote ${configFile}\n`);
+  success(`Wrote ${configFile}`);
   if (!spec) {
     // The schema path is the answer to "no OpenAPI spec": yesterday this run
     // had nothing to say, today it scaffolds the contract the app does have.
-    console.log(
-      "No OpenAPI spec found, so this config starts from your validation schemas instead.",
-    );
-    console.log("Add a spec later with: sources: [openapi({ spec: \"./openapi.yaml\" }), ...]");
+    info("No OpenAPI spec found, so this config starts from your validation schemas instead.");
+    info("Add a spec later with: sources: [openapi({ spec: \"./openapi.yaml\" }), ...]");
   }
   if (schemaLibs.length > 0) {
-    console.log(`Detected ${schemaLibs.join(", ")}. Declare agent-facing actions from your`);
-    console.log("schemas; see the commented block in the config.");
+    info(`Detected ${schemaLibs.join(", ")}. Declare agent-facing actions from your`);
+    info("schemas; see the commented block in the config.");
   }
-  console.log("\nEdit it to add sources, change the output directory, or set safety options.");
+  info("\nEdit it to add sources, change the output directory, or set safety options.");
+  info("Docs: https://webmcp-stack.vercel.app/docs/configuration\n");
   console.log("Docs: https://webmcp-stack.vercel.app/docs/configuration\n");
   return 0;
 }
@@ -257,8 +259,8 @@ ${schemaHint}`;
 async function dev(port: number): Promise<number> {
   const cwd = process.cwd();
   const server = await startDevServer({ cwd, port, open: true });
-  console.log(`\n✔ Dashboard: http://localhost:${port}\n`);
-  console.log("List, describe, enable, and test your tools. Ctrl+C to stop.\n");
+  success(`Dashboard: http://localhost:${port}`);
+  info("List, describe, enable, and test your tools. Ctrl+C to stop.\n");
 
   await new Promise<void>((resolveExit) => {
     process.on("SIGINT", () => {
@@ -287,7 +289,7 @@ async function suggest(modulePath: string): Promise<number> {
   }
   const provider = resolveLlmProvider(llm ?? {});
   if (!provider) {
-    console.log(
+    info(
       "\n◦ The LLM layer is off: no provider configured and no WEBMCP_LLM_API_KEY / " +
         "OPENAI_API_KEY in the environment. Nothing proposed.\n",
     );
@@ -297,10 +299,10 @@ async function suggest(modulePath: string): Promise<number> {
   const moduleExports = await importSchemaModule(cwd, modulePath);
   const { schemas, skipped } = schemaExportsToJson(moduleExports, cwd);
   for (const entry of skipped) {
-    console.log(dim(`  skipped ${entry.name}: ${entry.reason}`));
+    debug(`skipped ${entry.name}: ${entry.reason}`);
   }
   if (schemas.length === 0) {
-    console.log(`\n◦ No Standard Schema exports found in ${modulePath}. Nothing to propose on.\n`);
+    info(`\n◦ No Standard Schema exports found in ${modulePath}. Nothing to propose on.\n`);
     return 0;
   }
 
@@ -312,16 +314,14 @@ async function suggest(modulePath: string): Promise<number> {
   );
   spinner.stop("Done");
 
-  console.log("");
+  info("");
   if (suggestions.length === 0) {
-    console.log("  ◦ The provider had no proposals. Declare schemas by hand, as usual.");
+    info("  ◦ The provider had no proposals. Declare schemas by hand, as usual.");
   }
   for (const suggestion of suggestions) {
-    console.log(`  ◦ ${suggestion.message}`);
+    info(`  ◦ ${suggestion.message}`);
   }
-  console.log(
-    dim("\n  Proposals only; nothing was written. Declare what you want in codegen.config.mjs.\n"),
-  );
+  info(dim("\n  Proposals only; nothing was written. Declare what you want in codegen.config.mjs.\n"));
   return 0;
 }
 
