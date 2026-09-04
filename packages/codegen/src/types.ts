@@ -79,7 +79,32 @@ export interface CandidateTool {
   requiresAuth: boolean;
   /** Where the description text came from. Always reviewable before commit. */
   description: string;
-  descriptionSource: "openapi-summary" | "generated-template";
+  descriptionSource: "openapi-summary" | "declared" | "generated-template";
+  /**
+   * The OpenAPI operationId, when the source knows one. The merge pairs a
+   * schema entry with the operation it refines through this; nothing else
+   * may, because path/name matching would be guessing.
+   */
+  operationId?: string;
+  /**
+   * For a merged tool: the endpoint route it fused with ("POST /v1/trips").
+   * source.ref stays the schema's own reference, so the report can show both
+   * halves of the fusion. Safety heuristics read this when present, because
+   * the route carries the auth/admin/destructive signal.
+   */
+  endpointRef?: string;
+  /**
+   * Present when the tool annotates a literal <form> component instead of
+   * generating a .webmcp.ts file. Set by the schema source from the entry's
+   * `form` pointer; consumed by the `form` output.
+   */
+  form?: { path: string; autosubmit?: boolean };
+  /**
+   * Input fields whose description was machine-drafted by the describe layer
+   * (nothing in the contract carried text). The audit warns when that is ALL
+   * a tool has: synthesized constraints are a floor, not a finish.
+   */
+  synthesizedFields?: string[];
 }
 
 /** The MCP hints the spec defines for a tool, computed by the safety layer. */
@@ -142,6 +167,12 @@ export interface ToolOverrides {
   [toolName: string]: {
     description?: string;
     enabled?: boolean;
+    /**
+     * Per-field description text. Applied after every description layer and
+     * never appended to: this is the developer's final word on what the agent
+     * reads for that field.
+     */
+    fields?: Record<string, string>;
   };
 }
 
@@ -166,6 +197,13 @@ export interface GeneratedFile {
  */
 export interface Source {
   readonly kind: SourceKind;
+  /**
+   * Called by the CLI right after the config file loads. Sources that need to
+   * resolve the app's own dependencies anchor at the config file's directory
+   * rather than the process cwd: in a pnpm monorepo the schema library lives
+   * in the app package, not the root. Most sources never need this.
+   */
+  bindContext?(context: { configPath: string }): void;
   collect(): Promise<CandidateTool[]>;
 }
 

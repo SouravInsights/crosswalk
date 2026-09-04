@@ -91,6 +91,12 @@ function operationsFromSpec(spec: unknown): CandidateTool[] {
         pathTemplate: path,
         paramLocations: locateParams(operation, sharedParams, spec),
         serverUrl,
+        // The merge pairs schema entries with operations through this; it is
+        // the only cross-source join key, because names and paths would be
+        // guessing.
+        ...(typeof operation.operationId === "string" && operation.operationId.length > 0
+          ? { operationId: operation.operationId }
+          : {}),
         // The safety layer refines this; the source only reports the verb.
         sideEffect: "unknown",
         requiresAuth,

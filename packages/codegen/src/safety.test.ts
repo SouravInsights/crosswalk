@@ -20,6 +20,30 @@ function candidate(overrides: Partial<CandidateTool>): CandidateTool {
 }
 
 describe("reviewTools classification", () => {
+  it("classifies schema-declared tools (no verb) from the name", () => {
+    const { tools } = reviewTools([
+      // Reading words are reads, born enabled.
+      candidate({ name: "search-places", httpMethod: undefined, source: { kind: "schema", ref: "search-places" } }),
+      // An unknown action defaults to write: never silently treated as safe.
+      candidate({ name: "create-trip", httpMethod: undefined, source: { kind: "schema", ref: "create-trip" } }),
+      candidate({ name: "delete-account", httpMethod: undefined, source: { kind: "schema", ref: "delete-account" } }),
+    ]);
+    expect(tools.map((tool) => tool.sideEffect)).toEqual(["read", "write", "destructive"]);
+    expect(tools.map((tool) => tool.enabledByDefault)).toEqual([true, false, false]);
+  });
+
+  it("reads the endpoint ref for merged tools, not the schema ref", () => {
+    const { tools } = reviewTools([
+      candidate({
+        name: "create-trip",
+        httpMethod: "POST",
+        source: { kind: "schema", ref: "create-trip" },
+        endpointRef: "POST /v1/admin/trips",
+      }),
+    ]);
+    expect(tools[0]?.endpointRole).toBe("admin");
+  });
+
   it("classifies by HTTP verb", () => {
     const { tools } = reviewTools([
       candidate({ name: "get-a", httpMethod: "GET" }),
@@ -170,7 +194,14 @@ describe("findPiiFields", () => {
 });
 
 describe("auditTools", () => {
-  const { tools: cleanTools } = reviewTools([candidate({ name: "get-x" })]);
+  // A well-formed read tool has a description and an output schema; anything
+  // less earns a warning now.
+  const { tools: cleanTools } = reviewTools([
+    candidate({
+      name: "get-x",
+      outputSchema: { type: "object", properties: { ok: { type: "boolean" } } },
+    }),
+  ]);
   const clean = cleanTools[0];
 
   it("passes a well-formed read tool quietly", () => {
@@ -179,7 +210,12 @@ describe("auditTools", () => {
 
   it("warns when the description is a bare template", () => {
     const { tools } = reviewTools([
-      candidate({ name: "get-y", description: "GET /y", descriptionSource: "generated-template" }),
+      candidate({
+        name: "get-y",
+        description: "GET /y",
+        descriptionSource: "generated-template",
+        outputSchema: { type: "object", properties: {} },
+      }),
     ]);
     const findings = auditTools(tools);
     expect(findings).toHaveLength(1);
@@ -219,5 +255,78 @@ describe("auditTools", () => {
     const messages = auditTools(tools).map((finding) => finding.message);
     expect(messages.some((message) => message.includes("email"))).toBe(true);
     expect(messages.some((message) => message.includes("authenticated"))).toBe(true);
+  });
+
+  it("warns when a read tool has no output schema", () => {
+    const { tools } = reviewTools([candidate({ name: "list-trips" })]);
+    const messages = auditTools(tools).map((finding) => finding.message);
+    expect(messages.some((message) => message.includes("No output schema"))).toBe(true);
+  });
+
+  it("warns when every input field was machine-drafted", () => {
+    const { tools } = reviewTools([
+      candidate({
+        name: "get-x",
+        outputSchema: { type: "object", properties: {} },
+        inputSchema: {
+          type: "object",
+          properties: { guests: { type: "number" } },
+          required: [],
+        },
+      }),
+    ]);
+    tools[0]!.synthesizedFields = ["guests"];
+    const messages = auditTools(tools).map((finding) => finding.message);
+    expect(messages.some((message) => message.includes("No input field has a description"))).toBe(
+      true,
+    );
+  });
+
+  it("warns when a field points at a producer tool that is not in the run", () => {
+    const { tools } = reviewTools([
+      candidate({
+        name: "create-trip",
+        httpMethod: "POST",
+        inputSchema: {
+          type: "object",
+          properties: {
+            locationObject: {
+              type: "object",
+              description: "Resolved place object. Always get this from the search-places tool.",
+            },
+          },
+          required: [],
+        },
+      }),
+    ]);
+    const messages = auditTools(tools).map((finding) => finding.message);
+    expect(
+      messages.some(
+        (message) =>
+          message.includes('"locationObject"') && message.includes('"search-places"'),
+      ),
+    ).toBe(true);
+  });
+
+  it("stays quiet when the producer tool is declared", () => {
+    const { tools } = reviewTools([
+      candidate({
+        name: "create-trip",
+        httpMethod: "POST",
+        inputSchema: {
+          type: "object",
+          properties: {
+            locationObject: {
+              type: "object",
+              description: "Resolved place object. Always get this from the search-places tool.",
+            },
+          },
+          required: [],
+        },
+      }),
+      candidate({ name: "search-places" }),
+    ]);
+    const messages = auditTools(tools).map((finding) => finding.message);
+    expect(messages.some((message) => message.includes('"locationObject"'))).toBe(false);
   });
 });

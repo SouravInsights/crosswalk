@@ -157,4 +157,144 @@ describe("runGenerate", () => {
     expect(tool?.description).toBe("Place a new order for the current cart.");
     expect(tool?.enabledByDefault).toBe(true);
   });
+
+  it("merges a schema entry with the operation it names, into one tool", async () => {
+    const result = await runGenerate(
+      configWith([
+        manualSource([
+          {
+            name: "create-trip",
+            httpMethod: "POST",
+            source: { kind: "openapi", ref: "POST /v1/trips" },
+            operationId: "createTrip",
+            pathTemplate: "/v1/trips",
+          },
+          {
+            id: "schema:create-trip",
+            name: "create-trip",
+            source: { kind: "schema", ref: "create-trip" },
+            operationId: "createTrip",
+            httpMethod: undefined,
+            description: "Create a trip and open it in the editor.",
+            descriptionSource: "declared",
+          },
+        ]),
+      ]),
+      { cwd, dryRun: true },
+    );
+    expect(result.tools).toHaveLength(1);
+    expect(result.tools[0]?.description).toBe("Create a trip and open it in the editor.");
+    expect(result.tools[0]?.endpointRef).toBe("POST /v1/trips");
+    expect(result.tools[0]?.sideEffect).toBe("write");
+  });
+
+  it("blocks when a schema entry names an operation the spec does not have", async () => {
+    const result = await runGenerate(
+      configWith([
+        manualSource([
+          {
+            id: "schema:create-trip",
+            name: "create-trip",
+            source: { kind: "schema", ref: "create-trip" },
+            operationId: "createTrip",
+            httpMethod: undefined,
+          },
+        ]),
+      ]),
+      { cwd },
+    );
+    expect(result.blocked).toBe(true);
+    expect(result.wrote).toBe(false);
+    expect(
+      result.findings.some(
+        (finding) => finding.level === "error" && finding.message.includes('"createTrip"'),
+      ),
+    ).toBe(true);
+  });
+
+  it("applies field overrides last, and flags overrides that match no field", async () => {
+    const result = await runGenerate(
+      configWith([
+        manualSource([
+          {
+            name: "create-trip",
+            httpMethod: "POST",
+            inputSchema: {
+              type: "object",
+              properties: { title: { type: "string", maxLength: 40 } },
+              required: ["title"],
+            },
+          },
+        ]),
+      ]),
+      {
+        cwd,
+        dryRun: true,
+        overrides: {
+          "create-trip": {
+            fields: { title: "The trip's name.", locaton: "a typo" },
+          },
+        },
+      },
+    );
+    const tool = result.tools[0];
+    // The override is the final word: no synthesized constraint text appended.
+    expect(tool?.inputSchema.properties?.title?.description).toBe("The trip's name.");
+    expect(
+      result.findings.some(
+        (finding) => finding.level === "warning" && finding.message.includes('"locaton"'),
+      ),
+    ).toBe(true);
+  });
+
+  it("synthesizes field text from constraints, and marks it", async () => {
+    const result = await runGenerate(
+      configWith([
+        manualSource([
+          {
+            name: "log-time",
+            httpMethod: "POST",
+            inputSchema: {
+              type: "object",
+              properties: { minutes: { type: "number", minimum: 30, maximum: 600 } },
+              required: ["minutes"],
+            },
+          },
+        ]),
+      ]),
+      { cwd, dryRun: true },
+    );
+    const tool = result.tools[0];
+    expect(tool?.inputSchema.properties?.minutes?.description).toBe(
+      "Minutes. A number from 30 to 600.",
+    );
+    expect(tool?.synthesizedFields).toEqual(["minutes"]);
+    // And the audit says so, rather than letting machine text pass silently.
+    expect(
+      result.findings.some((finding) =>
+        finding.message.includes("No input field has a description"),
+      ),
+    ).toBe(true);
+  });
+
+  it("warns when a form pointer has no form output configured, and still writes the tool", async () => {
+    const result = await runGenerate(
+      configWith([
+        manualSource([
+          {
+            name: "contact",
+            httpMethod: "POST",
+            form: { path: "./src/components/ContactForm.tsx" },
+          },
+        ]),
+      ]),
+      { cwd },
+    );
+    expect(result.wrote).toBe(true);
+    expect(
+      result.findings.some(
+        (finding) => finding.level === "warning" && finding.message.includes("form"),
+      ),
+    ).toBe(true);
+  });
 });
