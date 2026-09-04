@@ -386,7 +386,7 @@ async function generate(flags: CliFlags): Promise<number> {
   // Verbose gets every step; the default gets just the source count so you
   // know what the CLI consumed.
   const progress = flags.verbose
-    ? (msg: string) => console.log(dim(`  → ${msg}`))
+    ? (msg: string) => debug(msg)
     : undefined;
 
   const result = await runGenerate(setup.config, {
@@ -398,7 +398,7 @@ async function generate(flags: CliFlags): Promise<number> {
   });
 
   if (!flags.verbose && result.tools.length > 0) {
-    console.log(dim(`  → Read ${result.tools.length + result.skipped.length} operations`));
+    info(`  → Read ${result.tools.length + result.skipped.length} operations`);
   }
 
   // Audit errors block the write. Instead of requiring --force on a re-run,
@@ -409,7 +409,7 @@ async function generate(flags: CliFlags): Promise<number> {
       initialValue: false,
     });
     if (clack.isCancel(proceed) || !proceed) {
-      console.log(dim("\n  Fix the errors and run generate again, or use --force to skip this check.\n"));
+      info("\n  Fix the errors and run generate again, or use --force to skip this check.\n");
       return 1;
     }
     // Re-run with force to actually write.
@@ -445,7 +445,7 @@ async function generate(flags: CliFlags): Promise<number> {
 
   if (flags.watch && !flags.dryRun) {
     // TODO: implement watch mode
-    console.log(dim("\n  --watch is not implemented yet. Run generate again after changes.\n"));
+    warn("--watch is not implemented yet. Run generate again after changes.\n");
   }
 
   return result.blocked ? 1 : 0;
@@ -453,16 +453,16 @@ async function generate(flags: CliFlags): Promise<number> {
 
 main().then(
   (code) => process.exit(code),
-  (error) => {
-    const message = error instanceof Error ? error.message : String(error);
+  (err) => {
+    const message = err instanceof Error ? err.message : String(err);
     // Multi-line messages are composed, actionable guidance written for the
     // person running the command; print them as-is. Single-line failures are
     // genuinely unexpected, so those get the report link.
     if (message.includes("\n")) {
-      console.error(`\n✖ ${message}\n`);
+      error(`\n${message}\n`);
     } else {
-      console.error("\n✖ Unexpected error:", message);
-      console.error("\nPlease report this: https://github.com/SouravInsights/webmcp-stack/issues\n");
+      error(`Unexpected error: ${message}`);
+      error("\nPlease report this: https://github.com/SouravInsights/webmcp-stack/issues\n");
     }
     process.exit(1);
   },
