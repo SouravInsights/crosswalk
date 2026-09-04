@@ -102,7 +102,7 @@ export default function HomePage() {
               Turn your API into tools AI agents can call.
             </h1>
             <p className="mx-auto mb-10 max-w-xl text-[16px] leading-relaxed text-dim sm:text-[17px]">
-              One command reads your OpenAPI spec and writes a WebMCP tool for every endpoint:
+              One command reads your OpenAPI spec or validation schemas and writes WebMCP tools:
               typed, checked for safety, and committed to your repo as code you own. It comes with a
               local playground to review and test them.
             </p>
