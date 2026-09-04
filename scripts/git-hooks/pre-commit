@@ -15,7 +15,20 @@ if [ -z "$staged" ]; then
   exit 0
 fi
 
-echo "$staged" | tr '\n' '\0' | xargs -0 pnpm exec biome check --write
+# Hooks inherit the committer's environment; GUI git clients and stripped
+# shells may not have pnpm on PATH. Fall back to the repo's own biome binary.
+if command -v pnpm >/dev/null 2>&1; then
+  biome="pnpm exec biome"
+elif [ -x ./node_modules/.bin/biome ]; then
+  biome="./node_modules/.bin/biome"
+else
+  echo "pre-commit: neither pnpm nor node_modules/.bin/biome found; run pnpm install first."
+  exit 1
+fi
+
+# --no-errors-on-unmatched: a commit that stages only biome-ignored files
+# (docs markdown, etc.) is a pass, not a failure.
+echo "$staged" | tr '\n' '\0' | xargs -0 $biome check --write --no-errors-on-unmatched
 status=$?
 
 # Re-stage whatever biome fixed, so the commit contains the fixed version.

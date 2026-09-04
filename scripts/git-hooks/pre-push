@@ -4,4 +4,20 @@
 # nothing reaches a pull request that CI would reject.
 
 set -e
+
+# Hooks inherit the committer's environment; GUI git clients and stripped
+# shells may not have pnpm on PATH. Probe the usual homes before failing.
+if ! command -v pnpm >/dev/null 2>&1; then
+  for dir in "$HOME"/.nvm/versions/node/*/bin "$HOME/.local/bin" /opt/homebrew/bin /usr/local/bin; do
+    if [ -x "$dir/pnpm" ]; then
+      PATH="$dir:$PATH"
+      break
+    fi
+  done
+fi
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "pre-push: pnpm not found on PATH; cannot run the lint + typecheck + test gate."
+  exit 1
+fi
+
 pnpm lint && pnpm typecheck && pnpm test

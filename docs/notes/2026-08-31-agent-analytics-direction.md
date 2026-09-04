@@ -1,6 +1,6 @@
 # Direction: agent analytics, merged with audit
 
-**Date:** 2026-08-31. Seed: user's rough idea (visits, tool calls, success rate, latency), the open-core sketch in `docs/specs/codegen-design.md` (telemetry client, self-hostable dashboard), and the standalone-audit idea from the repo review. Post-hackathon project. Money is secondary; ship something genuinely useful, open-core like PostHog.
+**Date:** 2026-08-31. Seed: user's rough idea (visits, tool calls, success rate, latency), the open-core sketch in `docs/specs/codegen-design.md` (telemetry client, self-hostable dashboard), and the standalone-audit idea from the repo review. A later product, after codegen is established. Money is secondary; ship something genuinely useful, open-core like PostHog.
 
 ## One line
 
@@ -46,7 +46,7 @@ Codegen already knows every tool's schema, risk tier, and description. So: instr
 
 ## Timing
 
-Build order after the hackathon: (1) the client + local-first dashboard, cheap and composable with codegen; (2) the standalone audit page as the funnel; (3) the hosted cloud only once real origin-trial traffic exists. Do not build cloud infrastructure before ten sites ask for it.
+Build order: (1) the client + local-first dashboard, cheap and composable with codegen; (2) the standalone audit page as the funnel; (3) the hosted cloud only once real origin-trial traffic exists. Do not build cloud infrastructure before ten sites ask for it.
 
 ## Later, same monorepo
 
