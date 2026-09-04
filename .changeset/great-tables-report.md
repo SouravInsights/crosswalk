@@ -1,5 +1,6 @@
 ---
 "@webmcp-stack/codegen": minor
+---
 
 **Breaking:** In `codegen.config.mjs`, `generate:` is now `outputs:`, `js()` is now `tools()`, and imports come from `@webmcp-stack/codegen/outputs` (not `/generators`). An old config fails with the exact fix printed.
 
