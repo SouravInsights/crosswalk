@@ -1,0 +1,28 @@
+#!/bin/sh
+# Pre-commit: lint and format exactly what is staged, never the whole tree.
+#
+# This hook exists because "remember to run pnpm lint" failed in practice:
+# a whole branch once reached CI unlinted. Git runs this file, so neither a
+# tired human nor an agent can skip it. Auto-fixable problems (formatting,
+# import order) are fixed and re-staged; anything else blocks the commit
+# with the diagnostics printed.
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR -z |
+  tr '\0' '\n' |
+  grep -E '\.(ts|tsx|js|jsx|mjs|cjs|json|jsonc|css|md|mdx)$' || true)
+
+if [ -z "$staged" ]; then
+  exit 0
+fi
+
+echo "$staged" | tr '\n' '\0' | xargs -0 pnpm exec biome check --write
+status=$?
+
+# Re-stage whatever biome fixed, so the commit contains the fixed version.
+echo "$staged" | tr '\n' '\0' | xargs -0 git add
+
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "biome found issues it could not auto-fix. Fix them, stage, and commit again."
+  exit 1
+fi

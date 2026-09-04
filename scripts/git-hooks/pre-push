@@ -1,0 +1,7 @@
+#!/bin/sh
+# Pre-push: the full local gate — the same three commands CI runs.
+# Turbo's cache keeps this to seconds on a warm repo; the point is that
+# nothing reaches a pull request that CI would reject.
+
+set -e
+pnpm lint && pnpm typecheck && pnpm test
