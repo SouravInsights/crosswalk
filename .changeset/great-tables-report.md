@@ -2,15 +2,37 @@
 "@webmcp-stack/codegen": minor
 ---
 
-**Breaking:** in `codegen.config.mjs`, `generate:` is now `outputs:`, `js()` is now `tools()`, and the import subpath is now `@webmcp-stack/codegen/outputs`. An old config fails with the exact fix printed. Generated files and `.webmcp-codegen.json` carry over unchanged.
+**Breaking:** In `codegen.config.mjs`, `generate:` is now `outputs:`, `js()` is now `tools()`, and imports come from `@webmcp-stack/codegen/outputs` (not `/generators`). An old config fails with the exact fix printed.
 
-New:
+**What's new:**
 
-- Declare tools straight from your zod schemas, no OpenAPI spec required: `schema({ tools: [{ name: "create-trip", schema: CreateTripInput }] })`.
-- Add `operation: "createTrip"` to fuse a schema entry with its OpenAPI operation: your schema owns the input contract and descriptions, the spec owns the endpoint mechanics, one tool comes out.
-- Field text is now assembled, not passed through: your `.describe()` stays verbatim, constraints render as prose ("A number from 30 to 600."), undocumented fields get a draft the audit flags as machine-written.
-- New `form` output: annotate a literal `<form>` with WebMCP's declarative attributes instead of generating a file. The agent fills the visible form; a human submits writes.
-- New audit rules: a merge target that doesn't exist is an error; a field pointing at an undeclared producer tool warns; a read with no output schema warns; a tool whose fields are all machine-drafted warns.
-- Opt-in LLM layer (`llm` in config): drafts and suggestions printed as `◦` proposal lines. Never applied to files, never blocks a run, off without a key.
-- `generate --suggest ./src/schemas.ts` proposes which exported schemas are worth declaring. Nothing is auto-declared.
-- `init` detects zod/valibot/arktype, and scaffolds the schema source when no OpenAPI spec exists.
+- **No OpenAPI spec? Use your validation schemas.** If your app validates with zod, valibot, arktype, or TypeBox, you can declare agent-facing actions directly from those schemas:
+
+  ```js
+  import { schema } from "@webmcp-stack/codegen/sources";
+  import { CreateTripInput } from "./src/schemas";
+
+  export default defineConfig({
+    sources: [
+      schema({ tools: [{ name: "create-trip", schema: CreateTripInput }] })
+    ],
+  });
+  ```
+
+- **Have both a spec and schemas? Merge them.** Add `operation: "createTrip"` to a schema entry and it fuses with the OpenAPI operation: your schema's descriptions and constraints, the endpoint's URL and method. One tool, best of both.
+
+- **Field descriptions are now useful.** Your `.describe()` text stays as-is. Constraints like `min(30)` become "A number from 30 to 600." Fields with no description get a draft the audit flags, so you know what to fix.
+
+- **Working with a real `<form>`?** The new `form` output annotates it with WebMCP's attributes instead of generating a file. The agent fills the form; a human clicks submit on writes.
+
+- **The audit catches more.** A merge target that doesn't exist is an error. A field pointing at an undeclared tool warns. A read with no output schema warns. A tool with all machine-drafted fields warns.
+
+- **Optional LLM help.** Add `llm: { apiKey: "..." }` to your config and the CLI can draft descriptions and suggest tool relationships. It prints proposals (marked `◦`), never writes them, and works without a key (just skipped).
+
+- **`generate --suggest ./src/schemas.ts`** asks the LLM which schemas in that file are worth declaring as tools. It proposes; you decide.
+
+- **The CLI explains itself.** Verbose mode shows each step ("Reading sources", "Found 73 candidates", "Disabled 2 auth endpoints"). Tables replace walls of text. Colors auto-disable in CI logs.
+
+- **`init` detects your setup.** Finds zod/valibot/arktype/TypeBox in `package.json` and scaffolds accordingly. No OpenAPI spec? It starts you with schemas instead of a placeholder.
+
+Your generated files and `.webmcp-codegen.json` keep working unchanged.
