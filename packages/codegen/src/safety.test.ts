@@ -330,3 +330,38 @@ describe("auditTools", () => {
     expect(messages.some((message) => message.includes('"locationObject"'))).toBe(false);
   });
 });
+
+describe("set-level audit", () => {
+  function fakeTool(name: string): Parameters<typeof auditTools>[0][number] {
+    return {
+      id: name,
+      name,
+      description: `Does ${name}.`,
+      descriptionSource: "declared" as const,
+      requiresAuth: false,
+      inputSchema: { type: "object", properties: {} },
+      inputTypeName: "Input",
+      sideEffect: "read",
+      riskTier: "safe-read",
+      enabledByDefault: true,
+      endpointRole: "endpoint" as const,
+      piiInOutput: [],
+      source: { kind: "openapi", ref: `GET /${name}` },
+      hints: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+      synthesizedFields: [],
+    };
+  }
+
+  it("warns once when a run exceeds the tool-count soft limit", () => {
+    const tools = Array.from({ length: 41 }, (_, i) => fakeTool(`tool-${i}`));
+    const findings = auditTools(tools);
+    const count = findings.filter((f) => f.message.includes("tools in one surface"));
+    expect(count).toHaveLength(1);
+    expect(count[0]?.message).toContain("41 tools");
+  });
+
+  it("stays quiet at or under the limit", () => {
+    const tools = Array.from({ length: 40 }, (_, i) => fakeTool(`tool-${i}`));
+    expect(auditTools(tools).filter((f) => f.message.includes("tools in one surface"))).toEqual([]);
+  });
+});

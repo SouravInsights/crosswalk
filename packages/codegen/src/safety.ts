@@ -74,6 +74,10 @@ const AUTH_PATTERN =
 /** Admin endpoints. Exposing them to agents is a deliberate decision. */
 const ADMIN_PATTERN = /\badmin\b/i;
 
+/** Past this many tools the surface is a catalog, not a toolkit (the audit
+ *  warns once per run). Roughly double what an agent holds comfortably. */
+const TOOL_COUNT_SOFT_LIMIT = 40;
+
 /**
  * Field names that usually hold personal data or secrets. Matched against
  * the last segment of a field path, case-insensitively. Teams extend this
@@ -400,6 +404,21 @@ export function auditTools(
     }
 
     findings.push(...findMissingProducerTools(tool, tools));
+  }
+
+  // Set-level: every tool competes for the agent's context window, and past
+  // a point the surface is a catalog, not a toolkit. This fires once per run,
+  // not per tool; the fix is fewer tools, and the person running it knows which.
+  const enabledCount = tools.filter((tool) => tool.enabledByDefault).length;
+  if (tools.length > TOOL_COUNT_SOFT_LIMIT) {
+    findings.push({
+      level: "warning",
+      message:
+        `${tools.length} tools in one surface (${enabledCount} enabled). Agents hold a handful ` +
+        "well; a catalog this size degrades tool selection. Narrow with `safety.exclude`, " +
+        "split per page, or declare the goal-shaped actions with the schema source instead of " +
+        "exposing every operation.",
+    });
   }
 
   return findings;

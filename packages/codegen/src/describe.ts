@@ -168,6 +168,17 @@ function humanizeFieldName(name: string): string {
 }
 
 /**
+ * A spec author writing "X." or "The id." has not described the field; they
+ * have closed their editor. Stub text is treated as absent: the field gets a
+ * synthesized draft and the audit warns, rather than the stub passing as
+ * author intent and shipping to the agent.
+ */
+function isStubDescription(text: string): boolean {
+  const words = text.replace(/[.\s]+/g, " ").trim().split(" ").filter(Boolean);
+  return words.length <= 3;
+}
+
+/**
  * Assemble one field's description. Returns the text plus whether the text is
  * machine-drafted (no author text existed at all), which the audit reports on.
  */
@@ -175,7 +186,8 @@ export function describeField(
   name: string,
   schema: JsonSchema,
 ): { description: string; synthesized: boolean } {
-  const authorText = typeof schema.description === "string" ? schema.description.trim() : "";
+  const raw = typeof schema.description === "string" ? schema.description.trim() : "";
+  const authorText = raw && !isStubDescription(raw) ? raw : "";
   const constraints = describeConstraints(schema);
 
   if (authorText) {
@@ -186,7 +198,18 @@ export function describeField(
     };
   }
 
-  const draft = `${humanizeFieldName(name)}.${constraints ? ` ${constraints}` : ""}`;
+  // The humanized name is sometimes itself a description ("Trip id" for
+  // tripId); a stub then *is* the draft, and the constraint text is what adds
+  // anything new. Only when the name adds nothing (the stub was just the
+  // letter, like "x") does the format get promoted into the draft.
+  const nameText = humanizeFieldName(name);
+  const stubIsTheName = raw && raw.replace(/[.\s]+/g, "").toLowerCase() === name.toLowerCase();
+  const format = FORMAT_SENTENCES[schema.format ?? ""];
+  const draft = stubIsTheName
+    ? `${nameText}.${constraints ? ` ${constraints}` : ""}`
+    : format && !constraints
+      ? `${nameText} (${format.replace(/^An?\s+/i, "").replace(/\.$/, "")}).`
+      : `${nameText}.${constraints ? ` ${constraints}` : ""}`;
   return { description: draft, synthesized: true };
 }
 

@@ -128,3 +128,26 @@ describe("describeCandidateInputs", () => {
     expect(candidate.synthesizedFields).toEqual([]);
   });
 });
+
+describe("stub descriptions and format-aware drafts", () => {
+  it("treats a stub description as absent, not author intent", () => {
+    const result = describeField("x", { type: "number", description: "X.", minimum: 0 });
+    expect(result.synthesized).toBe(true);
+    // The stub "X." restates the field name and adds nothing; the draft is
+    // the name plus the constraint text, marked as machine-written.
+    expect(result.description).toBe("X. A number, at least 0.");
+    expect(result.description).not.toBe("X.");
+  });
+
+  it("keeps real author text", () => {
+    const result = describeField("title", { type: "string", description: "Name of the trip." });
+    expect(result.synthesized).toBe(false);
+    expect(result.description).toBe("Name of the trip.");
+  });
+
+  it("drafts carry the format when the name already says the noun", () => {
+    const result = describeField("tripId", { type: "string", format: "uuid" });
+    expect(result.description).toBe("Trip id. A UUID.");
+    expect(result.synthesized).toBe(true);
+  });
+});

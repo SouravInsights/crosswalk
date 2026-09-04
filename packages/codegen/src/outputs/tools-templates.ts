@@ -138,20 +138,31 @@ export function generatedRegion(tool: ReviewedTool): string {
 export function ownedRegionScaffold(tool: ReviewedTool): string {
   const pascal = pascalCase(tool.name);
   const call = requestCall(tool);
-  // For a merged tool, source.ref is the schema's own reference; the route
-  // the scaffold calls lives on endpointRef.
+  // An endpoint-backed tool scaffolds a call to its route. A standalone schema
+  // tool has no route: the honest scaffold says "wire this to your app's own
+  // action" and names nothing we made up.
+  const endpointBacked = Boolean(tool.endpointRef) || tool.source.kind === "openapi";
   const calledWhat = tool.endpointRef ?? tool.source.ref;
   const lines: string[] = [
     ``,
     `/**`,
     ` * What actually happens when the agent calls "${tool.name}".`,
     ` *`,
-    ` * Default implementation: calls ${calledWhat} from this page, with the`,
-    ` * signed-in user's session. Replace it with your app's own API client`,
-    ` * whenever you like; the contract above never changes.`,
+    ...(endpointBacked
+      ? [
+          ` * Default implementation: calls ${calledWhat} from this page, with the`,
+          ` * signed-in user's session. Replace it with your app's own API client`,
+          ` * whenever you like; the contract above never changes.`,
+        ]
+      : [
+          ` * This tool was declared from a schema, not derived from an endpoint,`,
+          ` * so there is no default request to scaffold. Wire it to your app's own`,
+          ` * action (the function your UI already calls), with the signed-in`,
+          ` * user's session. The contract above never changes.`,
+        ]),
   ];
 
-  if (tool.serverUrl) {
+  if (endpointBacked && tool.serverUrl) {
     lines.push(` *`, ` * Calls the API at ${tool.serverUrl} (from your spec's servers list).`);
   }
 
