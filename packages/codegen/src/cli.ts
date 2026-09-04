@@ -27,6 +27,7 @@ import { dim, renderSummary, renderVerbose } from "./cli-output.js";
 import { CONFIG_FILE_NAMES, loadConfig } from "./config.js";
 import { saveDataFile } from "./data-file.js";
 import { findSpecs } from "./detect.js";
+import { findSchemaLibraries } from "./detect-app.js";
 import { startDevServer } from "./dev/server.js";
 import { resolveLlmProvider, runLlmLayer } from "./llm.js";
 import { runGenerate } from "./pipeline.js";
@@ -148,31 +149,92 @@ async function init(): Promise<number> {
   }
 
   const specs = await findSpecs(cwd);
-  const specPath = specs.length > 0 ? `./${specs[0]}` : "./openapi.yaml";
+  const schemaLibs = await findSchemaLibraries(cwd);
+  const spec = specs.length > 0 ? `./${specs[0]}` : undefined;
 
-  await writeFile(
-    configPath,
-    `import { defineConfig } from "@webmcp-stack/codegen";
-import { openapi } from "@webmcp-stack/codegen/sources";
-import { tools } from "@webmcp-stack/codegen/outputs";
+  await writeFile(configPath, initTemplate(spec, schemaLibs));
 
-export default defineConfig({
-  sources: [openapi({ spec: "${specPath}" })],
-  outputs: [tools({ outDir: "./src/webmcp" })],
-  safety: {
+  console.log(`\n✔ Wrote ${configFile}\n`);
+  if (!spec) {
+    // The schema path is the answer to "no OpenAPI spec": yesterday this run
+    // had nothing to say, today it scaffolds the contract the app does have.
+    console.log(
+      "No OpenAPI spec found, so this config starts from your validation schemas instead.",
+    );
+    console.log("Add a spec later with: sources: [openapi({ spec: \"./openapi.yaml\" }), ...]");
+  }
+  if (schemaLibs.length > 0) {
+    console.log(`Detected ${schemaLibs.join(", ")}. Declare agent-facing actions from your`);
+    console.log("schemas; see the commented block in the config.");
+  }
+  console.log("\nEdit it to add sources, change the output directory, or set safety options.");
+  console.log("Docs: https://webmcp-stack.vercel.app/docs/configuration\n");
+  return 0;
+}
+
+/**
+ * The init config. With a spec: OpenAPI-first, as always. Without one: the
+ * schema path, so a specless app is no longer a dead end. Either way the
+ * schema source appears as a commented block when the project already has a
+ * validation library: a suggestion for a library nobody installed is noise.
+ */
+function initTemplate(spec: string | undefined, schemaLibs: string[]): string {
+  const safetyBlock = `  safety: {
     // Extra field names to treat as PII, on top of the built-in list:
     // piiFields: ["internalId"],
     // Tools to skip entirely (matched against name and route):
     // exclude: ["internal"],
-  },
-});
-`,
-  );
+  },`;
 
-  console.log(`\n✔ Wrote ${configFile}\n`);
-  console.log("Edit it to add sources, change the output directory, or set safety options.");
-  console.log("Docs: https://webmcp-stack.vercel.app/docs/configuration\n");
-  return 0;
+  if (!spec) {
+    return `import { defineConfig } from "@webmcp-stack/codegen";
+import { schema } from "@webmcp-stack/codegen/sources";
+import { tools } from "@webmcp-stack/codegen/outputs";
+
+// Import the schemas your app validates with, e.g.:
+// import { CreateTripInput } from "./src/schemas";
+
+export default defineConfig({
+  sources: [
+    schema({
+      tools: [
+        // One entry per agent-facing action:
+        // { name: "create-trip", schema: CreateTripInput },
+      ],
+    }),
+  ],
+  outputs: [tools({ outDir: "./src/webmcp" })],
+${safetyBlock}
+});
+`;
+  }
+
+  const schemaHint =
+    schemaLibs.length > 0
+      ? `
+// This project uses ${schemaLibs.join(", ")}. You can also declare agent-facing actions
+// straight from your validation schemas:
+//
+//   import { schema } from "@webmcp-stack/codegen/sources";
+//   import { CreateTripInput } from "./src/schemas";
+//
+//   sources: [
+//     openapi({ spec: "${spec}" }),
+//     schema({ tools: [{ name: "create-trip", schema: CreateTripInput, operation: "createTrip" }] }),
+//   ],
+`
+      : "";
+
+  return `import { defineConfig } from "@webmcp-stack/codegen";
+import { openapi } from "@webmcp-stack/codegen/sources";
+import { tools } from "@webmcp-stack/codegen/outputs";
+
+export default defineConfig({
+  sources: [openapi({ spec: "${spec}" })],
+  outputs: [tools({ outDir: "./src/webmcp" })],
+${safetyBlock}
+});
+${schemaHint}`;
 }
 
 async function dev(port: number): Promise<number> {
@@ -319,8 +381,16 @@ async function generate(flags: CliFlags): Promise<number> {  const cwd = process
 main().then(
   (code) => process.exit(code),
   (error) => {
-    console.error("\n✖ Unexpected error:", error instanceof Error ? error.message : error);
-    console.error("\nPlease report this: https://github.com/SouravInsights/webmcp-stack/issues\n");
+    const message = error instanceof Error ? error.message : String(error);
+    // Multi-line messages are composed, actionable guidance written for the
+    // person running the command; print them as-is. Single-line failures are
+    // genuinely unexpected, so those get the report link.
+    if (message.includes("\n")) {
+      console.error(`\n✖ ${message}\n`);
+    } else {
+      console.error("\n✖ Unexpected error:", message);
+      console.error("\nPlease report this: https://github.com/SouravInsights/webmcp-stack/issues\n");
+    }
     process.exit(1);
   },
 );

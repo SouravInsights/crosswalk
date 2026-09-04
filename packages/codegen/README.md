@@ -41,6 +41,35 @@ npx @webmcp-stack/codegen generate --dry-run
 
 Then start your app, open it in Chrome with `#enable-webmcp-testing`, and ask the agent to use one of your tools.
 
+## No OpenAPI spec? Use your schemas
+
+Most React/Next.js apps don't have one. If your app validates with schemas (zod, valibot, arktype), you can declare agent-facing actions straight from them, and a schema entry can also *refine* an OpenAPI operation (your contract and words, the endpoint's mechanics):
+
+```js
+// codegen.config.mjs
+import { defineConfig } from "@webmcp-stack/codegen";
+import { openapi, schema } from "@webmcp-stack/codegen/sources";
+import { tools } from "@webmcp-stack/codegen/outputs";
+import { CreateTripInput } from "./src/schemas";
+
+export default defineConfig({
+  sources: [
+    openapi({ spec: "./openapi.yaml" }),
+    schema({
+      tools: [
+        // operation fuses this with the spec's createTrip endpoint into one tool
+        { name: "create-trip", schema: CreateTripInput, operation: "createTrip" },
+      ],
+    }),
+  ],
+  outputs: [tools({ outDir: "./src/webmcp" })],
+});
+```
+
+Every field gets text an agent can act on: your `.describe()` words stay verbatim, constraints are rendered as plain language ("A number from 30 to 600."), and anything still silent gets a marked draft the audit reports on.
+
+Working with a literal `<form>` instead? The `form` output annotates it in place with WebMCP's declarative attributes (`{ name: "add-to-timesheet", schema: Entry, form: "./src/TimesheetForm.tsx" }` plus `form` in `outputs`), so the agent fills the visible form and a human keeps the final click on writes.
+
 ## Safety is part of generation
 
 This is not a dumb API → WebMCP converter. Giving agents access to application actions is a new security surface, so the generator analyzes what every endpoint actually is: read-only, write, destructive, auth-boundary, or sensitive/PII-related. Every tool gets a safety classification and WebMCP hints, the audit pass runs inside `generate` (errors block, exit codes for CI), and higher-risk tools are generated disabled so you explicitly decide what agents can touch. The goal is that you stay in control of the agent-facing surface instead of blindly exposing every endpoint.
@@ -90,6 +119,7 @@ export async function executeDeletePet(input: DeletePetInput) {
 | `generate --dry-run` | Preview everything, write nothing |
 | `generate --watch` | Re-generate when source files change |
 | `generate --force` | Write files even when the audit reports errors |
+| `generate --suggest PATH` | Ask the LLM layer which schemas in PATH are worth declaring (proposals only) |
 | `generate --spec PATH` / `--out DIR` | Overrides without a config file |
 | `webmcp-codegen dev` | Open the tools dashboard (`--port N` to change the port) |
 | `webmcp-codegen init` | Write `codegen.config.mjs` for full control (needs the package installed) |
@@ -112,6 +142,8 @@ export default defineConfig({
     piiFields: ["internalId"],  // extend the built-in PII heuristics
     exclude: ["internal"],      // skip tools by name or route substring
   },
+  // llm: { apiKey: "..." },    // opt-in advisory layer: drafts and suggestions
+                                // rendered as proposals, never applied, never blocking
 });
 ```
 

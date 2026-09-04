@@ -18,7 +18,7 @@ import { basename } from "node:path";
 import { loadDataFile, saveDataFile } from "../data-file.js";
 import { runGenerate } from "../pipeline.js";
 import { resolveSetup } from "../setup.js";
-import type { GeneratedFile, JsonSchema, ReviewedTool } from "../types.js";
+import type { GeneratedFile, JsonSchema, ReviewedTool, ToolOverrides } from "../types.js";
 import { dashboardHtml } from "./ui.js";
 
 export interface DevServerOptions {
@@ -43,6 +43,10 @@ interface DashboardState {
     name: string;
     verb?: string;
     path?: string;
+    /** Where this tool came from: the route, the schema, or both ("merged"). */
+    provenance: string;
+    /** Present when the tool annotates a form instead of generating a file. */
+    form?: { path: string };
     description: string;
     sideEffect: string;
     riskTier: string;
@@ -50,6 +54,8 @@ interface DashboardState {
     endpointRole: string;
     piiInOutput: string[];
     inputSchema: JsonSchema;
+    /** Per-field text the developer overrode, so the editor shows their words. */
+    fieldOverrides?: Record<string, string>;
     /** Route info the direct "run it" test needs to build a real request. */
     pathTemplate?: string;
     paramLocations?: { path: string[]; query: string[]; body: string[] };
@@ -83,7 +89,7 @@ export async function startDevServer(options: DevServerOptions): Promise<Server>
     return {
       label: setup.label,
       outDir: setup.config.outputs[0]?.outDir,
-      tools: result.tools.map((tool) => toUiTool(tool, result.findings, result.files)),
+      tools: result.tools.map((tool) => toUiTool(tool, result.findings, result.files, data.overrides)),
       skipped: result.skipped,
       notes: result.notes,
     };
@@ -119,6 +125,7 @@ export async function startDevServer(options: DevServerOptions): Promise<Server>
         name?: string;
         description?: string;
         enabled?: boolean;
+        fields?: Record<string, string>;
       };
       if (!body.name) {
         sendJson(response, 400, { error: "Missing tool name." });
@@ -132,6 +139,11 @@ export async function startDevServer(options: DevServerOptions): Promise<Server>
         ...existing,
         ...(body.description !== undefined ? { description: body.description } : {}),
         ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
+        // Per-field text merges key by key, so editing one field never drops
+        // the developer's edits to another.
+        ...(body.fields !== undefined
+          ? { fields: { ...(existing.fields ?? {}), ...body.fields } }
+          : {}),
       };
       await saveDataFile(options.cwd, { overrides });
       sendJson(response, 200, { ok: true, saved: `.webmcp-codegen.json` });
@@ -166,8 +178,18 @@ function toUiTool(
   tool: ReviewedTool,
   findings: { level: string; tool?: string; message: string }[],
   files: GeneratedFile[],
+  overrides: ToolOverrides | undefined,
 ): DashboardState["tools"][number] {
-  const [verb, ...rest] = tool.source.ref.split(" ");
+  // Route info only exists for endpoint-backed tools. A standalone schema
+  // tool has no verb, and showing one would be a lie; the provenance line
+  // carries the truth instead ("schema: create-trip", "merged: … + POST …").
+  const route = tool.endpointRef ?? (tool.source.kind === "openapi" ? tool.source.ref : "");
+  const [verb, ...rest] = route ? route.split(" ") : [undefined, ""];
+  const provenance = tool.endpointRef
+    ? `merged: ${tool.source.ref} + ${tool.endpointRef}`
+    : tool.source.kind === "schema"
+      ? `schema: ${tool.source.ref}`
+      : tool.source.ref;
   // The dry run already holds every file's contents in memory, so the
   // dashboard can show the real generated source per tool — the same
   // progressive disclosure the site's demo has, against live output.
@@ -176,6 +198,8 @@ function toUiTool(
     name: tool.name,
     verb,
     path: rest.join(" "),
+    provenance,
+    ...(tool.form ? { form: tool.form } : {}),
     description: tool.description,
     sideEffect: tool.sideEffect,
     riskTier: tool.riskTier,
@@ -183,6 +207,7 @@ function toUiTool(
     endpointRole: tool.endpointRole,
     piiInOutput: tool.piiInOutput,
     inputSchema: tool.inputSchema,
+    ...(overrides?.[tool.name]?.fields ? { fieldOverrides: overrides[tool.name]?.fields } : {}),
     ...(tool.pathTemplate ? { pathTemplate: tool.pathTemplate } : {}),
     ...(tool.paramLocations ? { paramLocations: tool.paramLocations } : {}),
     ...(tool.serverUrl ? { serverUrl: tool.serverUrl } : {}),

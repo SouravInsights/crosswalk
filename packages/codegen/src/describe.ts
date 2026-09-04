@@ -108,7 +108,11 @@ function stringConstraintSentences(schema: JsonSchema): string[] {
 
   const format = FORMAT_SENTENCES[schema.format ?? ""];
   if (format) sentences.push(format);
-  if (typeof schema.pattern === "string") sentences.push(`Must match /${schema.pattern}/.`);
+  // A pattern next to a known format is the format's implementation (this is
+  // how zod emits z.string().email()); the regex is noise in prose.
+  if (typeof schema.pattern === "string" && !format) {
+    sentences.push(`Must match /${schema.pattern}/.`);
+  }
   return sentences;
 }
 
@@ -128,14 +132,17 @@ const FORMAT_SENTENCES: Record<string, string> = {
  * The constraint values a description would have to mention to count as
  * "already stated". Value-mention is deliberately crude: when in doubt we
  * append, because a duplicated constraint is harmless and a missing one is a
- * failed agent call.
+ * failed agent call. minLength: 1 is excluded, matching the sentence
+ * renderer: it spells "required string", and no author writes "1" to say it.
  */
 function statedValues(schema: JsonSchema): string[] {
   const values: string[] = [];
-  for (const key of ["minimum", "maximum", "minLength", "maxLength", "minItems", "maxItems"]) {
+  for (const key of ["minimum", "maximum", "maxLength", "minItems", "maxItems"] as const) {
     const value = schema[key];
     if (typeof value === "number") values.push(String(value));
   }
+  const minLength = schema.minLength;
+  if (typeof minLength === "number" && minLength > 1) values.push(String(minLength));
   for (const member of Array.isArray(schema.enum) ? schema.enum : []) {
     values.push(String(member));
   }

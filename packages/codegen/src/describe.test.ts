@@ -45,6 +45,13 @@ describe("describeConstraints", () => {
     expect(describeConstraints({ type: "string", format: "cuid2" })).toBe("");
   });
 
+  it("does not render a known format's own regex as prose", () => {
+    // zod emits z.string().email() as format + pattern; the pattern is the
+    // format's implementation, and a regex dump helps no agent.
+    const result = describeConstraints({ type: "string", format: "email", pattern: "^\\S+@\\S+$" });
+    expect(result).toBe("An email address.");
+  });
+
   it("renders array sizes", () => {
     expect(describeConstraints({ type: "array", minItems: 1, maxItems: 5 })).toBe(
       "A list of 1 to 5 items.",

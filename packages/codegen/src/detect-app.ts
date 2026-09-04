@@ -23,6 +23,31 @@ export interface WebApp {
   framework: "next" | "vite-react" | "nuxt" | "sveltekit" | "unknown";
 }
 
+/** The validation libraries the schema source can read. */
+const SCHEMA_LIBS = ["zod", "valibot", "arktype"] as const;
+
+/**
+ * Which schema libraries the project already uses, by reading every workspace
+ * package.json. `init` uses this to scaffold the schema source only when it
+ * is real for the project; a suggestion for a library nobody has installed
+ * would be noise.
+ */
+export async function findSchemaLibraries(cwd: string): Promise<string[]> {
+  const found = new Set<string>();
+  for (const dir of await findPackageDirs(cwd)) {
+    const pkg = await readPackageJson(join(cwd, dir));
+    if (!pkg) continue;
+    const deps = {
+      ...(pkg.dependencies as Record<string, string> | undefined),
+      ...(pkg.devDependencies as Record<string, string> | undefined),
+    };
+    for (const lib of SCHEMA_LIBS) {
+      if (deps[lib]) found.add(lib);
+    }
+  }
+  return [...found];
+}
+
 /** The frameworks we recognize, best-supported first. */
 const FRAMEWORKS: { dep: string; framework: WebApp["framework"] }[] = [
   { dep: "next", framework: "next" },

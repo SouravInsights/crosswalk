@@ -88,14 +88,19 @@ export function renderSummary(
   }
   console.log("");
 
-  // Blocking errors get one line each: they stop the write, so they are never
-  // allowed to hide inside a count.
+  // Blocking errors first, one line each, in red. They stop the write, and a
+  // red wall that says exactly what to fix beats a green ✓ that doesn't mean it.
   const errorFindings = findings.filter((f) => f.level === "error");
-  for (const f of errorFindings) {
-    const where = f.tool ? dim(` (${f.tool})`) : "";
-    console.log(`  ${c("red", "✖")} ${f.message}${where}`);
+  if (errorFindings.length > 0) {
+    console.log(
+      `  ${c("red", "✖")} ${bold(`${errorFindings.length} error${errorFindings.length === 1 ? "" : "s"}, nothing written`)}`,
+    );
+    for (const f of errorFindings) {
+      const where = f.tool ? dim(` (${f.tool})`) : "";
+      console.log(`  ${c("red", "✖")} ${f.message}${where}`);
+    }
+    console.log("");
   }
-  if (errorFindings.length > 0) console.log("");
 
   // Safety notes — human-readable
   const warnings = totalFindings - errorFindings.length;

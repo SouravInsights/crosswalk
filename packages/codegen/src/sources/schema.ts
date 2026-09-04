@@ -110,7 +110,7 @@ function candidateFromEntry(entry: SchemaToolEntry, anchorDir: string): Candidat
     id: `schema:${entry.name}`,
     name: entry.name,
     source: { kind: "schema", ref: entry.name },
-    inputSchema: stripSelfDescription(inputSchema),
+    inputSchema: stripSchemaNoise(inputSchema),
     outputSchema: entry.output
       ? toJsonSchema(entry.output, entry.name, "output", anchorDir)
       : undefined,
@@ -128,9 +128,10 @@ function candidateFromEntry(entry: SchemaToolEntry, anchorDir: string): Candidat
 }
 
 /** The object's own .describe() became the tool description; repeating it on
- *  the input schema would make the agent read the same sentence twice. */
-function stripSelfDescription(schema: JsonSchema): JsonSchema {
-  const { description: _self, ...rest } = schema;
+ *  the input schema would make the agent read the same sentence twice. The
+ *  `$schema` keyword zod adds is spec-metadata noise in a tool contract. */
+function stripSchemaNoise(schema: JsonSchema): JsonSchema {
+  const { description: _self, $schema: _schemaKeyword, ...rest } = schema;
   return rest;
 }
 

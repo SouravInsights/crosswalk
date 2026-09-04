@@ -66,6 +66,17 @@ export async function loadConfig(
  */
 function withLoadingGuidance(candidate: string, error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
+  // A 0.4 config fails at import time: the /generators subpath no longer
+  // exists. Say what changed and the exact fix; never "please report this".
+  if (message.includes("./generators")) {
+    return (
+      `Failed to load ${candidate}: it imports "@webmcp-stack/codegen/generators", removed in 0.5.\n` +
+      "Three edits:\n" +
+      '  1. import from "@webmcp-stack/codegen/outputs" instead\n' +
+      "  2. rename `js(...)` to `tools(...)`\n" +
+      "  3. rename the `generate: [...]` key to `outputs: [...]`"
+    );
+  }
   const looksLikeTs = /\.ts\b|unknown file extension/i.test(message);
   if (!looksLikeTs) return `Failed to load ${candidate}: ${message}`;
   return (
