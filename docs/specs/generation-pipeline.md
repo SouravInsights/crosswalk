@@ -54,7 +54,7 @@ machine-readable by design:
 | Source | Contract consumed | Answers | Status |
 |---|---|---|---|
 | `openapi` | OpenAPI 3.x spec | "what does the HTTP API expose" | shipped |
-| `schema` | Standard Schema modules (zod, valibot, arktype) | "what should an agent be able to do, in my product's terms" | this spec |
+| `schema` | validation schemas (zod, valibot, arktype, TypeBox) | "what should an agent be able to do, in my product's terms" | this spec |
 | `manual` | a small hand-written tools file | "just let me write it" | escape hatch |
 | `trpc` | the router's own schemas | same as openapi, typed end to end | planned |
 
@@ -424,7 +424,7 @@ rename. It stays cheap anyway: three mechanical renames.
 detectable, and CLI commands are unchanged (`generate` default, `init`,
 `dev`), plus one flag: `generate --suggest` runs the LLM proposals. What is
 new is that having no OpenAPI spec is no longer a dead end: `init` detects
-zod/valibot/arktype in `package.json` and scaffolds a `schema` source block,
+zod/valibot/arktype/TypeBox in `package.json` and scaffolds a `schema` source block,
 and when no spec is found it scaffolds the schema path instead of having
 nothing to say.
 
@@ -469,7 +469,7 @@ codebase:
 | File | Change |
 |---|---|
 | `src/types.ts` | `SourceKind` gains `"schema"`; `CandidateTool` gains `operationId?` and a merged-source ref shape; `CodegenConfig.generate` renamed `outputs`; `ToolOverrides` gains per-field `fields`; `ToolGenerator` renamed `Output` |
-| `src/sources/schema.ts` | new: Standard Schema to `CandidateTool`; detects zod v3 vs v4 via the `~standard` marker and converts accordingly |
+| `src/sources/schema.ts` | new: validation schema to `CandidateTool`; detects zod v3 vs v4 via the `~standard` marker, TypeBox via shape (it is already JSON Schema), and converts accordingly |
 | `src/schema.ts` | rename to `src/json-schema.ts` so the JSON-Schema helpers do not share a name with the new source |
 | `src/merge.ts` | new: fuses schema entries with their named operations before naming/safety; emits the missing-target error |
 | `src/describe.ts` | new: `describeConstraints` plus the layer walk (source text, synthesis, LLM hook, overrides last) |
