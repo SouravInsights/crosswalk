@@ -24,7 +24,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import * as clack from "@clack/prompts";
-import { dim, renderSummary, renderVerbose } from "./cli-output.js";
+import { dim, printBanner, renderSummary, renderVerbose } from "./cli-output.js";
 import { CONFIG_FILE_NAMES, loadConfig } from "./config.js";
 import { saveDataFile } from "./data-file.js";
 import { findSpecs } from "./detect.js";
@@ -143,6 +143,7 @@ async function main(): Promise<number> {
 }
 
 async function init(): Promise<number> {
+  printBanner();
   const cwd = process.cwd();
   const configFile = CONFIG_FILE_NAMES[0] ?? "codegen.config.mjs";
   const configPath = join(cwd, configFile);
@@ -275,6 +276,7 @@ ${schemaHint}`;
 }
 
 async function dev(port: number): Promise<number> {
+  printBanner();
   const cwd = process.cwd();
   const server = await startDevServer({ cwd, port, open: true });
   success(`Dashboard: http://localhost:${port}`);
@@ -295,6 +297,7 @@ async function dev(port: number): Promise<number> {
  * is declared, generated, or written; declaring is the developer's edit.
  */
 async function suggest(modulePath: string): Promise<number> {
+  printBanner();
   const cwd = process.cwd();
 
   // The llm settings live in the config when there is one. A missing config is
@@ -367,7 +370,8 @@ async function importSchemaModule(
   }
 }
 
-async function generate(flags: CliFlags): Promise<number> {  const cwd = process.cwd();
+async function generate(flags: CliFlags): Promise<number> {
+  printBanner();  const cwd = process.cwd();
   const setup = await resolveSetup(cwd, {
     dryRun: flags.dryRun,
     skipAudit: flags.skipAudit,
@@ -394,7 +398,7 @@ async function generate(flags: CliFlags): Promise<number> {  const cwd = process
   });
 
   if (!flags.verbose && result.tools.length > 0) {
-    console.log(dim(`  → Read ${result.tools.length + result.skipped.length} operations from ${setup.label}`));
+    console.log(dim(`  → Read ${result.tools.length + result.skipped.length} operations`));
   }
 
   // Audit errors block the write. Instead of requiring --force on a re-run,

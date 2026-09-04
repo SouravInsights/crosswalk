@@ -47,6 +47,9 @@ importers:
       cli-table3:
         specifier: ^0.6.5
         version: 0.6.5
+      figlet:
+        specifier: ^1.11.4
+        version: 1.11.4
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
@@ -60,6 +63,9 @@ importers:
         specifier: ^2.8.0
         version: 2.9.0
     devDependencies:
+      '@types/figlet':
+        specifier: ^1.7.0
+        version: 1.7.0
       '@types/node':
         specifier: ^22.20.1
         version: 22.20.1
@@ -1494,6 +1500,9 @@ packages:
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
+  '@types/figlet@1.7.0':
+    resolution: {integrity: sha512-KwrT7p/8Eo3Op/HBSIwGXOsTZKYiM9NpWRBJ5sVjWP/SmlS+oxxRvJht/FNAtliJvja44N3ul1yATgohnVBV0Q==}
+
   '@types/hast@3.0.5':
     resolution: {integrity: sha512-rp/ezSWaD1m44dPKICGhiskI13nVr7qTloFwDa/IYkhhf5nzwP+zIQcIJh3WIFSBOy/H1PzB40jPjMDksN4F+g==}
 
@@ -1823,6 +1832,11 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
+
+  figlet@1.11.4:
+    resolution: {integrity: sha512-ZU41480OncL+NVLQrT0GVnbO0COL24sLSrzksioDgunmdJNYEUxhJJZ4Y3x1csN8XXqN5OcCZTLG8lKdquNyfQ==}
+    engines: {node: '>= 17.0.0'}
+    hasBin: true
 
   fix-dts-default-cjs-exports@1.0.1:
     resolution: {integrity: sha512-pVIECanWFC61Hzl2+oOCtoJ3F17kglZC/6N94eRWycFgBH35hHx0Li604ZIzhseh97mf2p0cv7vVrOZGoqhlEg==}
@@ -4020,6 +4034,8 @@ snapshots:
 
   '@types/estree@1.0.9': {}
 
+  '@types/figlet@1.7.0': {}
+
   '@types/hast@3.0.5':
     dependencies:
       '@types/unist': 3.0.3
@@ -4176,8 +4192,7 @@ snapshots:
 
   comma-separated-tokens@2.0.3: {}
 
-  commander@14.0.3:
-    optional: true
+  commander@14.0.3: {}
 
   commander@4.1.1: {}
 
@@ -4362,6 +4377,10 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.7):
     optionalDependencies:
       picomatch: 4.0.7
+
+  figlet@1.11.4:
+    dependencies:
+      commander: 14.0.3
 
   fix-dts-default-cjs-exports@1.0.1:
     dependencies:

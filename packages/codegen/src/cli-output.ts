@@ -4,6 +4,7 @@
  * and be understandable by someone who has never seen the tool before.
  */
 
+import figlet from "figlet";
 import pc from "picocolors";
 import Table from "cli-table3";
 import type { GenerateResult } from "./pipeline.js";
@@ -24,37 +25,107 @@ const c = {
 const bold = pc.bold;
 export const dim = pc.dim;
 
-/** The webmcp-stack logo. Compact, professional, earns its two lines. */
-export const LOGO = `
-  ╭─────────────────────────────╮
-  │  webmcp-stack               │
-  ╰─────────────────────────────╯
-`;
+/** Terminal width for layout; a sane default when piped. */
+function termWidth(): number {
+  return process.stdout.columns ?? 100;
+}
 
-/** Group findings by what the user needs to know. */
-function summarizeFindings(findings: GenerateResult["findings"]): {
-  auth: number;
-  admin: number;
-  pii: number;
-  postAsRead: number;
-  other: number;
-} {
-  const counts = { auth: 0, admin: 0, pii: 0, postAsRead: 0, other: 0 };
+/**
+ * The banner, printed once at the start of every command — a banner leads,
+ * it never sits in the middle of a report. Small Slant keeps the full
+ * wordmark inside 60 columns; colors strip automatically when piped.
+ */
+export function printBanner(): void {
+  const mark = figlet.textSync("webmcp-stack", { font: "Small Slant" });
+  console.log("");
+  for (const line of mark.split("\n")) {
+    if (line.trim().length > 0) console.log(c.cyan(line));
+  }
+  console.log(dim("  codegen: tools AI agents can call, from the contract you already have"));
+  console.log("");
+}
+
+/**
+ * Group findings by what the person needs to do about them. A finding that
+ * repeats 60 times ("this endpoint may return personal data") reads as one
+ * line plus a list of names, not a 60-line wall. Order is fixed so the
+ * output is stable run to run.
+ */
+export interface FindingGroup {
+  key: "auth" | "admin" | "pii" | "postAsRead" | "other";
+  /** One sentence naming the category and the recourse, with the count. */
+  heading: string;
+  /** Tool/route names affected. */
+  items: string[];
+}
+
+export function groupFindings(findings: GenerateResult["findings"]): FindingGroup[] {
+  const groups: Record<Exclude<FindingGroup["key"], "other">, { heading: string; items: string[] }> =
+    {
+      auth: { heading: "auth endpoints disabled; agents should never sign in", items: [] },
+      admin: { heading: "admin endpoints disabled; review each before enabling", items: [] },
+      pii: { heading: "endpoints may return personal data; check each response", items: [] },
+      postAsRead: {
+        heading: "POST endpoints treated as read-only; verify that is correct",
+        items: [],
+      },
+    };
+  // Anything outside the four known categories is grouped by its message, so
+  // 48 copies of the same note collapse into one heading plus a name list.
+  const othersByMessage = new Map<string, string[]>();
+
   for (const f of findings) {
+    if (f.level === "error") continue; // errors print on their own, in red
     const msg = f.message.toLowerCase();
+    const name = f.tool ?? "";
     if (msg.includes("sign-in") || msg.includes("auth") || msg.includes("session")) {
-      counts.auth++;
+      groups.auth.items.push(name);
     } else if (msg.includes("admin")) {
-      counts.admin++;
-    } else if (msg.includes("pii") || msg.includes("email")) {
-      counts.pii++;
+      groups.admin.items.push(name);
+    } else if (msg.includes("pii") || msg.includes("email") || msg.includes("personal")) {
+      groups.pii.items.push(name);
     } else if (msg.includes("post") && msg.includes("read")) {
-      counts.postAsRead++;
+      groups.postAsRead.items.push(name);
     } else {
-      counts.other++;
+      const list = othersByMessage.get(f.message) ?? [];
+      list.push(name);
+      othersByMessage.set(f.message, list);
     }
   }
-  return counts;
+
+  const order: Exclude<FindingGroup["key"], "other">[] = ["auth", "admin", "pii", "postAsRead"];
+  const known = order
+    .filter((key) => groups[key].items.length > 0)
+    .map((key) => {
+      const { heading, items } = groups[key];
+      return { key, heading: `${items.length} ${heading}`, items };
+    });
+  const others = [...othersByMessage.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([message, items]) => ({
+      key: "other" as const,
+      heading: items.length > 1 ? `${items.length} tools: ${message}` : message,
+      items,
+    }));
+  return [...known, ...others];
+}
+
+/** Comma-joined names wrapped to the terminal, with a hanging indent. */
+function wrapNames(names: string[], indent: string): string[] {
+  const width = Math.max(40, termWidth() - indent.length - 2);
+  const lines: string[] = [];
+  let line = indent;
+  for (const name of names) {
+    const piece = line === indent ? name : `, ${name}`;
+    if (line.length + piece.length > width && line !== indent) {
+      lines.push(line);
+      line = indent + name;
+    } else {
+      line += piece;
+    }
+  }
+  if (line !== indent) lines.push(line);
+  return lines;
 }
 
 /** The default summary output — written for humans, not machines. */
@@ -66,12 +137,9 @@ export function renderSummary(
 ): void {
   const { tools, findings, skipped } = result;
   const enabled = tools.filter((t) => t.enabledByDefault).length;
+  const groups = groupFindings(findings);
 
-  const findingCounts = summarizeFindings(findings);
-  const totalFindings = findings.length;
-
-  // Header
-  console.log(LOGO);
+  // Header: the banner already led the command; here just the source.
   console.log(dim(`  ${setup.label}`));
   console.log("");
 
@@ -97,39 +165,20 @@ export function renderSummary(
     console.log("");
   }
 
-  // Safety notes — human-readable
-  const warnings = totalFindings - errorFindings.length;
+  // Safety notes: one line per category, not one per occurrence. Long
+  // messages are trimmed here; --verbose shows them in full with the tools.
+  const warnings = groups.reduce((sum, group) => sum + group.items.length, 0);
   if (warnings > 0) {
     console.log(`  ${c.yellow("!")} ${bold(`${warnings} safety note${warnings === 1 ? "" : "s"}`)}`);
-    if (findingCounts.auth > 0) {
-      console.log(
-        dim(
-          `    ${findingCounts.auth} auth endpoint${findingCounts.auth === 1 ? "" : "s"} disabled (agents shouldn't sign in)`,
-        ),
-      );
+    const maxHeading = Math.max(60, termWidth() - 6);
+    for (const group of groups) {
+      const heading =
+        group.heading.length > maxHeading
+          ? `${group.heading.slice(0, maxHeading - 1)}…`
+          : group.heading;
+      console.log(dim(`    ${heading}`));
     }
-    if (findingCounts.admin > 0) {
-      console.log(
-        dim(
-          `    ${findingCounts.admin} admin endpoint${findingCounts.admin === 1 ? "" : "s"} disabled (review each before enabling)`,
-        ),
-      );
-    }
-    if (findingCounts.pii > 0) {
-      console.log(
-        dim(
-          `    ${findingCounts.pii} endpoint${findingCounts.pii === 1 ? "" : "s"} may return personal data`,
-        ),
-      );
-    }
-    if (findingCounts.postAsRead > 0) {
-      console.log(
-        dim(
-          `    ${findingCounts.postAsRead} POST endpoint${findingCounts.postAsRead === 1 ? "" : "s"} treated as read-only (verify this is correct)`,
-        ),
-      );
-    }
-    console.log(dim(`    Run with --verbose to see all details`));
+    console.log(dim(`    Run with --verbose to see which tools`));
     console.log("");
   }
 
@@ -174,8 +223,6 @@ export function renderSummary(
 export function renderVerbose(result: GenerateResult, setup: Setup, _cwd: string): void {
   const { tools, findings, skipped } = result;
 
-  console.log("");
-  console.log(LOGO);
   console.log(dim(`${tools.length} tools from ${setup.label}`));
   console.log("");
 
@@ -189,8 +236,9 @@ export function renderVerbose(result: GenerateResult, setup: Setup, _cwd: string
     console.log("");
   }
 
-  // Tools grouped by risk, rendered as a table per group so 72 tools scan
-  // as columns, not a wall of indented text.
+  // Tools grouped by risk, one table per group. Column widths adapt to the
+  // terminal: the description column takes what is left and truncates, so the
+  // box never breaks at the terminal's right edge.
   const byRisk = {
     read: tools.filter((t) => t.sideEffect === "read"),
     write: tools.filter((t) => t.sideEffect === "write"),
@@ -203,34 +251,58 @@ export function renderVerbose(result: GenerateResult, setup: Setup, _cwd: string
     destructive: c.red("Destructive"),
   };
 
+  const width = termWidth();
+  const nameWidth = Math.min(
+    Math.max(...tools.map((t) => t.name.length), 4),
+    Math.floor(width * 0.4),
+  );
+  const statusWidth = 10;
+  // 4 border columns + padding between the three columns.
+  const descWidth = Math.max(24, width - nameWidth - statusWidth - 10);
+
   for (const [risk, group] of Object.entries(byRisk)) {
     if (group.length === 0) continue;
-    console.log(riskLabels[risk] ?? risk);
+    console.log(`${riskLabels[risk] ?? risk} ${dim(`(${group.length})`)}`);
     const table = new Table({
       head: [dim("Tool"), dim("Status"), dim("Description")],
       style: { head: [], border: [] },
-      chars: { mid: "", "left-mid": "", "mid-mid": "", "right-mid": "" },
+      colWidths: [nameWidth + 2, statusWidth, descWidth],
+      wordWrap: false,
     });
     for (const tool of group) {
+      const description = tool.description || "(no description)";
       table.push([
-        tool.name,
+        tool.name.length > nameWidth ? `${tool.name.slice(0, nameWidth - 1)}…` : tool.name,
         tool.enabledByDefault ? c.green("enabled") : dim("disabled"),
-        tool.description || dim("(no description)"),
+        description.length > descWidth - 2
+          ? `${description.slice(0, descWidth - 3)}…`
+          : description,
       ]);
     }
     console.log(table.toString());
     console.log("");
   }
 
-  // Findings
-  if (findings.length > 0) {
-    console.log(bold("Safety notes:"));
-    for (const f of findings) {
-      const icon = f.level === "error" ? c.red("✖") : c.yellow("⚠");
-      const where = f.tool ? dim(` (${f.tool})`) : "";
-      console.log(`  ${icon} ${f.message}${where}`);
-    }
+  // Safety notes: grouped by what the person should do, with the affected
+  // tools listed compactly under each. 60 identical ⚠ lines teach nothing;
+  // 5 headed groups do.
+  const errorFindings = findings.filter((f) => f.level === "error");
+  const groups = groupFindings(findings);
+  if (errorFindings.length > 0 || groups.length > 0) {
+    console.log(bold("Safety notes"));
     console.log("");
+    for (const f of errorFindings) {
+      const where = f.tool ? dim(` (${f.tool})`) : "";
+      console.log(`  ${c.red("✖")} ${f.message}${where}`);
+    }
+    if (errorFindings.length > 0) console.log("");
+    for (const group of groups) {
+      console.log(`  ${c.yellow("⚠")} ${group.heading}`);
+      for (const line of wrapNames(group.items, "      ")) {
+        console.log(dim(line));
+      }
+      console.log("");
+    }
   }
 
   // LLM proposals, visually distinct from findings.
