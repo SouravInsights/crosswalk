@@ -53,7 +53,7 @@ const AUDIT_CATCHES: Array<[string, string]> = [
   ],
   [
     "auth boundaries",
-    "Login, signup, token refresh. An agent should never carry your user's credentials into a model context. Blocked, always.",
+    "Login, signup, token refresh. An agent should never carry your user's credentials into an AI model. Blocked, always.",
   ],
 ];
 
@@ -102,9 +102,9 @@ export default function HomePage() {
               Turn your API into tools AI agents can call.
             </h1>
             <p className="mx-auto mb-10 max-w-xl text-[16px] leading-relaxed text-dim sm:text-[17px]">
-              One command reads your OpenAPI spec or validation schemas and writes WebMCP tools:
-              typed, checked for safety, and committed to your repo as code you own. It comes with a
-              local playground to review and test them.
+              One command reads your OpenAPI spec or validation schemas and writes the WebMCP tools
+              AI agents call: typed, checked for safety, and committed to your repo as code you own.
+              It comes with a local playground to review and test them.
             </p>
             <div className="flex flex-col items-center gap-4">
               <CopyCommand command={COMMAND} />
@@ -137,7 +137,7 @@ export default function HomePage() {
       <section className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
           <h2 className="mb-3 font-display text-[clamp(1.5rem,3vw,2.1rem)] font-medium tracking-[-0.015em]">
-            Not a dumb API → WebMCP converter.
+            Not a dumb API-to-tool converter.
           </h2>
           <p className="mb-10 max-w-2xl text-[15px] leading-relaxed text-dim sm:mb-14">
             Point a generator at an API without thinking and you ship every route as something an
@@ -232,8 +232,8 @@ export default function HomePage() {
             One product of a stack.
           </h2>
           <p className="max-w-2xl text-[15px] leading-relaxed text-dim">
-            codegen is the first product of <LogoWord />: the layer that turns contracts into tools.
-            The rest of the loop is on the roadmap:{" "}
+            codegen is the first product of <LogoWord />: it reads your API spec and validation
+            schemas and writes the tools. The rest of the loop is on the roadmap:{" "}
             <span className="font-mono text-[13px] text-dim">@webmcp-stack/telemetry</span> to see
             how agents actually use your tools, and{" "}
             <span className="font-mono text-[13px] text-dim">@webmcp-stack/audit</span> to check any
@@ -257,7 +257,7 @@ export default function HomePage() {
         />
         <div className="relative mx-auto max-w-6xl px-5 py-20 text-center sm:px-6 sm:py-28">
           <h2 className="mb-3 font-display text-[clamp(1.5rem,3vw,2.2rem)] font-medium tracking-[-0.015em]">
-            Point it at your spec.
+            Point it at your API.
           </h2>
           <p className="mx-auto mb-10 max-w-md text-dim">
             The first run writes nothing. It only shows you the tools hiding in your API.
