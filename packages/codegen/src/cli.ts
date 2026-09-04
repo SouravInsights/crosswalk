@@ -28,7 +28,7 @@ import { dim, renderSummary, renderVerbose } from "./cli-output.js";
 import { CONFIG_FILE_NAMES, loadConfig } from "./config.js";
 import { saveDataFile } from "./data-file.js";
 import { findSpecs } from "./detect.js";
-import { findSchemaLibraries } from "./detect-app.js";
+import { findSchemaLibraries, findWebApps } from "./detect-app.js";
 import { startDevServer } from "./dev/server.js";
 import { resolveLlmProvider, runLlmLayer } from "./llm.js";
 import { debug, enableVerbose, error, info, success, warn } from "./logger.js";
@@ -154,6 +154,13 @@ async function init(): Promise<number> {
 
   const specs = await findSpecs(cwd);
   const schemaLibs = await findSchemaLibraries(cwd);
+  const apps = await findWebApps(cwd);
+
+  // Tools are browser code, so they live in the web app's package, not
+  // wherever the command ran. In a monorepo that is apps/web, not root.
+  // One app: use it. Several: the ranked first candidate wins and we say so.
+  const app = apps[0];
+  const outDir = app ? `./${app.dir}/src/webmcp` : "./src/webmcp";
 
   // Multiple specs: let the person pick, don't guess. The choice is saved
   // in the config, so this only asks once.
@@ -172,9 +179,12 @@ async function init(): Promise<number> {
     spec = `./${specs[0]}`;
   }
 
-  await writeFile(configPath, initTemplate(spec, schemaLibs));
+  await writeFile(configPath, initTemplate(spec, schemaLibs, outDir, app?.dir));
 
   success(`Wrote ${configFile}`);
+  if (app) {
+    info(`Tools will be generated into ${app.dir} (${app.framework}).`);
+  }
   if (!spec) {
     // The schema path is the answer to "no OpenAPI spec": yesterday this run
     // had nothing to say, today it scaffolds the contract the app does have.
@@ -187,7 +197,6 @@ async function init(): Promise<number> {
   }
   info("\nEdit it to add sources, change the output directory, or set safety options.");
   info("Docs: https://webmcp-stack.vercel.app/docs/configuration\n");
-  console.log("Docs: https://webmcp-stack.vercel.app/docs/configuration\n");
   return 0;
 }
 
@@ -197,7 +206,12 @@ async function init(): Promise<number> {
  * schema source appears as a commented block when the project already has a
  * validation library: a suggestion for a library nobody installed is noise.
  */
-function initTemplate(spec: string | undefined, schemaLibs: string[]): string {
+function initTemplate(
+  spec: string | undefined,
+  schemaLibs: string[],
+  outDir = "./src/webmcp",
+  appDir?: string,
+): string {
   const safetyBlock = `  safety: {
     // Extra field names to treat as PII, on top of the built-in list:
     // piiFields: ["internalId"],
@@ -205,13 +219,17 @@ function initTemplate(spec: string | undefined, schemaLibs: string[]): string {
     // exclude: ["internal"],
   },`;
 
+  // Point the example import at the detected app, so a monorepo user is not
+  // handed a root-relative path that does not exist.
+  const schemaImportPath = appDir ? `./${appDir}/src/schemas` : "./src/schemas";
+
   if (!spec) {
     return `import { defineConfig } from "@webmcp-stack/codegen";
 import { schema } from "@webmcp-stack/codegen/sources";
 import { tools } from "@webmcp-stack/codegen/outputs";
 
 // Import the schemas your app validates with, e.g.:
-// import { CreateTripInput } from "./src/schemas";
+// import { CreateTripInput } from "${schemaImportPath}";
 
 export default defineConfig({
   sources: [
@@ -222,7 +240,7 @@ export default defineConfig({
       ],
     }),
   ],
-  outputs: [tools({ outDir: "./src/webmcp" })],
+  outputs: [tools({ outDir: "${outDir}" })],
 ${safetyBlock}
 });
 `;
@@ -235,7 +253,7 @@ ${safetyBlock}
 // straight from your validation schemas:
 //
 //   import { schema } from "@webmcp-stack/codegen/sources";
-//   import { CreateTripInput } from "./src/schemas";
+//   import { CreateTripInput } from "${schemaImportPath}";
 //
 //   sources: [
 //     openapi({ spec: "${spec}" }),
@@ -250,7 +268,7 @@ import { tools } from "@webmcp-stack/codegen/outputs";
 
 export default defineConfig({
   sources: [openapi({ spec: "${spec}" })],
-  outputs: [tools({ outDir: "./src/webmcp" })],
+  outputs: [tools({ outDir: "${outDir}" })],
 ${safetyBlock}
 });
 ${schemaHint}`;
