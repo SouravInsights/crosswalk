@@ -66,6 +66,17 @@ function isStandardSchema(value: unknown): value is StandardSchemaV1 {
   return !!marker && marker.version === 1 && typeof marker.vendor === "string";
 }
 
+/**
+ * TypeBox v1 schemas are JSON Schema documents, not wrapper objects: the value
+ * has `type` and `properties` and no `~standard`. This is the only check that
+ * does not lie about what TypeBox is — there is no vendor marker to read.
+ */
+function isTypeBoxSchema(value: unknown): value is JsonSchema {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return record.type === "object" && typeof record.properties === "object";
+}
+
 /** Create the schema source for the config's `sources` array. */
 export function schema(options: SchemaSourceOptions): Source {
   // Anchored by bindContext once the config loads; until then, the process
@@ -147,11 +158,18 @@ function toJsonSchema(
   which: "schema" | "output",
   anchorDir: string,
 ): JsonSchema {
+  // TypeBox schemas are JSON Schema already: `Type.Object({...})` returns the
+  // draft-2020-12 shape with no wrapper. Detected by shape, not a marker —
+  // TypeBox v1 has no `~standard` and no `_def`; the object is the contract.
+  if (isTypeBoxSchema(value)) {
+    return value;
+  }
+
   if (!isStandardSchema(value)) {
     throw new Error(
       `Schema tool "${toolName}": the ${which} is not a Standard Schema ` +
-        '(no "~standard" marker). Pass the schema object itself (e.g. the zod schema), ' +
-        "not JSON Schema or a type.",
+        '(no "~standard" marker) and not a TypeBox schema (no "type"/"properties"). ' +
+        "Pass the schema object itself (e.g. the zod or TypeBox schema), not JSON Schema or a type.",
     );
   }
 
@@ -159,7 +177,7 @@ function toJsonSchema(
   if (vendor !== "zod") {
     throw new Error(
       `Schema tool "${toolName}": Standard Schema vendor "${vendor}" is not converted yet ` +
-        "(zod only today). Ask for it: https://github.com/SouravInsights/webmcp-stack/issues",
+        "(zod and TypeBox only today). Ask for it: https://github.com/SouravInsights/webmcp-stack/issues",
     );
   }
 

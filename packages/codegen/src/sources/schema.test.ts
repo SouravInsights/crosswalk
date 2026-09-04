@@ -109,3 +109,22 @@ describe("schema source", () => {
     await expect(source.collect()).rejects.toThrow("zod v3");
   });
 });
+
+describe("TypeBox schemas", () => {
+  it("accepts a TypeBox schema as-is (it is already JSON Schema)", async () => {
+    // TypeBox v1 Type.Object returns the draft-2020-12 shape directly.
+    const typeBoxSchema = {
+      type: "object" as const,
+      properties: {
+        title: { type: "string" as const, minLength: 1 },
+        notes: { type: "array" as const, items: { type: "string" as const } },
+      },
+      required: ["title"],
+    };
+    const [candidate] = await schema({
+      tools: [{ name: "add-note", schema: typeBoxSchema as never }],
+    }).collect();
+    expect(candidate?.inputSchema.properties?.title?.minLength).toBe(1);
+    expect(candidate?.inputSchema.required).toContain("title");
+  });
+});
