@@ -5,7 +5,7 @@ description: codegen.config.mjs for structure, .webmcp-codegen.json for choices 
 
 ## Two files, two jobs
 
-**`codegen.config.mjs`** is code. It defines structure: sources, generators, safety
+**`codegen.config.mjs`** is code. It defines structure: sources, outputs, safety
 options. Write it with `npx @webmcp-stack/codegen init` when you outgrow the defaults. It imports
 from the package, so it needs `npm install -D webmcp-codegen`.
 
@@ -32,11 +32,11 @@ regeneration. Editing this file by hand is fine.
 ```ts title="codegen.config.mjs"
 import { defineConfig } from "@webmcp-stack/codegen";
 import { openapi } from "@webmcp-stack/codegen/sources";
-import { js } from "@webmcp-stack/codegen/generators";
+import { tools } from "@webmcp-stack/codegen/outputs";
 
 export default defineConfig({
   sources: [openapi({ spec: "./openapi.yaml" })],
-  generate: [js({ outDir: "./src/webmcp" })],
+  outputs: [tools({ outDir: "./src/webmcp" })],
   safety: {
     // Extra field names to treat as PII, on top of the built-in list:
     // piiFields: ["internalId"],
@@ -57,11 +57,11 @@ run the command in.
 An array; today there is one source. `openapi({ spec })` reads an OpenAPI 3.x document
 (YAML or JSON). Add more entries to combine several specs into one toolset.
 
-### `generate`
+### `outputs`
 
-An array; today there is one generator. `js({ outDir })` writes the plain-TypeScript
-output described in [Regeneration](/docs/regeneration). Framework generators
-(`react`, `html`) are on the roadmap.
+An array; today there is one output. `tools({ outDir })` writes the per-tool
+files described in [Regeneration](/docs/regeneration). More outputs
+(`form`, `reactHooks`) are on the roadmap.
 
 ### `safety.piiFields`
 

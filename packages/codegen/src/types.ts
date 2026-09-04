@@ -3,11 +3,11 @@
  *
  * Every stage of the pipeline speaks in these types:
  *
- *   Source → CandidateTool → (safety review) → ReviewedTool → Generator → GeneratedFile
+ *   Source → CandidateTool → (safety review) → ReviewedTool → Output → GeneratedFile
  *
- * A source (OpenAPI today, tRPC/Zod later) only has to produce CandidateTools.
- * A generator only has to turn ReviewedTools into files. Everything in between
- * lives here so the stages stay independent.
+ * A source only has to produce CandidateTools. An output only has to turn
+ * ReviewedTools into files. Everything in between lives here so the stages
+ * stay independent.
  */
 
 /**
@@ -32,7 +32,7 @@ export interface JsonSchema {
 }
 
 /** Which source a candidate came from. Grows as new sources are added. */
-export type SourceKind = "openapi" | "trpc" | "zod" | "prisma" | "graphql" | "manual";
+export type SourceKind = "openapi" | "schema" | "trpc" | "prisma" | "graphql" | "manual";
 
 /**
  * What the tool does to the world. The safety layer derives this from the
@@ -79,7 +79,32 @@ export interface CandidateTool {
   requiresAuth: boolean;
   /** Where the description text came from. Always reviewable before commit. */
   description: string;
-  descriptionSource: "openapi-summary" | "generated-template";
+  descriptionSource: "openapi-summary" | "declared" | "generated-template";
+  /**
+   * The OpenAPI operationId, when the source knows one. The merge pairs a
+   * schema entry with the operation it refines through this; nothing else
+   * may, because path/name matching would be guessing.
+   */
+  operationId?: string;
+  /**
+   * For a merged tool: the endpoint route it fused with ("POST /v1/trips").
+   * source.ref stays the schema's own reference, so the report can show both
+   * halves of the fusion. Safety heuristics read this when present, because
+   * the route carries the auth/admin/destructive signal.
+   */
+  endpointRef?: string;
+  /**
+   * Present when the tool annotates a literal <form> component instead of
+   * generating a .webmcp.ts file. Set by the schema source from the entry's
+   * `form` pointer; consumed by the `form` output.
+   */
+  form?: { path: string; autosubmit?: boolean };
+  /**
+   * Input fields whose description was machine-drafted by the describe layer
+   * (nothing in the contract carried text). The audit warns when that is ALL
+   * a tool has: synthesized constraints are a floor, not a finish.
+   */
+  synthesizedFields?: string[];
 }
 
 /** The MCP hints the spec defines for a tool, computed by the safety layer. */
@@ -142,10 +167,16 @@ export interface ToolOverrides {
   [toolName: string]: {
     description?: string;
     enabled?: boolean;
+    /**
+     * Per-field description text. Applied after every description layer and
+     * never appended to: this is the developer's final word on what the agent
+     * reads for that field.
+     */
+    fields?: Record<string, string>;
   };
 }
 
-/** A file the generator wants to write. */
+/** A file an output wants to write. */
 export interface GeneratedFile {
   /** Absolute path on disk. */
   path: string;
@@ -158,6 +189,12 @@ export interface GeneratedFile {
    * so we refused to touch it. The new contents go to a `.new` sibling instead.
    */
   conflict?: string;
+  /**
+   * Plain-language lines about this file that the report must show:
+   * attributes kept because a human edited them, fields no control matched,
+   * names added. Nothing the codegen does to a file is silent.
+   */
+  notes?: string[];
 }
 
 /**
@@ -166,14 +203,22 @@ export interface GeneratedFile {
  */
 export interface Source {
   readonly kind: SourceKind;
+  /**
+   * Called by the CLI right after the config file loads. Sources that need to
+   * resolve the app's own dependencies anchor at the config file's directory
+   * rather than the process cwd: in a pnpm monorepo the schema library lives
+   * in the app package, not the root. Most sources never need this.
+   */
+  bindContext?(context: { configPath: string }): void;
   collect(): Promise<CandidateTool[]>;
 }
 
 /**
- * A generator turns reviewed tools into files.
- * Named after what lands in your repo: `js`, `html`, `react`, `manifest`.
+ * An output turns reviewed tools into something that lands in your repo:
+ * files (`tools`), annotated markup (`form`), and so on. Named after what
+ * lands in the repo, never after the language it happens to be written in.
  */
-export interface ToolGenerator {
+export interface Output {
   readonly kind: string;
   /** Where the files go, relative to the project root. Reported by the CLI. */
   readonly outDir: string;
@@ -191,6 +236,58 @@ export interface SafetyOptions {
 /** The config file shape. Create it with `defineConfig` for type checking. */
 export interface CodegenConfig {
   sources: Source[];
-  generate: ToolGenerator[];
+  outputs: Output[];
   safety?: SafetyOptions;
+  /**
+   * The opt-in LLM layer. Absent means off: the run is then exactly the
+   * deterministic one. The layer only ever proposes (report lines); it never
+   * writes files, never classifies risk, and never changes exit codes.
+   */
+  llm?: LlmOptions;
+}
+
+/** The four things the LLM layer may propose on. */
+export type LlmTask = "describe" | "relationship" | "semantic-review" | "suggest";
+
+/**
+ * A model backend. Bring your own to use any vendor, or configure a key and
+ * use the built-in OpenAI-compatible one. One method, because the layer asks
+ * one kind of question.
+ */
+export interface LlmProvider {
+  name: string;
+  /**
+   * Ask one question. `system` is the per-task prompt (the built-in default,
+   * or the developer's override from config); providers that ignore it fall
+   * back to whatever the task implies.
+   */
+  complete(task: LlmTask, prompt: string, system?: string): Promise<string>;
+}
+
+export interface LlmOptions {
+  /** A custom provider. Wins over apiKey when both are set. */
+  provider?: LlmProvider;
+  /** API key for the built-in provider. Falls back to env WEBMCP_LLM_API_KEY, then OPENAI_API_KEY. */
+  apiKey?: string;
+  /** OpenAI-compatible base URL. Default: https://api.openai.com/v1 */
+  baseUrl?: string;
+  /** Model name for the built-in provider. Default: gpt-4o-mini */
+  model?: string;
+  /** Override the shipped prompt per task, e.g. to match your domain's voice. */
+  prompts?: Partial<Record<LlmTask, string>>;
+}
+
+/**
+ * One proposal from the LLM layer. Rendered as `◦` lines, visually apart from
+ * audit findings, because a suggestion is not a fact: the developer disposes.
+ * Nothing here is ever applied to a file in this version; the acceptance
+ * surface (dashboard accept/reject) is a deliberate follow-up.
+ */
+export interface LlmSuggestion {
+  task: LlmTask;
+  /** The tool (and field, when relevant) this proposal is about. */
+  tool?: string;
+  field?: string;
+  /** The one-line proposal text for the report. */
+  message: string;
 }

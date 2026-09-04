@@ -12,7 +12,7 @@
  *                 they survive regeneration.
  *
  * The config file (codegen.config.mjs) stays the source of truth for
- * *structure* (sources, generators, safety). This file is for *choices and
+ * *structure* (sources, outputs, safety). This file is for *choices and
  * tweaks*. Editing it by hand is fine; it is meant to be committed.
  */
 

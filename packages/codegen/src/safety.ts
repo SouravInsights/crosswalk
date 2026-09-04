@@ -74,6 +74,10 @@ const AUTH_PATTERN =
 /** Admin endpoints. Exposing them to agents is a deliberate decision. */
 const ADMIN_PATTERN = /\badmin\b/i;
 
+/** Past this many tools the surface is a catalog, not a toolkit (the audit
+ *  warns once per run). Roughly double what an agent holds comfortably. */
+const TOOL_COUNT_SOFT_LIMIT = 40;
+
 /**
  * Field names that usually hold personal data or secrets. Matched against
  * the last segment of a field path, case-insensitively. Teams extend this
@@ -105,6 +109,13 @@ const AGENT_INSTRUCTION_PATTERN =
 
 /** Step 1: classify what calling the tool does. */
 export function classifySideEffect(tool: CandidateTool): SideEffect {
+  if (!tool.httpMethod) {
+    // Schema-declared tools carry no verb, so the name carries the signal.
+    // The default for an unknown action is write (generated disabled,
+    // confirmation on): an action we cannot classify is never treated as safe.
+    if (nameSaysRead(tool.name)) return "read";
+    return DESTRUCTIVE_WORDS.test(tool.name) ? "destructive" : "write";
+  }
   switch (tool.httpMethod) {
     case "GET":
     case "HEAD":
@@ -117,13 +128,13 @@ export function classifySideEffect(tool: CandidateTool): SideEffect {
       // A POST whose name is a reading word ("search-assets", "post-search")
       // is a read wearing a write verb. Treat it as one.
       if (nameSaysRead(tool.name)) return "read";
-      return DESTRUCTIVE_WORDS.test(tool.name) || DESTRUCTIVE_WORDS.test(tool.source.ref)
+      return DESTRUCTIVE_WORDS.test(tool.name) || DESTRUCTIVE_WORDS.test(routeRef(tool))
         ? "destructive"
         : "write";
     case "PUT":
     case "PATCH":
       // Upgrade nominally-"write" verbs when the name says it can't be undone.
-      return DESTRUCTIVE_WORDS.test(tool.name) || DESTRUCTIVE_WORDS.test(tool.source.ref)
+      return DESTRUCTIVE_WORDS.test(tool.name) || DESTRUCTIVE_WORDS.test(routeRef(tool))
         ? "destructive"
         : "write";
     default:
@@ -132,11 +143,20 @@ export function classifySideEffect(tool: CandidateTool): SideEffect {
 }
 
 /**
+ * The route this tool wraps, for heuristics. For a merged tool that is the
+ * endpoint it fused with (source.ref holds the schema's own reference), so the
+ * route's destructive/admin signal is never lost in the merge.
+ */
+function routeRef(tool: CandidateTool): string {
+  return tool.endpointRef ?? tool.source.ref;
+}
+
+/**
  * What kind of endpoint this tool wraps. Checked against the route and the
  * name: "/v1/admin/users" and "admin-feature-access-approve" both catch it.
  */
 export function endpointRoleFor(tool: CandidateTool): EndpointRole {
-  const haystack = `${tool.name} ${tool.source.ref}`;
+  const haystack = `${tool.name} ${routeRef(tool)}`;
   if (WEBHOOK_PATTERN.test(haystack)) return "webhook";
   if (AUTH_PATTERN.test(haystack)) return "auth";
   if (ADMIN_PATTERN.test(haystack)) return "admin";
@@ -214,8 +234,7 @@ export function reviewTools(
   for (const tool of candidates) {
     const excludedBy = excluded.find(
       (pattern) =>
-        tool.name.toLowerCase().includes(pattern) ||
-        tool.source.ref.toLowerCase().includes(pattern),
+        tool.name.toLowerCase().includes(pattern) || routeRef(tool).toLowerCase().includes(pattern),
     );
     if (excludedBy) {
       skipped.push({ ref: tool.source.ref, reason: `excluded by config ("${excludedBy}")` });
@@ -357,7 +376,79 @@ export function auditTools(
           "changes state, disable it: a mislabeled read skips the user-confirmation step.",
       });
     }
+
+    // The rules below judge the *assembled* tool (post-merge, post-describe,
+    // post-overrides), because that is what the agent will actually see.
+
+    if (tool.sideEffect === "read" && !tool.outputSchema) {
+      findings.push({
+        level: "warning",
+        tool: tool.name,
+        message:
+          "No output schema: the agent gets unstructured text back and has to guess at the " +
+          "shape. Add a response schema to the contract so agents can use the results reliably.",
+      });
+    }
+
+    const fieldNames = Object.keys(tool.inputSchema.properties ?? {});
+    const synthesized = new Set(tool.synthesizedFields ?? []);
+    if (fieldNames.length > 0 && fieldNames.every((name) => synthesized.has(name))) {
+      findings.push({
+        level: "warning",
+        tool: tool.name,
+        message:
+          "No input field has a description. Constraints were synthesized from the schema; " +
+          "one line of prose per field in your spec or schema is better.",
+      });
+    }
+
+    findings.push(...findMissingProducerTools(tool, tools));
   }
 
+  // Set-level: every tool competes for the agent's context window, and past
+  // a point the surface is a catalog, not a toolkit. This fires once per run,
+  // not per tool; the fix is fewer tools, and the person running it knows which.
+  const enabledCount = tools.filter((tool) => tool.enabledByDefault).length;
+  if (tools.length > TOOL_COUNT_SOFT_LIMIT) {
+    findings.push({
+      level: "warning",
+      message:
+        `${tools.length} tools in one surface (${enabledCount} enabled). Agents hold a handful ` +
+        "well; a catalog this size degrades tool selection. Narrow with `safety.exclude`, " +
+        "split per page, or declare the goal-shaped actions with the schema source instead of " +
+        "exposing every operation.",
+    });
+  }
+
+  return findings;
+}
+
+/**
+ * Field text can point at another tool as the only way to fill it
+ * ("Always get this from the search-places tool"). When that producer is not
+ * in the run, the agent is sent to fetch a value from a tool that does not
+ * exist, so the gap is a finding, not a surprise mid-conversation.
+ * Deterministic on purpose: the dependency is declared in the field's own
+ * words, never inferred from shapes.
+ */
+function findMissingProducerTools(tool: ReviewedTool, all: ReviewedTool[]): AuditFinding[] {
+  const findings: AuditFinding[] = [];
+  const present = new Set(all.map((candidate) => candidate.name));
+  const REFERENCE = /the ["'`]?([a-z][a-z0-9-]*)["'`]? tool\b/i;
+
+  for (const [field, fieldSchema] of Object.entries(tool.inputSchema.properties ?? {})) {
+    const description = (fieldSchema as JsonSchema).description;
+    if (typeof description !== "string") continue;
+    const referenced = REFERENCE.exec(description)?.[1];
+    if (referenced && referenced !== tool.name && !present.has(referenced)) {
+      findings.push({
+        level: "warning",
+        tool: tool.name,
+        message:
+          `Field "${field}" says it comes from the "${referenced}" tool, but no such tool ` +
+          "exists in this run. Declare it, or document another source in the field's description.",
+      });
+    }
+  }
   return findings;
 }

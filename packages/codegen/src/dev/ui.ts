@@ -22,6 +22,12 @@ interface UiTool {
   requiresAuth?: boolean;
   verb?: string;
   path?: string;
+  /** Where this tool came from: the route, the schema, or both ("merged"). */
+  provenance?: string;
+  /** Present when the tool annotates a form instead of generating a file. */
+  form?: { path: string };
+  /** Per-field text the developer overrode, so the editor shows their words. */
+  fieldOverrides?: Record<string, string>;
   /** The generated file, shown on demand. The dashboard is the disclosure. */
   source?: { fileName: string; code: string };
 }
@@ -469,6 +475,12 @@ export function dashboardHtml(embeddedState?: UiState, opts?: { scoped?: boolean
     outline: none;
     border-color: var(--accent);
   }
+  .detail-provenance {
+    color: var(--faint);
+    font-size: 12.5px;
+    margin-top: 6px;
+    font-family: var(--mono, ui-monospace, monospace);
+  }
   .edit-actions {
     display: flex;
     align-items: center;
@@ -906,6 +918,19 @@ var EMBEDDED_STATE = ${embeddedState ? JSON.stringify(embeddedState) : "null"};
         hint + "</div>";
     }).join("");
 
+    // Field description editor: the assembled text the agent reads, editable
+    // per field. Overrides are the developer's final word and survive
+    // regeneration, exactly like the tool description.
+    var fieldOverrides = tool.fieldOverrides || {};
+    var fieldEdits = Object.keys(properties).map(function (key) {
+      var field = properties[key];
+      var value = fieldOverrides[key] !== undefined ? fieldOverrides[key] : (field.description || "");
+      var overridden = fieldOverrides[key] !== undefined ? ' <span class="badge">override</span>' : "";
+      return '<div class="param"><label class="param-label">' + esc(key) + overridden + '</label>' +
+        '<input class="param-input field-desc" data-field="' + esc(key) + '" type="text" value="' + esc(value) + '" spellcheck="false" />' +
+        "</div>";
+    }).join("");
+
     var baseUrl = "";
     try { baseUrl = localStorage.getItem("webmcp-codegen:baseUrl") || tool.serverUrl || ""; } catch (e) {}
 
@@ -918,9 +943,17 @@ var EMBEDDED_STATE = ${embeddedState ? JSON.stringify(embeddedState) : "null"};
       '<h1 class="detail-title">' + esc(tool.name) + "</h1>" +
       "</div>" +
       '<div class="detail-route">' +
-      '<span class="verb ' + tool.sideEffect + '">' + esc(tool.verb || "GET") + "</span>" +
-      "<span>" + esc(tool.path || "") + "</span>" +
+      (tool.verb
+        ? '<span class="verb ' + tool.sideEffect + '">' + esc(tool.verb) + "</span>" +
+          "<span>" + esc(tool.path || "") + "</span>"
+        : '<span class="verb ' + tool.sideEffect + '">' + esc(tool.sideEffect.toUpperCase()) + "</span>") +
       "</div>" +
+      (tool.provenance
+        ? '<div class="detail-provenance">' + esc(tool.provenance) + "</div>"
+        : "") +
+      (tool.form
+        ? '<div class="detail-provenance">annotates ' + esc(tool.form.path) + " (form output; no file generated)</div>"
+        : "") +
       (badges ? '<div class="badges">' + badges + "</div>" : "") +
       "</div>" +
 
@@ -944,6 +977,18 @@ var EMBEDDED_STATE = ${embeddedState ? JSON.stringify(embeddedState) : "null"};
       "</div>" +
       '<div class="edit-hint">Agents pick tools by this text. Saved to .webmcp-codegen.json, so it survives regeneration. ⌘S to save.</div>' +
       "</div>" +
+
+      (fieldEdits
+        ? '<div class="section">' +
+          '<div class="section-label">Field descriptions</div>' +
+          fieldEdits +
+          '<div class="edit-actions">' +
+          '<button class="btn btn-primary" id="save-fields">Save fields</button>' +
+          '<span class="saved-indicator" id="saved-fields">Saved</span>' +
+          "</div>" +
+          '<div class="edit-hint">Agents fill inputs from this text. Saved per field to .webmcp-codegen.json, so it survives regeneration.</div>' +
+          "</div>"
+        : "") +
 
       '<div class="section">' +
       '<div class="section-label">Status</div>' +
@@ -972,6 +1017,8 @@ var EMBEDDED_STATE = ${embeddedState ? JSON.stringify(embeddedState) : "null"};
       "</div>";
 
     document.getElementById("save-desc").addEventListener("click", saveDescription);
+    var saveFieldsBtn = document.getElementById("save-fields");
+    if (saveFieldsBtn) saveFieldsBtn.addEventListener("click", saveFields);
     var backBtn = document.getElementById("detail-back");
     if (backBtn) {
       backBtn.addEventListener("click", function () {
@@ -996,6 +1043,27 @@ var EMBEDDED_STATE = ${embeddedState ? JSON.stringify(embeddedState) : "null"};
     }).then(function () {
       tool.description = desc;
       var saved = document.getElementById("saved");
+      saved.classList.add("show");
+      setTimeout(function () { saved.classList.remove("show"); }, 2000);
+    }).catch(function (error) { alert(error.message); });
+  }
+
+  function saveFields() {
+    var tool = currentTool();
+    if (!tool) return;
+    var fields = {};
+    Array.prototype.forEach.call(document.querySelectorAll(".field-desc"), function (input) {
+      var value = input.value.trim();
+      if (value) fields[input.getAttribute("data-field")] = value;
+    });
+    if (Object.keys(fields).length === 0) return;
+    api("/api/override", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: tool.name, fields: fields }),
+    }).then(function () {
+      tool.fieldOverrides = Object.assign({}, tool.fieldOverrides, fields);
+      var saved = document.getElementById("saved-fields");
       saved.classList.add("show");
       setTimeout(function () { saved.classList.remove("show"); }, 2000);
     }).catch(function (error) { alert(error.message); });

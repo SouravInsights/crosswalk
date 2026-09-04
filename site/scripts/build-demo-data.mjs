@@ -8,8 +8,8 @@
 import { writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { js } from "../../packages/codegen/dist/generators/index.js";
 import { runGenerate } from "../../packages/codegen/dist/index.js";
+import { tools } from "../../packages/codegen/dist/outputs/index.js";
 import { openapi } from "../../packages/codegen/dist/sources/index.js";
 
 const site = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -17,7 +17,7 @@ const site = join(dirname(fileURLToPath(import.meta.url)), "..");
 const report = await runGenerate(
   {
     sources: [openapi({ spec: "demo/immich-excerpt.openapi.yaml" })],
-    generate: [js({ outDir: "src/webmcp" })],
+    outputs: [tools({ outDir: "src/webmcp" })],
   },
   { cwd: site, write: false, skipAudit: false, force: true },
 );
@@ -35,7 +35,7 @@ const toolFiles = new Map(
     ]),
 );
 
-const tools = report.tools.map((tool) => {
+const demoTools = report.tools.map((tool) => {
   const [verb, ...rest] = tool.source.ref.split(" ");
   const contents = toolFiles.get(tool.name);
   if (!contents) throw new Error(`No generated file found for ${tool.name}`);
@@ -105,7 +105,7 @@ export const DEMO_SOURCE = {
   specUrl: "https://github.com/immich-app/immich/blob/main/open-api/immich-openapi-specs.json",
 };
 
-export const DEMO_TOOLS: DemoTool[] = ${JSON.stringify(tools, null, 2)};
+export const DEMO_TOOLS: DemoTool[] = ${JSON.stringify(demoTools, null, 2)};
 
 // Shaped like UiState from packages/codegen/src/dev/ui.ts; the landing demo
 // injects it into the real dashboard UI.
@@ -113,4 +113,4 @@ export const DASHBOARD_STATE = ${JSON.stringify(dashboardState, null, 2)};
 `;
 
 await writeFile(join(site, "lib/demo-data.ts"), out);
-console.log(`Wrote lib/demo-data.ts with ${tools.length} tools from the Immich excerpt.`);
+console.log(`Wrote lib/demo-data.ts with ${demoTools.length} tools from the Immich excerpt.`);

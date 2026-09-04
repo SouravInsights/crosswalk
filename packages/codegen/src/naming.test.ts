@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  dedupeNames,
+  analyzeRoute,
+  cleanOperationId,
   nameFromRoute,
-  stripVersionPrefix,
+  resolveNames,
   TOOL_NAME_PATTERN,
   toToolName,
 } from "./naming.js";
@@ -33,66 +34,127 @@ describe("toToolName", () => {
   });
 });
 
+describe("cleanOperationId", () => {
+  it("strips framework prefixes", () => {
+    expect(cleanOperationId("TripsController_createTrip")).toBe("create-trip");
+    expect(cleanOperationId("user.service.getProfile")).toBe("get-profile");
+  });
+
+  it("strips trailing version markers", () => {
+    expect(cleanOperationId("createTrip_v2")).toBe("create-trip");
+    expect(cleanOperationId("getStatus.v3")).toBe("get-status");
+  });
+
+  it("leaves plain operationIds alone", () => {
+    expect(cleanOperationId("loginOtpVerify")).toBe("login-otp-verify");
+  });
+});
+
 describe("nameFromRoute", () => {
-  it("builds a readable name from method + path", () => {
-    expect(nameFromRoute("get", "/orders/{id}")).toBe("get-orders-id");
+  it("drops version segments from the fallback concat", () => {
+    expect(nameFromRoute("get", "/v1/orders/{id}")).toBe("get-orders-id");
   });
 });
 
-describe("dedupeNames", () => {
-  it("keeps unique names untouched", () => {
-    const { names, renames } = dedupeNames([{ name: "a" }, { name: "b" }]);
-    expect(names).toEqual(["a", "b"]);
-    expect(renames).toEqual([]);
+describe("analyzeRoute", () => {
+  const cases: [string, string, string][] = [
+    // Plain REST: the method supplies the verb, the path shape the noun.
+    ["post", "/v1/trips", "create-trip"],
+    ["get", "/v1/trips", "list-trips"],
+    ["get", "/v1/trips/{trip_id}", "get-trip"],
+    ["patch", "/v1/trips/{trip_id}", "update-trip"],
+    ["delete", "/v1/trips/{trip_id}", "delete-trip"],
+    // Nested under a member: the immediate parent joins the base name.
+    ["get", "/v1/trips/{trip_id}/blocks", "list-trip-blocks"],
+    ["post", "/v1/trips/{trip_id}/template", "create-trip-template"],
+    ["get", "/v1/trips/{trip_id}/stamp-eligibility", "get-trip-stamp-eligibility"],
+    ["get", "/v1/explore/destinations/{destination_id}/candidates", "list-destination-candidates"],
+    // A singular trailing word is a singleton, not a collection.
+    ["get", "/v1/auth/session", "get-session"],
+    // Action endpoints: the last segment's verb carries the intent.
+    ["post", "/v1/trips/{trip_id}/story/generate", "generate-story"],
+    ["post", "/v1/trips/{trip_id}/blocks/batch", "batch-blocks"],
+    ["post", "/v1/auth/verify-otp", "verify-otp"],
+    ["post", "/v1/auth/login", "login"],
+    ["post", "/v1/search", "search"],
+    // "me" means the current member, not a collection.
+    ["get", "/v1/users/me", "get-current-user"],
+    ["patch", "/v1/users/me", "update-current-user"],
+  ];
+
+  it.each(cases)("%s %s → %s", (method, path, expected) => {
+    expect(analyzeRoute(method, path).base).toBe(expected);
   });
 
-  it("disambiguates collisions with the HTTP method, then a counter", () => {
-    const { names, renames } = dedupeNames([
-      { name: "orders", httpMethod: "GET" },
-      { name: "orders", httpMethod: "POST" },
-      { name: "orders", httpMethod: "POST" },
+  it("marks unmapped methods as fallback tier with an honest concat", () => {
+    const analysis = analyzeRoute("head", "/v1/trips/{id}");
+    expect(analysis.tier).toBe("fallback");
+    expect(analysis.base).toBe("head-trips-id");
+  });
+
+  it("every produced name matches the runtime pattern", () => {
+    for (const [method, path] of cases.map(([m, p]) => [m, p] as const)) {
+      expect(analyzeRoute(method, path).base).toMatch(TOOL_NAME_PATTERN);
+    }
+  });
+});
+
+describe("resolveNames", () => {
+  it("deepens colliding route names with parent context, both sides", () => {
+    const { names, renames } = resolveNames([
+      {
+        name: "x",
+        declared: false,
+        httpMethod: "POST",
+        pathTemplate: "/v1/trips/{id}/story/generate",
+      },
+      {
+        name: "y",
+        declared: false,
+        httpMethod: "POST",
+        pathTemplate: "/v1/articles/{id}/story/generate",
+      },
     ]);
-    // The first keeps the plain name; later ones get disambiguated.
-    expect(names[0]).toBe("orders");
-    expect(new Set(names).size).toBe(3);
+    expect(names).toEqual(["generate-trip-story", "generate-article-story"]);
     expect(renames).toHaveLength(2);
+  });
+
+  it("declared names win collisions; route names deepen around them", () => {
+    const { names } = resolveNames([
+      { name: "create-trip", declared: true },
+      { name: "z", declared: false, httpMethod: "POST", pathTemplate: "/v1/orgs/{id}/trips" },
+    ]);
+    // The declared "create-trip" keeps the spot; the nested route already
+    // carries its parent, so there is no collision at all.
+    expect(names).toEqual(["create-trip", "create-org-trip"]);
+  });
+
+  it("falls back to a method suffix, then a counter, when context runs out", () => {
+    const { names, renames } = resolveNames([
+      { name: "a", declared: false, httpMethod: "POST", pathTemplate: "/v1/search" },
+      { name: "b", declared: false, httpMethod: "POST", pathTemplate: "/v1/search" },
+    ]);
+    expect(names[0]).toBe("search");
+    expect(names[1]).toBe("search-post");
+    expect(renames).toHaveLength(1);
+  });
+
+  it("notes when a version prefix was dropped", () => {
+    const { notes } = resolveNames([
+      { name: "a", declared: false, httpMethod: "GET", pathTemplate: "/v1/trips" },
+    ]);
+    expect(notes.some((n) => n.includes("version"))).toBe(true);
+  });
+
+  it("never produces duplicate or invalid names", () => {
+    const inputs = [
+      { name: "a", declared: false, httpMethod: "GET", pathTemplate: "/v1/trips" },
+      { name: "b", declared: false, httpMethod: "GET", pathTemplate: "/v2/trips" },
+      { name: "list-trips", declared: true },
+      { name: "c", declared: false, httpMethod: "POST", pathTemplate: "/v1/trips" },
+    ];
+    const { names } = resolveNames(inputs);
+    expect(new Set(names).size).toBe(names.length);
     for (const name of names) expect(name).toMatch(TOOL_NAME_PATTERN);
-  });
-});
-
-describe("stripVersionPrefix", () => {
-  it("drops the version segment when nearly every name shares it", () => {
-    const { names, note } = stripVersionPrefix([
-      { name: "get-v1-trips" },
-      { name: "get-v1-users" },
-      { name: "post-v1-trips" },
-    ]);
-    expect(names).toEqual(["get-trips", "get-users", "post-trips"]);
-    expect(note).toContain("v1");
-  });
-
-  it("leaves names alone when the version is not shared", () => {
-    const { names, note } = stripVersionPrefix([
-      { name: "get-v1-trips" },
-      { name: "get-users" },
-      { name: "get-orders" },
-      { name: "get-products" },
-    ]);
-    expect(names).toEqual(["get-v1-trips", "get-users", "get-orders", "get-products"]);
-    expect(note).toBeUndefined();
-  });
-
-  it("only touches route-derived names, not operationIds that mention a version", () => {
-    // "preview-v2-changes" does not start with an HTTP method, so it neither
-    // counts toward the shared prefix nor gets stripped.
-    const { names, note } = stripVersionPrefix([
-      { name: "get-v1-a" },
-      { name: "get-v1-b" },
-      { name: "get-v1-c" },
-      { name: "get-v1-d" },
-      { name: "preview-v2-changes" },
-    ]);
-    expect(names).toEqual(["get-a", "get-b", "get-c", "get-d", "preview-v2-changes"]);
-    expect(note).toContain("v1");
   });
 });

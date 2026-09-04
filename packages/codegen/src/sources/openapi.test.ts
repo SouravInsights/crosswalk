@@ -111,7 +111,7 @@ describe("openapi source", () => {
     expect(tools.map((tool) => tool.name)).toEqual([
       "list-orders",
       "create-order",
-      "get-orders-id", // no operationId → named from method + path
+      "get-order", // no operationId → intent name from the route shape
       "delete-order",
     ]);
   });
@@ -135,13 +135,13 @@ describe("openapi source", () => {
 
   it("marks required path params", async () => {
     const tools = await openapi({ spec: "./openapi.yaml" }).collect();
-    const getOne = tools.find((tool) => tool.name === "get-orders-id");
+    const getOne = tools.find((tool) => tool.name === "get-order");
     expect(getOne?.inputSchema.required).toEqual(["id"]);
   });
 
   it("captures output schemas (with refs resolved) for the PII scan", async () => {
     const tools = await openapi({ spec: "./openapi.yaml" }).collect();
-    const getOne = tools.find((tool) => tool.name === "get-orders-id");
+    const getOne = tools.find((tool) => tool.name === "get-order");
     expect(getOne?.outputSchema?.properties?.email).toEqual({ type: "string" });
   });
 
@@ -156,7 +156,7 @@ describe("openapi source", () => {
   it("prefers summary, falls back to a method+path template", async () => {
     const tools = await openapi({ spec: "./openapi.yaml" }).collect();
     const list = tools.find((tool) => tool.name === "list-orders");
-    const getOne = tools.find((tool) => tool.name === "get-orders-id");
+    const getOne = tools.find((tool) => tool.name === "get-order");
     expect(list?.description).toBe("List all orders");
     expect(list?.descriptionSource).toBe("openapi-summary");
     expect(getOne?.description).toBe("GET /orders/{id}");

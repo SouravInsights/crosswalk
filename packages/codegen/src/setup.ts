@@ -16,12 +16,13 @@
 
 import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
-import { createInterface } from "node:readline/promises";
+import * as clack from "@clack/prompts";
 import { CONFIG_FILE_NAMES, loadConfig } from "./config.js";
 import { loadDataFile } from "./data-file.js";
 import { findSpecs } from "./detect.js";
 import { findWebApps, type WebApp } from "./detect-app.js";
-import { js } from "./generators/js.js";
+import { info, warn } from "./logger.js";
+import { tools } from "./outputs/tools.js";
 import { openapi } from "./sources/openapi.js";
 import type { CodegenConfig } from "./types.js";
 
@@ -66,7 +67,7 @@ export async function resolveSetup(cwd: string, flags: GenerateFlags): Promise<S
   if (hasConfigFile) {
     const { config, path } = await loadConfig(cwd, flags.configPath);
     if (flags.spec || flags.out) {
-      console.warn(`Note: --spec/--out are ignored; ${basename(path)} is in charge here.`);
+      warn(`Note: --spec/--out are ignored; ${basename(path)} is in charge here.`);
     }
     // Wiring still works with a config file if we can find the app.
     const data = await loadDataFile(cwd);
@@ -93,7 +94,7 @@ export async function resolveSetup(cwd: string, flags: GenerateFlags): Promise<S
       app = remembered;
     } else if (apps.length === 1) {
       app = apps[0];
-      console.log(`Found your web app: ${app?.dir} (${app?.framework})`);
+      info(`Found your web app: ${app?.dir} (${app?.framework})`);
     } else if (apps.length > 1) {
       app = await askWhichApp(apps);
     }
@@ -101,7 +102,7 @@ export async function resolveSetup(cwd: string, flags: GenerateFlags): Promise<S
 
   const outDir = flags.out ?? (app && app.dir !== "." ? `${app.dir}/src/webmcp` : "./src/webmcp");
   return {
-    config: { sources: [openapi({ spec })], generate: [js({ outDir })] },
+    config: { sources: [openapi({ spec })], outputs: [tools({ outDir })] },
     label: flags.spec ? `--spec ${spec}` : `detected ${spec}`,
     app,
     fromConfigFile: false,
@@ -117,21 +118,22 @@ export async function resolveSetup(cwd: string, flags: GenerateFlags): Promise<S
 async function askWhichApp(apps: WebApp[]): Promise<WebApp> {
   if (!process.stdin.isTTY) {
     const first = apps[0] as WebApp;
-    console.log(`Several packages look like web apps; using ${first.dir}. Override with --out.`);
+    warn(`Several packages look like web apps; using ${first.dir}. Override with --out.`);
     return first;
   }
-  console.log("Several packages look like the web app. Which one should the tools live in?");
-  apps.forEach((app, index) => {
-    console.log(`  ${index + 1}. ${app.dir} (${app.framework})${index === 0 ? "  [default]" : ""}`);
+  // Same picker init uses for multiple specs; one prompt style everywhere.
+  const picked = await clack.select({
+    message: "Several packages look like the web app. Which one should the tools live in?",
+    options: apps.map((app) => ({
+      value: app.dir,
+      label: `${app.dir} (${app.framework})`,
+    })),
   });
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    const answer = await rl.question("Choice [1]: ");
-    const picked = Number.parseInt(answer.trim() || "1", 10);
-    return apps[picked - 1] ?? (apps[0] as WebApp);
-  } finally {
-    rl.close();
+  if (clack.isCancel(picked)) {
+    // Cancel in a required choice falls back to the best guess, same as CI.
+    return apps[0] as WebApp;
   }
+  return apps.find((app) => app.dir === picked) ?? (apps[0] as WebApp);
 }
 
 /**
@@ -155,6 +157,6 @@ async function detectSpec(cwd: string): Promise<string> {
     );
   }
 
-  console.log(`Detected ${specs[0]} (override with --spec)`);
+  info(`Detected ${specs[0]} (override with --spec)`);
   return specs[0] as string;
 }

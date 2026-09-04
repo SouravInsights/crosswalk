@@ -16,7 +16,7 @@ export const deleteAlbumInputSchema = {
     "id": {
       "type": "string",
       "format": "uuid",
-      "description": "Album ID"
+      "description": "Id. A UUID."
     }
   },
   "required": [

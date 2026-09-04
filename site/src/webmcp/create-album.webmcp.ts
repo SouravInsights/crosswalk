@@ -14,10 +14,12 @@ export const createAlbumInputSchema = {
   "type": "object",
   "properties": {
     "albumName": {
-      "type": "string"
+      "type": "string",
+      "description": "Album name."
     },
     "description": {
-      "type": "string"
+      "type": "string",
+      "description": "Description."
     }
   },
   "required": [

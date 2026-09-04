@@ -16,7 +16,7 @@ export const getAlbumInfoInputSchema = {
     "id": {
       "type": "string",
       "format": "uuid",
-      "description": "Album ID"
+      "description": "Id. A UUID."
     }
   },
   "required": [

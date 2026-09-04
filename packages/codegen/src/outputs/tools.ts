@@ -1,9 +1,9 @@
 /**
- * The `js` generator, named after what lands in your repo: plain JavaScript/
- * TypeScript files that call the spec's imperative API
+ * The `tools` output, named after what lands in your repo: one file per
+ * tool, calling the spec's imperative API
  * (`document.modelContext.registerTool`).
  *
- * Output layout for `js({ outDir: "./src/webmcp" })`:
+ * Output layout for `tools({ outDir: "./src/webmcp" })`:
  *
  *   src/webmcp/
  *   ├── runtime.webmcp.ts          ← fully generated, never edit
@@ -19,21 +19,21 @@
  *
  * This file contains only the *file mechanics*: which files exist, and how to
  * update them without destroying hand-written code. The text of the generated
- * code itself lives in js-templates.ts, keeping "what the output looks like"
+ * code itself lives in tools-templates.ts, keeping "what the output looks like"
  * separate from "how files get written" is what keeps both readable.
  */
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { GeneratedFile, ReviewedTool, ToolGenerator } from "../types.js";
+import type { GeneratedFile, Output, ReviewedTool } from "../types.js";
 import {
   barrelSource,
   generatedRegion,
   ownedRegionScaffold,
   runtimeSource,
-} from "./js-templates.js";
+} from "./tools-templates.js";
 
-export interface JsGeneratorOptions {
+export interface ToolsOutputOptions {
   /** Where the tool files go, relative to the project root. */
   outDir: string;
 }
@@ -48,10 +48,10 @@ export const GENERATED_START = "// ─── webmcp-codegen: generated. Do not e
 export const GENERATED_END =
   "// ─── webmcp-codegen: end generated. Your code below survives regeneration. ───";
 
-/** Create the `js` generator for the config's `generate` array. */
-export function js(options: JsGeneratorOptions): ToolGenerator {
+/** Create the `tools` output for the config's `outputs` array. */
+export function tools(options: ToolsOutputOptions): Output {
   return {
-    kind: "js",
+    kind: "tools",
     outDir: options.outDir,
     async generate(tools, cwd) {
       const outDir = join(cwd, options.outDir);

@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: Generate safe, typed, human-reviewed WebMCP tools from the OpenAPI spec you already have.
+description: Generate safe, typed, human-reviewed WebMCP tools from your OpenAPI spec or validation schemas.
 ---
 
 ## The problem
@@ -12,11 +12,12 @@ chore. For an API with seventy endpoints it's a project nobody starts.
 
 And the details matter more than they look: a tool's **description is literally part of the
 prompt** the agent reasons over, and its **schema is the contract** the agent fills in.
-Hand-written copies of things your spec already knows go stale, drift, and lie.
+Hand-written copies of things your code already knows go stale, drift, and lie.
 
 ## What webmcp-codegen does
 
-You already have an OpenAPI spec. webmcp-codegen turns it into WebMCP tools, written as real
+You already have the source of truth: an OpenAPI spec, or validation schemas (zod, valibot,
+arktype, TypeBox) your app uses. webmcp-codegen turns them into WebMCP tools, written as real
 TypeScript files in your repo:
 
 ```bash
