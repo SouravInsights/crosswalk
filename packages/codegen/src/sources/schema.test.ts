@@ -42,7 +42,9 @@ describe("schema source", () => {
 
   it("falls back to the schema's describe() when the entry says nothing", async () => {
     const described = z.object({ title: z.string() }).describe("From the schema.");
-    const [candidate] = await schema({ tools: [{ name: "create-trip", schema: described }] }).collect();
+    const [candidate] = await schema({
+      tools: [{ name: "create-trip", schema: described }],
+    }).collect();
     expect(candidate?.description).toBe("From the schema.");
     expect(candidate?.descriptionSource).toBe("declared");
     // The object's own describe became the tool description; it must not also

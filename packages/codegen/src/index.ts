@@ -15,12 +15,12 @@ export type {
   CodegenConfig,
   GeneratedFile,
   JsonSchema,
+  Output,
   ReviewedTool,
   RiskTier,
   SafetyOptions,
   SideEffect,
   Source,
   SourceKind,
-  Output,
   ToolHints,
 } from "./types.js";

@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { tools } from "./outputs/tools.js";
-import { openapi } from "./sources/openapi.js";
 import { runGenerate } from "./pipeline.js";
+import { openapi } from "./sources/openapi.js";
 import type { CandidateTool, CodegenConfig, Source } from "./types.js";
 
 /** A hand-rolled in-memory source, so pipeline tests need no spec files. */
@@ -112,10 +112,10 @@ describe("runGenerate", () => {
   });
 
   it("never rewrites declared names, even ones that look versioned", async () => {
-    const result = await runGenerate(
-      configWith([manualSource([{ name: "get-v1-trips" }])]),
-      { cwd, dryRun: true },
-    );
+    const result = await runGenerate(configWith([manualSource([{ name: "get-v1-trips" }])]), {
+      cwd,
+      dryRun: true,
+    });
     expect(result.tools.map((tool) => tool.name)).toContain("get-v1-trips");
   });
 

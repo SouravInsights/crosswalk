@@ -95,16 +95,76 @@ export function cleanOperationId(operationId: string): string {
  * is treated as a resource, never guessed at.
  */
 const ACTION_VERBS = new Set([
-  "accept", "activate", "approve", "archive", "batch", "bookmark", "cancel",
-  "check", "claim", "clone", "close", "complete", "confirm", "copy", "create",
-  "decline", "deploy", "disable", "download", "duplicate", "enable",
-  "execute", "export", "generate", "import", "invite", "join", "leave",
-  "lock", "login", "logout", "merge", "migrate", "move", "notify", "open",
-  "pin", "process", "publish", "redeem", "refresh", "register", "reject",
-  "reopen", "resend", "reset", "restore", "retry", "revoke", "rollback",
-  "run", "search", "send", "share", "signup", "split", "start", "stop",
-  "submit", "sync", "trigger", "unarchive", "unbookmark", "unlock",
-  "unpin", "unpublish", "unregister", "update", "upload", "validate",
+  "accept",
+  "activate",
+  "approve",
+  "archive",
+  "batch",
+  "bookmark",
+  "cancel",
+  "check",
+  "claim",
+  "clone",
+  "close",
+  "complete",
+  "confirm",
+  "copy",
+  "create",
+  "decline",
+  "deploy",
+  "disable",
+  "download",
+  "duplicate",
+  "enable",
+  "execute",
+  "export",
+  "generate",
+  "import",
+  "invite",
+  "join",
+  "leave",
+  "lock",
+  "login",
+  "logout",
+  "merge",
+  "migrate",
+  "move",
+  "notify",
+  "open",
+  "pin",
+  "process",
+  "publish",
+  "redeem",
+  "refresh",
+  "register",
+  "reject",
+  "reopen",
+  "resend",
+  "reset",
+  "restore",
+  "retry",
+  "revoke",
+  "rollback",
+  "run",
+  "search",
+  "send",
+  "share",
+  "signup",
+  "split",
+  "start",
+  "stop",
+  "submit",
+  "sync",
+  "trigger",
+  "unarchive",
+  "unbookmark",
+  "unlock",
+  "unpin",
+  "unpublish",
+  "unregister",
+  "update",
+  "upload",
+  "validate",
   "verify",
 ]);
 
@@ -119,9 +179,7 @@ const PLURAL_ACTIONS = new Set(["batch", "import", "export", "sync"]);
  * /auth/login" is "login", not "login-auth"; the grouping word adds nothing
  * an agent can act on.
  */
-const GROUPING_SEGMENTS = new Set([
-  "auth", "authentication", "api", "admin", "internal", "public",
-]);
+const GROUPING_SEGMENTS = new Set(["auth", "authentication", "api", "admin", "internal", "public"]);
 
 /**
  * Trailing segments that mean "the current one": GET /users/me is a member
@@ -364,7 +422,7 @@ export function resolveNames(inputs: NameInput[]): ResolvedNames {
     const pinned = fixed[index];
     if (pinned) return pinned;
     const analysis = analyses[index];
-    if (!analysis || analysis.tier !== "intent") return bases[index] as string;
+    if (analysis?.tier !== "intent") return bases[index] as string;
     const used = (analysis.context ?? []).slice(0, depth[index] as number).reverse();
     return [analysis.verb, ...used, analysis.noun].filter(Boolean).join("-");
   };

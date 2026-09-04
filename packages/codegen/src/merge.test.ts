@@ -49,10 +49,7 @@ function schemaCandidate(overrides: Partial<CandidateTool> = {}): CandidateTool 
 
 describe("mergeSchemaWithOperations", () => {
   it("fuses a schema entry with its operation into one tool", () => {
-    const { tools, findings } = mergeSchemaWithOperations([
-      openapiCandidate(),
-      schemaCandidate(),
-    ]);
+    const { tools, findings } = mergeSchemaWithOperations([openapiCandidate(), schemaCandidate()]);
 
     expect(findings).toEqual([]);
     expect(tools).toHaveLength(1);

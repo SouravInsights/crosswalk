@@ -10,11 +10,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { describeCandidateInputs } from "./describe.js";
+import { pascalCase } from "./json-schema.js";
 import { runLlmLayer } from "./llm.js";
 import { mergeSchemaWithOperations } from "./merge.js";
 import { resolveNames } from "./naming.js";
 import { auditTools, reviewTools } from "./safety.js";
-import { pascalCase } from "./json-schema.js";
 import type {
   AuditFinding,
   CodegenConfig,
@@ -81,7 +81,9 @@ export async function runGenerate(
   //    silent standalone fallback.
   const merge = mergeSchemaWithOperations(candidates);
   if (merge.findings.length > 0) {
-    progress(`Merged ${candidates.length - merge.tools.length} schema ${candidates.length - merge.tools.length === 1 ? "entry" : "entries"} into endpoints`);
+    progress(
+      `Merged ${candidates.length - merge.tools.length} schema ${candidates.length - merge.tools.length === 1 ? "entry" : "entries"} into endpoints`,
+    );
   }
 
   // 3. Describe: fill field text in layer order. Author text stays verbatim
@@ -120,7 +122,8 @@ export async function runGenerate(
   const authCount = tools.filter((t) => t.endpointRole === "auth").length;
   const adminCount = tools.filter((t) => t.endpointRole === "admin").length;
   if (authCount > 0) progress(`Disabled ${authCount} auth endpoint${authCount === 1 ? "" : "s"}`);
-  if (adminCount > 0) progress(`Disabled ${adminCount} admin endpoint${adminCount === 1 ? "" : "s"}`);
+  if (adminCount > 0)
+    progress(`Disabled ${adminCount} admin endpoint${adminCount === 1 ? "" : "s"}`);
 
   // 6. Hand-authored overrides (dashboard edits) win over every derived
   //    layer, field text included: an override is the developer's final word,

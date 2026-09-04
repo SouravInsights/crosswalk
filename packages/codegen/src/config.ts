@@ -97,7 +97,7 @@ function isCodegenConfig(value: unknown): value is CodegenConfig {
   if (Array.isArray(config.generate) && !Array.isArray(config.outputs)) {
     throw new Error(
       "This config uses `generate: [...]`, renamed in 0.5. Three edits:\n" +
-        '  1. rename the key to `outputs: [...]`\n' +
+        "  1. rename the key to `outputs: [...]`\n" +
         '  2. import from "@webmcp-stack/codegen/outputs" instead of "/generators"\n' +
         "  3. rename `js(...)` to `tools(...)`",
     );

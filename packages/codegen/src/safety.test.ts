@@ -23,10 +23,22 @@ describe("reviewTools classification", () => {
   it("classifies schema-declared tools (no verb) from the name", () => {
     const { tools } = reviewTools([
       // Reading words are reads, born enabled.
-      candidate({ name: "search-places", httpMethod: undefined, source: { kind: "schema", ref: "search-places" } }),
+      candidate({
+        name: "search-places",
+        httpMethod: undefined,
+        source: { kind: "schema", ref: "search-places" },
+      }),
       // An unknown action defaults to write: never silently treated as safe.
-      candidate({ name: "create-trip", httpMethod: undefined, source: { kind: "schema", ref: "create-trip" } }),
-      candidate({ name: "delete-account", httpMethod: undefined, source: { kind: "schema", ref: "delete-account" } }),
+      candidate({
+        name: "create-trip",
+        httpMethod: undefined,
+        source: { kind: "schema", ref: "create-trip" },
+      }),
+      candidate({
+        name: "delete-account",
+        httpMethod: undefined,
+        source: { kind: "schema", ref: "delete-account" },
+      }),
     ]);
     expect(tools.map((tool) => tool.sideEffect)).toEqual(["read", "write", "destructive"]);
     expect(tools.map((tool) => tool.enabledByDefault)).toEqual([true, false, false]);
@@ -302,8 +314,7 @@ describe("auditTools", () => {
     const messages = auditTools(tools).map((finding) => finding.message);
     expect(
       messages.some(
-        (message) =>
-          message.includes('"locationObject"') && message.includes('"search-places"'),
+        (message) => message.includes('"locationObject"') && message.includes('"search-places"'),
       ),
     ).toBe(true);
   });

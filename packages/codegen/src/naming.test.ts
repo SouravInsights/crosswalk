@@ -102,8 +102,18 @@ describe("analyzeRoute", () => {
 describe("resolveNames", () => {
   it("deepens colliding route names with parent context, both sides", () => {
     const { names, renames } = resolveNames([
-      { name: "x", declared: false, httpMethod: "POST", pathTemplate: "/v1/trips/{id}/story/generate" },
-      { name: "y", declared: false, httpMethod: "POST", pathTemplate: "/v1/articles/{id}/story/generate" },
+      {
+        name: "x",
+        declared: false,
+        httpMethod: "POST",
+        pathTemplate: "/v1/trips/{id}/story/generate",
+      },
+      {
+        name: "y",
+        declared: false,
+        httpMethod: "POST",
+        pathTemplate: "/v1/articles/{id}/story/generate",
+      },
     ]);
     expect(names).toEqual(["generate-trip-story", "generate-article-story"]);
     expect(renames).toHaveLength(2);

@@ -256,7 +256,12 @@ export type LlmTask = "describe" | "relationship" | "semantic-review" | "suggest
  */
 export interface LlmProvider {
   name: string;
-  complete(task: LlmTask, prompt: string): Promise<string>;
+  /**
+   * Ask one question. `system` is the per-task prompt (the built-in default,
+   * or the developer's override from config); providers that ignore it fall
+   * back to whatever the task implies.
+   */
+  complete(task: LlmTask, prompt: string, system?: string): Promise<string>;
 }
 
 export interface LlmOptions {

@@ -5,8 +5,8 @@
  */
 
 import CFonts from "cfonts";
-import pc from "picocolors";
 import Table from "cli-table3";
+import pc from "picocolors";
 import type { GenerateResult } from "./pipeline.js";
 import type { Setup } from "./setup.js";
 import type { WirePlan } from "./wire.js";
@@ -76,7 +76,8 @@ export function groupFindings(findings: GenerateResult["findings"]): FindingGrou
     { heading: (n: number) => string; items: string[] }
   > = {
     auth: {
-      heading: (n) => `${n} auth endpoint${n === 1 ? "" : "s"} disabled; agents should never sign in`,
+      heading: (n) =>
+        `${n} auth endpoint${n === 1 ? "" : "s"} disabled; agents should never sign in`,
       items: [],
     },
     admin: {
@@ -193,7 +194,9 @@ export function renderSummary(
   // messages are trimmed here; --verbose shows them in full with the tools.
   const warnings = groups.reduce((sum, group) => sum + group.items.length, 0);
   if (warnings > 0) {
-    console.log(`  ${c.yellow("!")} ${bold(`${warnings} safety note${warnings === 1 ? "" : "s"}`)}`);
+    console.log(
+      `  ${c.yellow("!")} ${bold(`${warnings} safety note${warnings === 1 ? "" : "s"}`)}`,
+    );
     const maxHeading = Math.max(60, termWidth() - 6);
     for (const group of groups) {
       const heading =

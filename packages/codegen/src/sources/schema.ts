@@ -218,7 +218,9 @@ function toJsonSchema(
   return converter.zodToJsonSchema(value);
 }
 
-/** Resolve a package from the app's own node_modules, with an actionable miss. */function requireFromApp<T>(packageName: string, anchorDir: string, toolName: string): T {
+/** Resolve a package from the app's own node_modules, with an actionable miss. */ function requireFromApp<
+  T,
+>(packageName: string, anchorDir: string, toolName: string): T {
   try {
     return createRequire(join(anchorDir, "codegen.config.mjs"))(packageName) as T;
   } catch {
@@ -239,7 +241,10 @@ function toJsonSchema(
 export function schemaExportsToJson(
   moduleExports: Record<string, unknown>,
   anchorDir: string,
-): { schemas: { name: string; schemaText: string }[]; skipped: { name: string; reason: string }[] } {
+): {
+  schemas: { name: string; schemaText: string }[];
+  skipped: { name: string; reason: string }[];
+} {
   const schemas: { name: string; schemaText: string }[] = [];
   const skipped: { name: string; reason: string }[] = [];
   for (const [name, value] of Object.entries(moduleExports)) {

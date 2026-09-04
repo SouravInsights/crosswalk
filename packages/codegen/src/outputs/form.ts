@@ -15,11 +15,9 @@ import { readFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import type { GeneratedFile, Output, ReviewedTool } from "../types.js";
 
-export interface FormOutputOptions {}
-
 type FormPointer = NonNullable<ReviewedTool["form"]>;
 
-type Quote = "\"" | "'" | "`";
+type Quote = '"' | "'" | "`";
 
 interface ParsedAttribute {
   name: string;
@@ -42,7 +40,7 @@ interface Insertion {
 }
 
 /** Create the in-place form output used by configs with declarative forms. */
-export function form(_options: FormOutputOptions = {}): Output {
+export function form(): Output {
   return {
     kind: "form",
     outDir: ".",
@@ -187,7 +185,12 @@ function findControl(tags: OpenTag[], key: string): OpenTag | undefined {
 
 /** Restrict annotation to native form controls and capitalized JSX wrappers. */
 function isControlTag(tag: OpenTag): boolean {
-  return tag.name === "input" || tag.name === "textarea" || tag.name === "select" || /^[A-Z]/.test(tag.name);
+  return (
+    tag.name === "input" ||
+    tag.name === "textarea" ||
+    tag.name === "select" ||
+    /^[A-Z]/.test(tag.name)
+  );
 }
 
 /** Match a static attribute value without guessing at dynamic JSX expressions. */

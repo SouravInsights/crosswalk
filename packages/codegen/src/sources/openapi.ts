@@ -19,8 +19,8 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
-import { analyzeRoute, cleanOperationId } from "../naming.js";
 import { deepDeref, deref, pascalCase } from "../json-schema.js";
+import { analyzeRoute, cleanOperationId } from "../naming.js";
 import type { CandidateTool, JsonSchema, Source } from "../types.js";
 
 export interface OpenApiSourceOptions {

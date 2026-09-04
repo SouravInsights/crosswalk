@@ -15,13 +15,16 @@ export const createUserAdminInputSchema = {
   "properties": {
     "email": {
       "type": "string",
-      "format": "email"
+      "format": "email",
+      "description": "Email. An email address."
     },
     "name": {
-      "type": "string"
+      "type": "string",
+      "description": "Name."
     },
     "password": {
-      "type": "string"
+      "type": "string",
+      "description": "Password."
     }
   },
   "required": [

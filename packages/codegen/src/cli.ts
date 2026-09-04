@@ -35,8 +35,8 @@ import { debug, enableVerbose, error, info, success, warn } from "./logger.js";
 import { runGenerate } from "./pipeline.js";
 import { resolveSetup } from "./setup.js";
 import { schemaExportsToJson } from "./sources/schema.js";
-import { applyWiring, planWiring, type WirePlan } from "./wire.js";
 import type { CodegenConfig } from "./types.js";
+import { applyWiring, planWiring, type WirePlan } from "./wire.js";
 
 const HELP = `
 webmcp-codegen — generate WebMCP tools from your OpenAPI spec
@@ -190,7 +190,7 @@ async function init(): Promise<number> {
     // The schema path is the answer to "no OpenAPI spec": yesterday this run
     // had nothing to say, today it scaffolds the contract the app does have.
     info("No OpenAPI spec found, so this config starts from your validation schemas instead.");
-    info("Add a spec later with: sources: [openapi({ spec: \"./openapi.yaml\" }), ...]");
+    info('Add a spec later with: sources: [openapi({ spec: "./openapi.yaml" }), ...]');
   }
   if (schemaLibs.length > 0) {
     info(`Detected ${schemaLibs.join(", ")}. Declare agent-facing actions from your`);
@@ -342,7 +342,9 @@ async function suggest(modulePath: string): Promise<number> {
   for (const suggestion of suggestions) {
     info(`  ◦ ${suggestion.message}`);
   }
-  info(dim("\n  Proposals only; nothing was written. Declare what you want in codegen.config.mjs.\n"));
+  info(
+    dim("\n  Proposals only; nothing was written. Declare what you want in codegen.config.mjs.\n"),
+  );
   return 0;
 }
 
@@ -371,7 +373,8 @@ async function importSchemaModule(
 }
 
 async function generate(flags: CliFlags): Promise<number> {
-  printBanner();  const cwd = process.cwd();
+  printBanner();
+  const cwd = process.cwd();
   const setup = await resolveSetup(cwd, {
     dryRun: flags.dryRun,
     skipAudit: flags.skipAudit,
@@ -385,9 +388,7 @@ async function generate(flags: CliFlags): Promise<number> {
   // Narrate what the pipeline is doing so the run doesn't feel magical.
   // Verbose gets every step; the default gets just the source count so you
   // know what the CLI consumed.
-  const progress = flags.verbose
-    ? (msg: string) => debug(msg)
-    : undefined;
+  const progress = flags.verbose ? (msg: string) => debug(msg) : undefined;
 
   const result = await runGenerate(setup.config, {
     cwd,

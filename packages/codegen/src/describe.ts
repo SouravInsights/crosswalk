@@ -73,10 +73,8 @@ function numberConstraintSentence(schema: JsonSchema, whole: boolean): string | 
   const noun = whole ? "A whole number" : "A number";
   const min = typeof schema.minimum === "number" ? schema.minimum : undefined;
   const max = typeof schema.maximum === "number" ? schema.maximum : undefined;
-  const exMin =
-    typeof schema.exclusiveMinimum === "number" ? schema.exclusiveMinimum : undefined;
-  const exMax =
-    typeof schema.exclusiveMaximum === "number" ? schema.exclusiveMaximum : undefined;
+  const exMin = typeof schema.exclusiveMinimum === "number" ? schema.exclusiveMinimum : undefined;
+  const exMax = typeof schema.exclusiveMaximum === "number" ? schema.exclusiveMaximum : undefined;
 
   if (min !== undefined && max !== undefined) return `${noun} from ${min} to ${max}.`;
   if (exMin !== undefined && exMax !== undefined) {
@@ -174,7 +172,11 @@ function humanizeFieldName(name: string): string {
  * author intent and shipping to the agent.
  */
 function isStubDescription(text: string): boolean {
-  const words = text.replace(/[.\s]+/g, " ").trim().split(" ").filter(Boolean);
+  const words = text
+    .replace(/[.\s]+/g, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean);
   return words.length <= 3;
 }
 

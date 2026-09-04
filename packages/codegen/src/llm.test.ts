@@ -50,9 +50,9 @@ describe("resolveLlmProvider", () => {
 
   it("builds the built-in provider from a config key, then env keys", () => {
     expect(resolveLlmProvider({ apiKey: "sk-config" }, {})?.name).toContain("openai-compatible");
-    expect(
-      resolveLlmProvider({}, { WEBMCP_LLM_API_KEY: "sk-env" })?.name,
-    ).toContain("openai-compatible");
+    expect(resolveLlmProvider({}, { WEBMCP_LLM_API_KEY: "sk-env" })?.name).toContain(
+      "openai-compatible",
+    );
     expect(resolveLlmProvider({}, { OPENAI_API_KEY: "sk-env" })?.name).toContain(
       "openai-compatible",
     );
@@ -88,9 +88,9 @@ describe("runLlmLayer", () => {
     expect(calls.filter((call) => call.task === "describe")).toHaveLength(1);
     expect(calls[0]?.prompt).toContain("create-trip");
     expect(suggestions.some((s) => s.message.includes("Create a trip and open it"))).toBe(true);
-    expect(
-      suggestions.some((s) => s.field === "minutes" && s.message.includes("30 to 600")),
-    ).toBe(true);
+    expect(suggestions.some((s) => s.field === "minutes" && s.message.includes("30 to 600"))).toBe(
+      true,
+    );
   });
 
   it("suggests a producer for fields the audit flagged as unproducible", async () => {
@@ -182,10 +182,7 @@ describe("runLlmLayer", () => {
       { sources: [], outputs: [], llm: { provider } },
       {
         // Two tools with byte-identical questions hash to one provider call.
-        tools: [
-          tool({ name: "same", ...twin }),
-          tool({ name: "same", ...twin }),
-        ],
+        tools: [tool({ name: "same", ...twin }), tool({ name: "same", ...twin })],
         findings: [],
       },
     );
@@ -207,9 +204,7 @@ describe("runLlmLayer", () => {
       },
     );
     expect(
-      suggestions.some(
-        (s) => s.message.includes("failed") && s.message.includes("unaffected"),
-      ),
+      suggestions.some((s) => s.message.includes("failed") && s.message.includes("unaffected")),
     ).toBe(true);
   });
 

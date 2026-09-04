@@ -64,7 +64,7 @@ const DEFAULT_PROMPTS: Record<LlmTask, string> = {
   suggest: [
     "You are given exported validation schemas from a web app. Propose which should",
     "become agent-facing WebMCP tools: user-meaningful actions, not plumbing. For each,",
-    'name (kebab-case, verb-first), one-sentence description, and whether it writes.',
+    "name (kebab-case, verb-first), one-sentence description, and whether it writes.",
     'Answer with JSON only: { "tools": [{ "name": string, "description": string, "write": boolean }] }.',
   ].join(" "),
 };
@@ -98,7 +98,7 @@ export function resolveLlmProvider(
 function openAiCompatibleProvider(apiKey: string, baseUrl: string, model: string): LlmProvider {
   return {
     name: `openai-compatible (${model})`,
-    async complete(task, prompt) {
+    async complete(task, prompt, system) {
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
@@ -108,7 +108,9 @@ function openAiCompatibleProvider(apiKey: string, baseUrl: string, model: string
         body: JSON.stringify({
           model,
           messages: [
-            { role: "system", content: DEFAULT_PROMPTS[task] },
+            // The developer's per-task override wins over the shipped default;
+            // config.llm.prompts exists so teams can tune these.
+            { role: "system", content: system ?? DEFAULT_PROMPTS[task] },
             { role: "user", content: prompt },
           ],
           temperature: 0,
@@ -139,11 +141,19 @@ function cached(provider: LlmProvider): LlmProvider {
   const seen = new Map<string, Promise<string>>();
   return {
     name: provider.name,
-    complete(task, prompt) {
-      const key = createHash("sha256").update(task).update("\0").update(prompt).digest("hex");
+    complete(task, prompt, system) {
+      // The system prompt is part of the question's identity: the same
+      // question under two different overrides must not share an answer.
+      const key = createHash("sha256")
+        .update(task)
+        .update("\0")
+        .update(system ?? "")
+        .update("\0")
+        .update(prompt)
+        .digest("hex");
       let pending = seen.get(key);
       if (!pending) {
-        pending = provider.complete(task, prompt);
+        pending = provider.complete(task, prompt, system);
         seen.set(key, pending);
       }
       return pending;
@@ -214,8 +224,7 @@ async function proposeDescriptions(
 ): Promise<void> {
   const needy = tools.filter(
     (tool) =>
-      tool.descriptionSource === "generated-template" ||
-      (tool.synthesizedFields ?? []).length > 0,
+      tool.descriptionSource === "generated-template" || (tool.synthesizedFields ?? []).length > 0,
   );
   for (const tool of needy) {
     const fields = (tool.synthesizedFields ?? [])
@@ -228,7 +237,7 @@ async function proposeDescriptions(
       `Tool "${tool.name}" (currently described as "${tool.description}"). ` +
       (fields ? `Fields needing text: { ${fields} }.` : "No fields need text.");
     try {
-      const answer = parseCompletionJson(await provider.complete("describe", question));
+      const answer = parseCompletionJson(await provider.complete("describe", question, prompt));
       if (typeof answer?.description === "string" && answer.description.trim()) {
         suggestions.push({
           task: "describe",
@@ -276,7 +285,7 @@ async function proposeProducers(
       `Field in tool "${gap.tool}": ${gap.message}\n` +
       `Existing tools: ${toolNames.join(", ") || "(none)"}.`;
     try {
-      const answer = parseCompletionJson(await provider.complete("relationship", question));
+      const answer = parseCompletionJson(await provider.complete("relationship", question, prompt));
       const producer = answer?.producer;
       if (typeof producer === "string" && toolNames.includes(producer)) {
         suggestions.push({
@@ -313,7 +322,9 @@ async function reviewSemantics(
     })
     .join("\n");
   try {
-    const answer = parseCompletionJson(await provider.complete("semantic-review", question));
+    const answer = parseCompletionJson(
+      await provider.complete("semantic-review", question, prompt),
+    );
     const contradictions = answer?.contradictions;
     if (Array.isArray(contradictions)) {
       for (const item of contradictions) {
@@ -339,11 +350,9 @@ async function proposeTools(
   exports_: { name: string; schemaText: string }[],
   suggestions: LlmSuggestion[],
 ): Promise<void> {
-  const question = exports_
-    .map((entry) => `${entry.name}: ${entry.schemaText}`)
-    .join("\n\n");
+  const question = exports_.map((entry) => `${entry.name}: ${entry.schemaText}`).join("\n\n");
   try {
-    const answer = parseCompletionJson(await provider.complete("suggest", question));
+    const answer = parseCompletionJson(await provider.complete("suggest", question, prompt));
     const proposed = answer?.tools;
     if (Array.isArray(proposed)) {
       for (const item of proposed) {

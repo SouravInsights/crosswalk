@@ -234,8 +234,7 @@ export function reviewTools(
   for (const tool of candidates) {
     const excludedBy = excluded.find(
       (pattern) =>
-        tool.name.toLowerCase().includes(pattern) ||
-        routeRef(tool).toLowerCase().includes(pattern),
+        tool.name.toLowerCase().includes(pattern) || routeRef(tool).toLowerCase().includes(pattern),
     );
     if (excludedBy) {
       skipped.push({ ref: tool.source.ref, reason: `excluded by config ("${excludedBy}")` });

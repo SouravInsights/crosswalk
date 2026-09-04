@@ -16,7 +16,7 @@ export const getAssetInfoInputSchema = {
     "id": {
       "type": "string",
       "format": "uuid",
-      "description": "Asset ID"
+      "description": "Id. A UUID."
     }
   },
   "required": [

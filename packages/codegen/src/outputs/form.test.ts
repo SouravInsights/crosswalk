@@ -82,7 +82,7 @@ export function ProfileForm() {
     );
     expect(file?.contents).toContain('<button type="submit">Save profile</button>');
     expect(file?.notes).toContain(
-      "added name=\"name\" to the control with id=\"name\" (WebMCP addresses fields by name)",
+      'added name="name" to the control with id="name" (WebMCP addresses fields by name)',
     );
     expect(file?.notes).toContain(
       "withheld toolautosubmit (write form): the agent fills the form, a human submits",
