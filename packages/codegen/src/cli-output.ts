@@ -4,36 +4,25 @@
  * and be understandable by someone who has never seen the tool before.
  */
 
+import pc from "picocolors";
+import Table from "cli-table3";
 import type { GenerateResult } from "./pipeline.js";
 import type { Setup } from "./setup.js";
 import type { WirePlan } from "./wire.js";
 
-// ANSI escapes
-const ESC = "\x1b[";
-const RESET = `${ESC}0m`;
-const BOLD = `${ESC}1m`;
-const DIM = `${ESC}2m`;
-
-const FG = {
-  red: `${ESC}31m`,
-  green: `${ESC}32m`,
-  yellow: `${ESC}33m`,
-  blue: `${ESC}34m`,
-  cyan: `${ESC}36m`,
-  gray: `${ESC}90m`,
+// picocolors auto-detects TTY and NO_COLOR, so piping to a file or CI logs
+// gets plain text, not raw escape codes.
+const c = {
+  red: pc.red,
+  green: pc.green,
+  yellow: pc.yellow,
+  blue: pc.blue,
+  cyan: pc.cyan,
+  gray: pc.gray,
 };
 
-function c(color: keyof typeof FG, text: string): string {
-  return `${FG[color]}${text}${RESET}`;
-}
-
-function bold(text: string): string {
-  return `${BOLD}${text}${RESET}`;
-}
-
-export function dim(text: string): string {
-  return `${DIM}${text}${RESET}`;
-}
+const bold = pc.bold;
+export const dim = pc.dim;
 
 /** Group findings by what the user needs to know. */
 function summarizeFindings(findings: GenerateResult["findings"]): {
@@ -81,7 +70,7 @@ export function renderSummary(
   console.log("");
 
   // What happened
-  console.log(`  ${c("green", "✓")} ${bold(`${tools.length} tools generated`)}`);
+  console.log(`  ${c.green("✓")} ${bold(`${tools.length} tools generated`)}`);
   console.log(dim(`    ${enabled} ready to use, ${tools.length - enabled} start disabled`));
   if (skipped.length > 0) {
     console.log(dim(`    ${skipped.length} skipped (webhooks and excluded endpoints)`));
@@ -93,11 +82,11 @@ export function renderSummary(
   const errorFindings = findings.filter((f) => f.level === "error");
   if (errorFindings.length > 0) {
     console.log(
-      `  ${c("red", "✖")} ${bold(`${errorFindings.length} error${errorFindings.length === 1 ? "" : "s"}, nothing written`)}`,
+      `  ${c.red("✖")} ${bold(`${errorFindings.length} error${errorFindings.length === 1 ? "" : "s"}, nothing written`)}`,
     );
     for (const f of errorFindings) {
       const where = f.tool ? dim(` (${f.tool})`) : "";
-      console.log(`  ${c("red", "✖")} ${f.message}${where}`);
+      console.log(`  ${c.red("✖")} ${f.message}${where}`);
     }
     console.log("");
   }
@@ -105,7 +94,7 @@ export function renderSummary(
   // Safety notes — human-readable
   const warnings = totalFindings - errorFindings.length;
   if (warnings > 0) {
-    console.log(`  ${c("yellow", "!")} ${bold(`${warnings} safety note${warnings === 1 ? "" : "s"}`)}`);
+    console.log(`  ${c.yellow("!")} ${bold(`${warnings} safety note${warnings === 1 ? "" : "s"}`)}`);
     if (findingCounts.auth > 0) {
       console.log(
         dim(
@@ -140,9 +129,9 @@ export function renderSummary(
 
   // Where things went
   const outDir = setup.config.outputs[0]?.outDir ?? "src/webmcp";
-  console.log(`  ${c("cyan", "→")} ${bold("Files")} ${outDir}`);
+  console.log(`  ${c.cyan("→")} ${bold("Files")} ${outDir}`);
   if (wiring && !wiring.alreadyWired) {
-    console.log(`  ${c("cyan", "→")} ${bold("Registration")} wired into your app`);
+    console.log(`  ${c.cyan("→")} ${bold("Registration")} wired into your app`);
   }
   // Per-file notes (kept attributes, added names, unmatched controls). Capped
   // in the summary; --verbose lists them all.
@@ -159,7 +148,7 @@ export function renderSummary(
   // suggestion is not a fact. Nothing here was applied to anything.
   if (result.suggestions.length > 0) {
     console.log(
-      `  ${c("cyan", "◦")} ${bold(`${result.suggestions.length} LLM suggestion${result.suggestions.length === 1 ? "" : "s"}`)} ${dim("(proposals only; nothing applied)")}`,
+      `  ${c.cyan("◦")} ${bold(`${result.suggestions.length} LLM suggestion${result.suggestions.length === 1 ? "" : "s"}`)} ${dim("(proposals only; nothing applied)")}`,
     );
     for (const suggestion of result.suggestions) {
       console.log(dim(`    ◦ ${suggestion.message}`));
@@ -168,7 +157,7 @@ export function renderSummary(
   }
 
   // Next step
-  console.log(`  ${bold("Next:")} ${c("cyan", "npx @webmcp-stack/codegen dev")}`);
+  console.log(`  ${bold("Next:")} ${c.cyan("npx @webmcp-stack/codegen dev")}`);
   console.log(dim("  Review your tools, edit descriptions, test them live"));
   console.log("");
   console.log(dim(`  Docs: https://webmcp-stack.vercel.app/docs`));
@@ -186,7 +175,7 @@ export function renderVerbose(result: GenerateResult, setup: Setup, _cwd: string
 
   // Skipped first
   if (skipped.length > 0) {
-    console.log(c("gray", "Skipped:"));
+    console.log(c.gray("Skipped:"));
     for (const s of skipped) {
       console.log(`  ${dim(s.ref)}`);
       console.log(`    ${dim(s.reason)}`);
@@ -194,7 +183,8 @@ export function renderVerbose(result: GenerateResult, setup: Setup, _cwd: string
     console.log("");
   }
 
-  // Tools grouped by risk
+  // Tools grouped by risk, rendered as a table per group so 72 tools scan
+  // as columns, not a wall of indented text.
   const byRisk = {
     read: tools.filter((t) => t.sideEffect === "read"),
     write: tools.filter((t) => t.sideEffect === "write"),
@@ -202,19 +192,27 @@ export function renderVerbose(result: GenerateResult, setup: Setup, _cwd: string
   };
 
   const riskLabels: Record<string, string> = {
-    read: c("green", "Read-only"),
-    write: c("yellow", "Write"),
-    destructive: c("red", "Destructive"),
+    read: c.green("Read-only"),
+    write: c.yellow("Write"),
+    destructive: c.red("Destructive"),
   };
 
   for (const [risk, group] of Object.entries(byRisk)) {
     if (group.length === 0) continue;
     console.log(riskLabels[risk] ?? risk);
+    const table = new Table({
+      head: [dim("Tool"), dim("Status"), dim("Description")],
+      style: { head: [], border: [] },
+      chars: { mid: "", "left-mid": "", "mid-mid": "", "right-mid": "" },
+    });
     for (const tool of group) {
-      const status = tool.enabledByDefault ? "" : dim(" (disabled)");
-      console.log(`  ${tool.name}${status}`);
-      if (tool.description) console.log(`    ${dim(tool.description)}`);
+      table.push([
+        tool.name,
+        tool.enabledByDefault ? c.green("enabled") : dim("disabled"),
+        tool.description || dim("(no description)"),
+      ]);
     }
+    console.log(table.toString());
     console.log("");
   }
 
@@ -222,7 +220,7 @@ export function renderVerbose(result: GenerateResult, setup: Setup, _cwd: string
   if (findings.length > 0) {
     console.log(bold("Safety notes:"));
     for (const f of findings) {
-      const icon = f.level === "error" ? c("red", "✖") : c("yellow", "⚠");
+      const icon = f.level === "error" ? c.red("✖") : c.yellow("⚠");
       const where = f.tool ? dim(` (${f.tool})`) : "";
       console.log(`  ${icon} ${f.message}${where}`);
     }
@@ -233,7 +231,7 @@ export function renderVerbose(result: GenerateResult, setup: Setup, _cwd: string
   if (result.suggestions.length > 0) {
     console.log(bold("LLM suggestions (proposals only; nothing applied):"));
     for (const suggestion of result.suggestions) {
-      console.log(`  ${c("cyan", "◦")} ${dim(suggestion.message)}`);
+      console.log(`  ${c.cyan("◦")} ${dim(suggestion.message)}`);
     }
     console.log("");
   }

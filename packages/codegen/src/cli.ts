@@ -23,6 +23,7 @@ import { writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
+import * as clack from "@clack/prompts";
 import { dim, renderSummary, renderVerbose } from "./cli-output.js";
 import { CONFIG_FILE_NAMES, loadConfig } from "./config.js";
 import { saveDataFile } from "./data-file.js";
@@ -150,7 +151,23 @@ async function init(): Promise<number> {
 
   const specs = await findSpecs(cwd);
   const schemaLibs = await findSchemaLibraries(cwd);
-  const spec = specs.length > 0 ? `./${specs[0]}` : undefined;
+
+  // Multiple specs: let the person pick, don't guess. The choice is saved
+  // in the config, so this only asks once.
+  let spec: string | undefined;
+  if (specs.length > 1) {
+    const picked = await clack.select({
+      message: "Found multiple OpenAPI specs. Which one should the codegen use?",
+      options: specs.map((s) => ({ value: `./${s}`, label: s })),
+    });
+    if (clack.isCancel(picked)) {
+      console.log(dim("\n  Cancelled. Run init again when you're ready.\n"));
+      return 0;
+    }
+    spec = picked as string;
+  } else if (specs.length === 1) {
+    spec = `./${specs[0]}`;
+  }
 
   await writeFile(configPath, initTemplate(spec, schemaLibs));
 
@@ -287,10 +304,13 @@ async function suggest(modulePath: string): Promise<number> {
     return 0;
   }
 
+  const spinner = clack.spinner();
+  spinner.start("Asking the LLM which schemas are worth declaring");
   const suggestions = await runLlmLayer(
     { sources: [], outputs: [], llm: llm ?? {} },
     { tools: [], findings: [], suggestExports: schemas },
   );
+  spinner.stop("Done");
 
   console.log("");
   if (suggestions.length === 0) {
@@ -346,6 +366,25 @@ async function generate(flags: CliFlags): Promise<number> {  const cwd = process
     force: flags.force,
     skipAudit: flags.skipAudit,
   });
+
+  // Audit errors block the write. Instead of requiring --force on a re-run,
+  // ask once: fix the errors, or write anyway.
+  if (result.blocked && !flags.dryRun) {
+    const proceed = await clack.confirm({
+      message: `${result.findings.filter((f) => f.level === "error").length} audit errors found. Write files anyway?`,
+      initialValue: false,
+    });
+    if (clack.isCancel(proceed) || !proceed) {
+      console.log(dim("\n  Fix the errors and run generate again, or use --force to skip this check.\n"));
+      return 1;
+    }
+    // Re-run with force to actually write.
+    const forced = await runGenerate(setup.config, { cwd, dryRun: false, force: true });
+    result.tools = forced.tools;
+    result.files = forced.files;
+    result.wrote = forced.wrote;
+    result.blocked = false;
+  }
 
   // Registration wiring: additive, idempotent, and only for real runs.
   let wiring: WirePlan | null = null;

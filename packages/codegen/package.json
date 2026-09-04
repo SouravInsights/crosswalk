@@ -55,6 +55,10 @@
     "directory": "packages/codegen"
   },
   "dependencies": {
+    "@bomb.sh/tab": "^0.0.22",
+    "@clack/prompts": "^1.7.0",
+    "cli-table3": "^0.6.5",
+    "picocolors": "^1.1.1",
     "yaml": "^2.8.0"
   },
   "devDependencies": {
