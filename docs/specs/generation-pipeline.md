@@ -8,7 +8,7 @@
 > Journeys (multi-step tool sets with shared state) are a separate spec:
 > `docs/specs/journeys.md`.
 >
-> Status: spec, not yet implemented. Target: `@webmcp-stack/codegen` 0.5.
+> Status: implemented on `feat/schema-source`; releases as `@webmcp-stack/codegen` 0.5.
 
 **Read this in one pass.** The problem, the one rule, how it works on a real
 app, then the details. Everything after "What changes for you" is reference.
