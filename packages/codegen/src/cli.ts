@@ -360,12 +360,24 @@ async function generate(flags: CliFlags): Promise<number> {  const cwd = process
     configPath: flags.config,
   });
 
+  // Narrate what the pipeline is doing so the run doesn't feel magical.
+  // Verbose gets every step; the default gets just the source count so you
+  // know what the CLI consumed.
+  const progress = flags.verbose
+    ? (msg: string) => console.log(dim(`  → ${msg}`))
+    : undefined;
+
   const result = await runGenerate(setup.config, {
     cwd,
     dryRun: flags.dryRun,
     force: flags.force,
     skipAudit: flags.skipAudit,
+    progress,
   });
+
+  if (!flags.verbose && result.tools.length > 0) {
+    console.log(dim(`  → Read ${result.tools.length + result.skipped.length} operations from ${setup.label}`));
+  }
 
   // Audit errors block the write. Instead of requiring --force on a re-run,
   // ask once: fix the errors, or write anyway.

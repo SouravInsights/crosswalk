@@ -40,6 +40,8 @@ export interface GenerateOptions {
    * regeneration.
    */
   overrides?: ToolOverrides;
+  /** Progress narration: each pipeline step reports what it's doing. */
+  progress?: (message: string) => void;
 }
 
 export interface GenerateResult {
@@ -66,24 +68,32 @@ export async function runGenerate(
   options: GenerateOptions,
 ): Promise<GenerateResult> {
   const notes: string[] = [];
+  const progress = options.progress ?? (() => {});
 
   // 1. Collect candidate tools from every configured source.
+  progress("Reading sources");
   const candidates = (await Promise.all(config.sources.map((source) => source.collect()))).flat();
+  progress(`Found ${candidates.length} candidate${candidates.length === 1 ? "" : "s"}`);
 
   // 2. Merge: a schema entry that names an OpenAPI operation fuses with it
   //    into one candidate (the schema's contract and words, the endpoint's
   //    mechanics). A merge target that does not exist is an error, not a
   //    silent standalone fallback.
   const merge = mergeSchemaWithOperations(candidates);
+  if (merge.findings.length > 0) {
+    progress(`Merged ${candidates.length - merge.tools.length} schema ${candidates.length - merge.tools.length === 1 ? "entry" : "entries"} into endpoints`);
+  }
 
   // 3. Describe: fill field text in layer order. Author text stays verbatim
   //    (constraints appended when missing); silent fields get a marked draft.
   //    Developer overrides (layer 5) run later, in step 6, so they always win.
+  progress("Assembling field descriptions");
   for (const candidate of merge.tools) describeCandidateInputs(candidate);
 
   // 4. Normalize names. First drop a shared API version prefix ("get-v1-x"
   //    → "get-x") when nearly every name carries it, then dedupe what remains.
   //    Strip before dedupe: stripping can create collisions, dedupe resolves them.
+  progress("Normalizing tool names");
   const stripped = stripVersionPrefix(merge.tools);
   if (stripped.note) notes.push(stripped.note);
   const versioned = merge.tools.map((candidate, index) => ({
@@ -95,10 +105,18 @@ export async function runGenerate(
     const name = names[index] ?? candidate.name;
     return { ...candidate, name, inputTypeName: `${pascalCase(name)}Input` };
   });
+  if (renames.length > 0) {
+    progress(`Renamed ${renames.length} tool${renames.length === 1 ? "" : "s"} for uniqueness`);
+  }
 
   // 5. Safety review: classify side effects, compute hints, scan for PII,
   //    apply endpoint roles and config exclusions. Webhooks never come back.
+  progress("Reviewing safety (classification, PII, auth)");
   const { tools, skipped } = reviewTools(named, config.safety);
+  const authCount = tools.filter((t) => t.endpointRole === "auth").length;
+  const adminCount = tools.filter((t) => t.endpointRole === "admin").length;
+  if (authCount > 0) progress(`Disabled ${authCount} auth endpoint${authCount === 1 ? "" : "s"}`);
+  if (adminCount > 0) progress(`Disabled ${adminCount} admin endpoint${adminCount === 1 ? "" : "s"}`);
 
   // 6. Hand-authored overrides (dashboard edits) win over every derived
   //    layer, field text included: an override is the developer's final word,
