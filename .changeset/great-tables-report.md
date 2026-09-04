@@ -1,4 +1,6 @@
 ---
+
+- **Tool names now read as intent, not routing.** Specs without `operationId`s used to produce names like `post-trips-trip-id-story-generate`. Now the same route produces `generate-story`: the generator recognizes action endpoints and plain REST, drops version prefixes and path params, understands `me` and lookup keys (`GET /trips/{username}/{slug}` → `get-trip-by-slug`), and resolves collisions by adding parent context — with every rename shown in the report.
 "@webmcp-stack/codegen": minor
 
 **Breaking:** In `codegen.config.mjs`, `generate:` is now `outputs:`, `js()` is now `tools()`, and imports come from `@webmcp-stack/codegen/outputs` (not `/generators`). An old config fails with the exact fix printed.

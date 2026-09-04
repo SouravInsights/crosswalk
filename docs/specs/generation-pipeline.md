@@ -190,8 +190,31 @@ flowchart TB
 2. **Merge.** A `schema` entry that names an OpenAPI operation fuses with it
    into one candidate. Declared by you, never guessed.
 3. **Describe.** Field and tool descriptions are assembled in layers.
-4. **Normalize names.** Version prefixes are stripped and collisions resolved,
-   as today. Names you declared in a `schema` entry are used verbatim.
+4. **Name.** Tool names are the vocabulary the agent reasons over, so they
+   read as intent, not as machine routing. Every tool takes its name from
+   the best available signal, in order: your override; a cleaned
+   `operationId` (framework scaffolding like `TripsController_create_v2`
+   is stripped to `create`); an intent-shaped name derived from the route;
+   and, when nothing else applies, the plain method+path concat, which can
+   never fail to produce a name.
+
+   The route algorithm recognizes two shapes. **Action endpoints** — the
+   last segment starts with a known verb (`generate`, `verify`, `sync`,
+   `batch`, ...) — become `{verb}-{noun}` from the nearest resource:
+   `POST /trips/{id}/story/generate` → `generate-story`. **Plain REST**
+   maps the method to a verb and the path shape to member or collection:
+   `POST /trips` → `create-trip`, `GET /trips` → `list-trips`,
+   `GET /trips/{id}` → `get-trip`, nested reads include the parent
+   (`GET /trips/{id}/blocks` → `list-trip-blocks`), `me` reads as the
+   current member (`GET /users/me` → `get-current-user`), and lookups with
+   several trailing params name the key (`GET /trips/{username}/{slug}` →
+   `get-trip-by-slug`). Version segments (`/v1`) are dropped everywhere.
+
+   Names start minimal and absorb parent context on collision
+   (`generate-story` → `generate-trip-story`); when context runs out, a
+   method suffix or counter breaks the tie. Declared names always win a
+   collision, and every rename appears in the report, because a name is a
+   tool's public identity.
 5. **Safety review.** Classification, hints, PII scan, endpoint roles.
    Unchanged.
 6. **Overrides.** Your `.webmcp-codegen.json` edits win. Now per-field too.
@@ -476,7 +499,7 @@ codebase:
 | `src/llm.ts` | new: provider interface, key handling, off-by-default; all four touchpoints behind it |
 | `src/pipeline.ts` | insert merge and describe between collect and safety; pass field overrides through |
 | `src/safety.ts` | the four new audit rules |
-| `src/naming.ts` | declared schema names skip version-prefix stripping |
+| `src/naming.ts` | the intent algorithm: cleaned operationIds, route-derived intent names (action verbs, REST member/collection mapping, `me` scopes, by-key lookups), collision deepening, version-prefix dropping |
 | `src/generators/` | renamed `src/outputs/`; `js.ts` becomes `tools.ts`; `form.ts` added (tag scanner, annotate-in-place, dry-run diff) |
 | `src/config.ts` | accept `outputs`, hard-error on `generate` with the rename instructions |
 | `src/detect.ts`, `src/setup.ts` | detect schema libraries in `package.json`; scaffold the schema path when no spec is found |

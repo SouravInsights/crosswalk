@@ -1,8 +1,9 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { tools } from "./outputs/tools.js";
+import { openapi } from "./sources/openapi.js";
 import { runGenerate } from "./pipeline.js";
 import type { CandidateTool, CodegenConfig, Source } from "./types.js";
 
@@ -88,37 +89,34 @@ describe("runGenerate", () => {
     expect(result.findings.some((finding) => finding.message.includes("Renamed"))).toBe(true);
   });
 
-  it("strips a shared API version prefix from tool names, with a note", async () => {
-    const result = await runGenerate(
-      configWith([
-        manualSource([
-          { name: "get-v1-trips" },
-          { name: "get-v1-users" },
-          { name: "post-v1-trips" },
-          { name: "get-v1-trips-id" },
-        ]),
-      ]),
-      { cwd, dryRun: true },
-    );
+  it("drops the version prefix from route-derived tool names, with a note", async () => {
+    // Declared names are never rewritten, so this needs a real spec: version
+    // dropping happens when a route becomes a name, not after.
+    const spec = {
+      openapi: "3.0.0",
+      info: { title: "t", version: "1" },
+      paths: {
+        "/v1/trips": { get: { summary: "List trips.", responses: {} } },
+        "/v1/trips/{id}": { get: { summary: "Get a trip.", responses: {} } },
+      },
+    };
+    const specPath = join(cwd, "spec.json");
+    await writeFile(specPath, JSON.stringify(spec));
+    const result = await runGenerate(configWith([openapi({ spec: specPath })]), {
+      cwd,
+      dryRun: true,
+    });
     const names = result.tools.map((tool) => tool.name).sort();
-    expect(names).toEqual(["get-trips", "get-trips-id", "get-users", "post-trips"]);
-    expect(result.notes.some((note) => note.includes("v1"))).toBe(true);
+    expect(names).toEqual(["get-trip", "list-trips"]);
+    expect(result.notes.some((note) => note.includes("version"))).toBe(true);
   });
 
-  it("keeps the version segment when it is not shared across the API", async () => {
+  it("never rewrites declared names, even ones that look versioned", async () => {
     const result = await runGenerate(
-      configWith([
-        manualSource([
-          { name: "get-v1-trips" },
-          { name: "get-users" },
-          { name: "get-orders" },
-          { name: "get-products" },
-        ]),
-      ]),
+      configWith([manualSource([{ name: "get-v1-trips" }])]),
       { cwd, dryRun: true },
     );
     expect(result.tools.map((tool) => tool.name)).toContain("get-v1-trips");
-    expect(result.notes).toHaveLength(0);
   });
 
   it("reports skipped endpoints instead of generating them silently", async () => {

@@ -19,7 +19,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
-import { nameFromRoute, toToolName } from "../naming.js";
+import { analyzeRoute, cleanOperationId } from "../naming.js";
 import { deepDeref, deref, pascalCase } from "../json-schema.js";
 import type { CandidateTool, JsonSchema, Source } from "../types.js";
 
@@ -72,10 +72,14 @@ function operationsFromSpec(spec: unknown): CandidateTool[] {
 
       const upperMethod = method.toUpperCase() as CandidateTool["httpMethod"];
       const ref = `${upperMethod} ${path}`;
-      const name =
-        typeof operation.operationId === "string" && operation.operationId.length > 0
-          ? toToolName(operation.operationId)
-          : nameFromRoute(method, path);
+      const hasOperationId =
+        typeof operation.operationId === "string" && operation.operationId.length > 0;
+      // operationIds carry author intent (cleaned of framework scaffolding);
+      // without one, the route itself yields an intent-shaped base name that
+      // the pipeline's naming pass deepens if it collides.
+      const name = hasOperationId
+        ? cleanOperationId(operation.operationId as string)
+        : analyzeRoute(method, path).base;
 
       const opSecurity = operation.security;
       const requiresAuth = Array.isArray(opSecurity) ? opSecurity.length > 0 : rootSecurity;
@@ -94,9 +98,7 @@ function operationsFromSpec(spec: unknown): CandidateTool[] {
         // The merge pairs schema entries with operations through this; it is
         // the only cross-source join key, because names and paths would be
         // guessing.
-        ...(typeof operation.operationId === "string" && operation.operationId.length > 0
-          ? { operationId: operation.operationId }
-          : {}),
+        ...(hasOperationId ? { operationId: operation.operationId as string } : {}),
         // The safety layer refines this; the source only reports the verb.
         sideEffect: "unknown",
         requiresAuth,

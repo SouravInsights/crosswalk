@@ -12,7 +12,7 @@ import { dirname, resolve } from "node:path";
 import { describeCandidateInputs } from "./describe.js";
 import { runLlmLayer } from "./llm.js";
 import { mergeSchemaWithOperations } from "./merge.js";
-import { dedupeNames, stripVersionPrefix } from "./naming.js";
+import { resolveNames } from "./naming.js";
 import { auditTools, reviewTools } from "./safety.js";
 import { pascalCase } from "./json-schema.js";
 import type {
@@ -90,19 +90,23 @@ export async function runGenerate(
   progress("Assembling field descriptions");
   for (const candidate of merge.tools) describeCandidateInputs(candidate);
 
-  // 4. Normalize names. First drop a shared API version prefix ("get-v1-x"
-  //    → "get-x") when nearly every name carries it, then dedupe what remains.
-  //    Strip before dedupe: stripping can create collisions, dedupe resolves them.
+  // 4. Names. Declared names (schema entries, cleaned operationIds) are
+  //    fixed. Route-derived names start minimal ("generate-story") and
+  //    absorb parent context on collision ("generate-trip-story"); every
+  //    rename is reported, because a name is a tool's public identity.
   progress("Normalizing tool names");
-  const stripped = stripVersionPrefix(merge.tools);
-  if (stripped.note) notes.push(stripped.note);
-  const versioned = merge.tools.map((candidate, index) => ({
-    ...candidate,
-    name: stripped.names[index] ?? candidate.name,
-  }));
-  const { names, renames } = dedupeNames(versioned);
-  const named = versioned.map((candidate, index) => {
-    const name = names[index] ?? candidate.name;
+  const resolved = resolveNames(
+    merge.tools.map((tool) => ({
+      name: tool.name,
+      declared: tool.source.kind !== "openapi" || Boolean(tool.operationId),
+      httpMethod: tool.httpMethod,
+      pathTemplate: tool.pathTemplate,
+    })),
+  );
+  notes.push(...resolved.notes);
+  const { renames } = resolved;
+  const named = merge.tools.map((candidate, index) => {
+    const name = resolved.names[index] ?? candidate.name;
     return { ...candidate, name, inputTypeName: `${pascalCase(name)}Input` };
   });
   if (renames.length > 0) {

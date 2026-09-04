@@ -69,16 +69,31 @@ export interface FindingGroup {
 }
 
 export function groupFindings(findings: GenerateResult["findings"]): FindingGroup[] {
-  const groups: Record<Exclude<FindingGroup["key"], "other">, { heading: string; items: string[] }> =
-    {
-      auth: { heading: "auth endpoints disabled; agents should never sign in", items: [] },
-      admin: { heading: "admin endpoints disabled; review each before enabling", items: [] },
-      pii: { heading: "endpoints may return personal data; check each response", items: [] },
-      postAsRead: {
-        heading: "POST endpoints treated as read-only; verify that is correct",
-        items: [],
-      },
-    };
+  // Headings are functions of the count: "1 auth endpoint disabled" and
+  // "9 auth endpoints disabled" are both sentences a person would write.
+  const groups: Record<
+    Exclude<FindingGroup["key"], "other">,
+    { heading: (n: number) => string; items: string[] }
+  > = {
+    auth: {
+      heading: (n) => `${n} auth endpoint${n === 1 ? "" : "s"} disabled; agents should never sign in`,
+      items: [],
+    },
+    admin: {
+      heading: (n) => `${n} admin endpoint${n === 1 ? "" : "s"} disabled; review before enabling`,
+      items: [],
+    },
+    pii: {
+      heading: (n) =>
+        `${n} endpoint${n === 1 ? "" : "s"} may return personal data; check each response`,
+      items: [],
+    },
+    postAsRead: {
+      heading: (n) =>
+        `${n} POST endpoint${n === 1 ? "" : "s"} treated as read-only; verify that is correct`,
+      items: [],
+    },
+  };
   // Anything outside the four known categories is grouped by its message, so
   // 48 copies of the same note collapse into one heading plus a name list.
   const othersByMessage = new Map<string, string[]>();
@@ -107,7 +122,7 @@ export function groupFindings(findings: GenerateResult["findings"]): FindingGrou
     .filter((key) => groups[key].items.length > 0)
     .map((key) => {
       const { heading, items } = groups[key];
-      return { key, heading: `${items.length} ${heading}`, items };
+      return { key, heading: heading(items.length), items };
     });
   const others = [...othersByMessage.entries()]
     .sort((a, b) => b[1].length - a[1].length)
