@@ -24,7 +24,7 @@ export interface WebApp {
 }
 
 /** The validation libraries the schema source can read. */
-const SCHEMA_LIBS = ["zod", "valibot", "arktype"] as const;
+const SCHEMA_LIBS = ["zod", "valibot", "arktype", "typebox"] as const;
 
 /**
  * Which schema libraries the project already uses, by reading every workspace
