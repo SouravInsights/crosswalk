@@ -1,5 +1,5 @@
 /**
- * The text of the code the `js` generator writes.
+ * The text of the code the `tools` output writes.
  *
  * Heads up before reading on: every function here returns *TypeScript source
  * code as a string*. When you see `export const ...` inside quotes, that's
@@ -19,9 +19,9 @@
  * mutations lives in the generated region so it cannot be edited away.
  */
 
-import { jsonSchemaToTs, pascalCase } from "../schema.js";
+import { jsonSchemaToTs, pascalCase } from "../json-schema.js";
 import type { ReviewedTool } from "../types.js";
-import { GENERATED_END, GENERATED_START } from "./js.js";
+import { GENERATED_END, GENERATED_START } from "./tools.js";
 
 /**
  * Everything above the end-marker of a per-tool file: the parts that must

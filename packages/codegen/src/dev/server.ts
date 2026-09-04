@@ -82,7 +82,7 @@ export async function startDevServer(options: DevServerOptions): Promise<Server>
     });
     return {
       label: setup.label,
-      outDir: setup.config.generate[0]?.outDir,
+      outDir: setup.config.outputs[0]?.outDir,
       tools: result.tools.map((tool) => toUiTool(tool, result.findings, result.files)),
       skipped: result.skipped,
       notes: result.notes,

@@ -20,7 +20,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { nameFromRoute, toToolName } from "../naming.js";
-import { deepDeref, deref, pascalCase } from "../schema.js";
+import { deepDeref, deref, pascalCase } from "../json-schema.js";
 import type { CandidateTool, JsonSchema, Source } from "../types.js";
 
 export interface OpenApiSourceOptions {

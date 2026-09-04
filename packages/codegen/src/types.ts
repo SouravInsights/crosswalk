@@ -3,11 +3,11 @@
  *
  * Every stage of the pipeline speaks in these types:
  *
- *   Source → CandidateTool → (safety review) → ReviewedTool → Generator → GeneratedFile
+ *   Source → CandidateTool → (safety review) → ReviewedTool → Output → GeneratedFile
  *
- * A source (OpenAPI today, tRPC/Zod later) only has to produce CandidateTools.
- * A generator only has to turn ReviewedTools into files. Everything in between
- * lives here so the stages stay independent.
+ * A source only has to produce CandidateTools. An output only has to turn
+ * ReviewedTools into files. Everything in between lives here so the stages
+ * stay independent.
  */
 
 /**
@@ -32,7 +32,7 @@ export interface JsonSchema {
 }
 
 /** Which source a candidate came from. Grows as new sources are added. */
-export type SourceKind = "openapi" | "trpc" | "zod" | "prisma" | "graphql" | "manual";
+export type SourceKind = "openapi" | "schema" | "trpc" | "prisma" | "graphql" | "manual";
 
 /**
  * What the tool does to the world. The safety layer derives this from the
@@ -170,10 +170,11 @@ export interface Source {
 }
 
 /**
- * A generator turns reviewed tools into files.
- * Named after what lands in your repo: `js`, `html`, `react`, `manifest`.
+ * An output turns reviewed tools into something that lands in your repo:
+ * files (`tools`), annotated markup (`form`), and so on. Named after what
+ * lands in the repo, never after the language it happens to be written in.
  */
-export interface ToolGenerator {
+export interface Output {
   readonly kind: string;
   /** Where the files go, relative to the project root. Reported by the CLI. */
   readonly outDir: string;
@@ -191,6 +192,6 @@ export interface SafetyOptions {
 /** The config file shape. Create it with `defineConfig` for type checking. */
 export interface CodegenConfig {
   sources: Source[];
-  generate: ToolGenerator[];
+  outputs: Output[];
   safety?: SafetyOptions;
 }

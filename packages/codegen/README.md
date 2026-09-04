@@ -103,11 +103,11 @@ overrides live in `.webmcp-codegen.json` (data, safe with npx, commit it).
 // codegen.config.mjs
 import { defineConfig } from "@webmcp-stack/codegen";
 import { openapi } from "@webmcp-stack/codegen/sources";
-import { js } from "@webmcp-stack/codegen/generators";
+import { tools } from "@webmcp-stack/codegen/outputs";
 
 export default defineConfig({
   sources: [openapi({ spec: "./openapi.yaml" })],
-  generate: [js({ outDir: "./src/webmcp" })],
+  outputs: [tools({ outDir: "./src/webmcp" })],
   safety: {
     piiFields: ["internalId"],  // extend the built-in PII heuristics
     exclude: ["internal"],      // skip tools by name or route substring

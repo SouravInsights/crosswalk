@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { js } from "./generators/js.js";
+import { tools } from "./outputs/tools.js";
 import { runGenerate } from "./pipeline.js";
 import type { CandidateTool, CodegenConfig, Source } from "./types.js";
 
@@ -29,7 +29,7 @@ function manualSource(tools: Partial<CandidateTool>[]): Source {
 }
 
 function configWith(sources: Source[]): CodegenConfig {
-  return { sources, generate: [js({ outDir: "src/webmcp" })] };
+  return { sources, outputs: [tools({ outDir: "src/webmcp" })] };
 }
 
 describe("runGenerate", () => {

@@ -126,7 +126,7 @@ export function renderSummary(
   }
 
   // Where things went
-  const outDir = setup.config.generate[0]?.outDir ?? "src/webmcp";
+  const outDir = setup.config.outputs[0]?.outDir ?? "src/webmcp";
   console.log(`  ${c("cyan", "→")} ${bold("Files")} ${outDir}`);
   if (wiring && !wiring.alreadyWired) {
     console.log(`  ${c("cyan", "→")} ${bold("Registration")} wired into your app`);
@@ -195,7 +195,7 @@ export function renderVerbose(result: GenerateResult, setup: Setup, _cwd: string
     console.log("");
   }
 
-  console.log(dim(`Files: ${setup.config.generate[0]?.outDir ?? "src/webmcp"}`));
+  console.log(dim(`Files: ${setup.config.outputs[0]?.outDir ?? "src/webmcp"}`));
   console.log(dim(`Docs: https://webmcp-stack.vercel.app/docs`));
   console.log("");
 }

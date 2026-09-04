@@ -21,7 +21,7 @@ import { CONFIG_FILE_NAMES, loadConfig } from "./config.js";
 import { loadDataFile } from "./data-file.js";
 import { findSpecs } from "./detect.js";
 import { findWebApps, type WebApp } from "./detect-app.js";
-import { js } from "./generators/js.js";
+import { tools } from "./outputs/tools.js";
 import { openapi } from "./sources/openapi.js";
 import type { CodegenConfig } from "./types.js";
 
@@ -101,7 +101,7 @@ export async function resolveSetup(cwd: string, flags: GenerateFlags): Promise<S
 
   const outDir = flags.out ?? (app && app.dir !== "." ? `${app.dir}/src/webmcp` : "./src/webmcp");
   return {
-    config: { sources: [openapi({ spec })], generate: [js({ outDir })] },
+    config: { sources: [openapi({ spec })], outputs: [tools({ outDir })] },
     label: flags.spec ? `--spec ${spec}` : `detected ${spec}`,
     app,
     fromConfigFile: false,

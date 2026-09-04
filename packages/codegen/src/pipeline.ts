@@ -11,7 +11,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { dedupeNames, stripVersionPrefix } from "./naming.js";
 import { auditTools, reviewTools } from "./safety.js";
-import { pascalCase } from "./schema.js";
+import { pascalCase } from "./json-schema.js";
 import type {
   AuditFinding,
   CodegenConfig,
@@ -105,10 +105,10 @@ export async function runGenerate(
     return { tools, skipped, findings, files: [], notes, blocked, wrote: false };
   }
 
-  // 6. Generate the files, then write them (unless this is a dry run).
+  // 6. Run the outputs, then write the files (unless this is a dry run).
   const files: GeneratedFile[] = [];
-  for (const generator of config.generate) {
-    files.push(...(await generator.generate(tools, options.cwd)));
+  for (const output of config.outputs) {
+    files.push(...(await output.generate(tools, options.cwd)));
   }
 
   let wrote = false;

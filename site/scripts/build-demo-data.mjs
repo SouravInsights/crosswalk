@@ -8,7 +8,7 @@
 import { writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { js } from "../../packages/codegen/dist/generators/index.js";
+import { tools } from "../../packages/codegen/dist/outputs/index.js";
 import { runGenerate } from "../../packages/codegen/dist/index.js";
 import { openapi } from "../../packages/codegen/dist/sources/index.js";
 
@@ -17,7 +17,7 @@ const site = join(dirname(fileURLToPath(import.meta.url)), "..");
 const report = await runGenerate(
   {
     sources: [openapi({ spec: "demo/immich-excerpt.openapi.yaml" })],
-    generate: [js({ outDir: "src/webmcp" })],
+    outputs: [tools({ outDir: "src/webmcp" })],
   },
   { cwd: site, write: false, skipAudit: false, force: true },
 );

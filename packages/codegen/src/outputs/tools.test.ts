@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ReviewedTool } from "../types.js";
-import { js } from "./js.js";
+import { tools } from "./tools.js";
 
 /** A small reviewed tool, as the safety layer would have produced it. */
 function reviewedTool(overrides: Partial<ReviewedTool> = {}): ReviewedTool {
@@ -53,7 +53,7 @@ describe("js generator", () => {
   });
 
   it("emits a runtime, a barrel, and one file per tool", async () => {
-    const files = await js({ outDir: "src/webmcp" }).generate([reviewedTool()], cwd);
+    const files = await tools({ outDir: "src/webmcp" }).generate([reviewedTool()], cwd);
     const paths = files.map((file) => file.path);
     expect(paths).toContain(join(cwd, "src/webmcp/runtime.webmcp.ts"));
     expect(paths).toContain(join(cwd, "src/webmcp/index.ts"));
@@ -61,7 +61,7 @@ describe("js generator", () => {
   });
 
   it("generated tool files carry the contract and the merge markers", async () => {
-    const files = await js({ outDir: "src/webmcp" }).generate([reviewedTool()], cwd);
+    const files = await tools({ outDir: "src/webmcp" }).generate([reviewedTool()], cwd);
     const tool = files.find((file) => file.path.includes("get-order-status"));
     expect(tool?.action).toBe("create");
     expect(tool?.contents).toContain('name: "get-order-status"');
@@ -74,11 +74,11 @@ describe("js generator", () => {
   });
 
   it("keeps the developer's execute() across regenerations", async () => {
-    const generator = js({ outDir: "src/webmcp" });
+    const output = tools({ outDir: "src/webmcp" });
     const toolPath = join(cwd, "src/webmcp/get-order-status.webmcp.ts");
 
     // First run creates the file; then the developer edits execute().
-    const first = await generator.generate([reviewedTool()], cwd);
+    const first = await output.generate([reviewedTool()], cwd);
     await writeAll(first);
     const before = await readFile(toolPath, "utf8");
     const implemented = before.replace(
@@ -88,7 +88,7 @@ describe("js generator", () => {
     await writeFile(toolPath, implemented);
 
     // Second run, with a changed description (the API contract evolved).
-    const second = await generator.generate(
+    const second = await output.generate(
       [reviewedTool({ description: "Get an order's live status." })],
       cwd,
     );
@@ -101,7 +101,7 @@ describe("js generator", () => {
   });
 
   it("read tools are born with a working request, not a TODO", async () => {
-    const files = await js({ outDir: "src/webmcp" }).generate([reviewedTool()], cwd);
+    const files = await tools({ outDir: "src/webmcp" }).generate([reviewedTool()], cwd);
     const tool = files.find((file) => file.path.includes("get-order-status"));
     // The scaffold calls the real endpoint with the path param interpolated.
     // biome-ignore lint/suspicious/noTemplateCurlyInString: asserting on generated source, which contains a template literal
@@ -112,7 +112,7 @@ describe("js generator", () => {
   });
 
   it("mutations start disabled, with working code one uncomment away", async () => {
-    const files = await js({ outDir: "src/webmcp" }).generate(
+    const files = await tools({ outDir: "src/webmcp" }).generate(
       [
         reviewedTool({
           name: "cancel-order",
@@ -141,7 +141,7 @@ describe("js generator", () => {
   });
 
   it("builds query strings and JSON bodies from the param locations", async () => {
-    const files = await js({ outDir: "src/webmcp" }).generate(
+    const files = await tools({ outDir: "src/webmcp" }).generate(
       [
         reviewedTool({
           name: "search-assets",
@@ -160,7 +160,7 @@ describe("js generator", () => {
   });
 
   it("uses the spec's server URL when one is declared", async () => {
-    const files = await js({ outDir: "src/webmcp" }).generate(
+    const files = await tools({ outDir: "src/webmcp" }).generate(
       [reviewedTool({ serverUrl: "http://localhost:3001" })],
       cwd,
     );
@@ -173,7 +173,7 @@ describe("js generator", () => {
   });
 
   it("falls back to an honest TODO when the source knows no route", async () => {
-    const files = await js({ outDir: "src/webmcp" }).generate(
+    const files = await tools({ outDir: "src/webmcp" }).generate(
       [reviewedTool({ httpMethod: undefined, pathTemplate: undefined, paramLocations: undefined })],
       cwd,
     );
@@ -182,12 +182,12 @@ describe("js generator", () => {
   });
 
   it("never clobbers a file whose markers were removed; it reports a conflict", async () => {
-    const generator = js({ outDir: "src/webmcp" });
+    const output = tools({ outDir: "src/webmcp" });
     const toolPath = join(cwd, "src/webmcp/get-order-status.webmcp.ts");
     await mkdir(join(cwd, "src/webmcp"), { recursive: true });
     await writeFile(toolPath, "// my totally hand-written file, no markers\n");
 
-    const files = await generator.generate([reviewedTool()], cwd);
+    const files = await output.generate([reviewedTool()], cwd);
     const conflicted = files.find((file) => file.path === toolPath);
     expect(conflicted?.conflict).toBe(`${toolPath}.new`);
     // The existing file's contents are reported back untouched.
@@ -195,7 +195,7 @@ describe("js generator", () => {
   });
 
   it("scaffolds a PII notice for tools whose responses carry PII", async () => {
-    const files = await js({ outDir: "src/webmcp" }).generate(
+    const files = await tools({ outDir: "src/webmcp" }).generate(
       [
         reviewedTool({
           name: "get-me",
@@ -212,10 +212,10 @@ describe("js generator", () => {
   });
 
   it("reports unchanged when nothing about the contract moved", async () => {
-    const generator = js({ outDir: "src/webmcp" });
-    await writeAll(await generator.generate([reviewedTool()], cwd));
+    const output = tools({ outDir: "src/webmcp" });
+    await writeAll(await output.generate([reviewedTool()], cwd));
 
-    const second = await generator.generate([reviewedTool()], cwd);
+    const second = await output.generate([reviewedTool()], cwd);
     const toolFile = second.find((file) => file.path.includes("get-order-status"));
     expect(toolFile?.action).toBe("unchanged");
   });

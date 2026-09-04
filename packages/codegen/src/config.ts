@@ -40,7 +40,7 @@ export async function loadConfig(
     const config = module.default;
     if (!isCodegenConfig(config)) {
       throw new Error(
-        `${candidate} must default-export defineConfig({ sources: [...], generate: [...] }).`,
+        `${candidate} must default-export defineConfig({ sources: [...], outputs: [...] }).`,
       );
     }
     return { config, path: candidate };
@@ -57,7 +57,18 @@ export async function loadConfig(
 function isCodegenConfig(value: unknown): value is CodegenConfig {
   if (value === null || typeof value !== "object") return false;
   const config = value as Record<string, unknown>;
-  return Array.isArray(config.sources) && Array.isArray(config.generate);
+  // 0.4 configs used `generate:` and the /generators subpath. Renamed in 0.5.
+  // Fail loud with the exact fix rather than a confusing "not a config" error;
+  // there is no silent dual support, by design.
+  if (Array.isArray(config.generate) && !Array.isArray(config.outputs)) {
+    throw new Error(
+      "This config uses `generate: [...]`, renamed in 0.5. Three edits:\n" +
+        '  1. rename the key to `outputs: [...]`\n' +
+        '  2. import from "@webmcp-stack/codegen/outputs" instead of "/generators"\n' +
+        "  3. rename `js(...)` to `tools(...)`",
+    );
+  }
+  return Array.isArray(config.sources) && Array.isArray(config.outputs);
 }
 
 async function exists(path: string): Promise<boolean> {

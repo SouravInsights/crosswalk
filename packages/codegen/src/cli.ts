@@ -145,11 +145,11 @@ async function init(): Promise<number> {
     configPath,
     `import { defineConfig } from "@webmcp-stack/codegen";
 import { openapi } from "@webmcp-stack/codegen/sources";
-import { js } from "@webmcp-stack/codegen/generators";
+import { tools } from "@webmcp-stack/codegen/outputs";
 
 export default defineConfig({
   sources: [openapi({ spec: "${specPath}" })],
-  generate: [js({ outDir: "./src/webmcp" })],
+  outputs: [tools({ outDir: "./src/webmcp" })],
   safety: {
     // Extra field names to treat as PII, on top of the built-in list:
     // piiFields: ["internalId"],
@@ -203,7 +203,7 @@ async function generate(flags: CliFlags): Promise<number> {
   // Registration wiring: additive, idempotent, and only for real runs.
   let wiring: WirePlan | null = null;
   if (!result.blocked && setup.app) {
-    const outDir = setup.config.generate[0]?.outDir;
+    const outDir = setup.config.outputs[0]?.outDir;
     if (outDir) {
       wiring = await planWiring(cwd, setup.app, outDir);
       if (wiring && wiring.edits.length > 0 && !flags.dryRun && result.wrote) {
