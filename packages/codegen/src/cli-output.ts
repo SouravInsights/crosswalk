@@ -4,7 +4,7 @@
  * and be understandable by someone who has never seen the tool before.
  */
 
-import figlet from "figlet";
+import CFonts from "cfonts";
 import pc from "picocolors";
 import Table from "cli-table3";
 import type { GenerateResult } from "./pipeline.js";
@@ -32,14 +32,23 @@ function termWidth(): number {
 
 /**
  * The banner, printed once at the start of every command — a banner leads,
- * it never sits in the middle of a report. Small Slant keeps the full
- * wordmark inside 60 columns; colors strip automatically when piped.
+ * it never sits in the middle of a report. The full wordmark in cfonts
+ * "tiny": solid block letters, small enough that webmcp-stack fits in 51
+ * columns. The color is the site's accent (#58a6ff), on a real terminal
+ * only; piped output stays plain.
  */
 export function printBanner(): void {
-  const mark = figlet.textSync("webmcp-stack", { font: "Small Slant" });
+  const isTTY = process.stdout.isTTY === true;
+  const mark = CFonts.render("webmcp-stack", {
+    font: "tiny",
+    space: false,
+    ...(isTTY ? { colors: ["#58a6ff"] } : {}),
+  });
   console.log("");
-  for (const line of mark.split("\n")) {
-    if (line.trim().length > 0) console.log(c.cyan(line));
+  if (mark) {
+    for (const line of mark.string.split("\n")) {
+      if (line.trim().length > 0) console.log(line);
+    }
   }
   console.log(dim("  codegen: tools AI agents can call, from the contract you already have"));
   console.log("");
