@@ -15,7 +15,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
 import * as clack from "@clack/prompts";
 import { CONFIG_FILE_NAMES, loadConfig } from "./config.js";
 import { loadDataFile } from "./data-file.js";
@@ -60,8 +60,9 @@ export interface Setup {
  * the user's project never has to resolve a webmcp-codegen import.
  */
 export async function resolveSetup(cwd: string, flags: GenerateFlags): Promise<Setup> {
+  // resolve, not join: an absolute --config must win over cwd, not nest.
   const hasConfigFile = flags.configPath
-    ? existsSync(join(cwd, flags.configPath))
+    ? existsSync(resolve(cwd, flags.configPath))
     : CONFIG_FILE_NAMES.some((name) => existsSync(join(cwd, name)));
 
   if (hasConfigFile) {

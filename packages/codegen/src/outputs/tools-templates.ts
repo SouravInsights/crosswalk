@@ -40,16 +40,19 @@ export function generatedRegion(tool: ReviewedTool): string {
   const inputType = jsonSchemaToTs(tool.inputSchema, undefined);
   const mutates = tool.riskTier !== "safe-read";
 
-  // The imports cover what this file's regions use: the generated register()
-  // and the owned execute() scaffold. A developer who replaces the scaffold
-  // with their own API client can trim the imports they stop using.
+  // Import only what this file's regions actually use, so generated files
+  // pass strict lint configs (no-unused-vars errors fail Next.js builds).
+  // A disabled tool's request is commented out, so callApi/toolResult stay
+  // out of its imports; a standalone schema tool has no route to call.
+  const enabled = tool.enabledByDefault;
+  const hasRoute = Boolean(tool.httpMethod && tool.pathTemplate && tool.paramLocations);
   const runtimeImports = [
     "getModelContext",
     ...(mutates ? ["requestUserConfirmation"] : []),
-    "callApi",
-    "toolResult",
+    ...(enabled && hasRoute ? ["callApi"] : []),
+    ...(enabled ? ["toolResult"] : []),
     "asToolError",
-    ...(tool.enabledByDefault ? [] : ["toolDisabled"]),
+    ...(enabled ? [] : ["toolDisabled"]),
   ].join(", ");
 
   const registerBody = mutates
@@ -227,7 +230,8 @@ export function ownedRegionScaffold(tool: ReviewedTool): string {
           ? "changes things"
           : `wraps an ${tool.endpointRole} endpoint`
       }. Agents can see it, and calling it tells`,
-      `  // them it is disabled. To enable it, delete the line below and uncomment the code.`,
+      `  // them it is disabled. To enable it, delete the line below, uncomment`,
+      `  // the code, and add callApi and toolResult to the import above.`,
       `  void signal; // passed to fetch once you enable the call below`,
       `  return toolDisabled("${tool.name}.webmcp.ts");`,
       ``,

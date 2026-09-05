@@ -6,6 +6,7 @@ import { DashboardDemo } from "@/components/dashboard-demo";
 import { LogoWord } from "@/components/logo";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
+import { DEMO_SOURCE } from "@/lib/demo-data";
 
 const COMMAND = "npx @webmcp-stack/codegen generate";
 
@@ -134,8 +135,17 @@ export default function HomePage() {
             </div>
             <DashboardDemo />
             <p className="mx-auto mt-5 max-w-md text-center text-[13px] leading-relaxed text-faint">
-              <span className="font-mono text-dim">npx @webmcp-stack/codegen dev</span> opens this
-              locally. Review every tool and test calls before an agent ever sees one.
+              Real tools, generated from the {DEMO_SOURCE.project} API&apos;s{" "}
+              <a
+                href={DEMO_SOURCE.specUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-dim underline decoration-line underline-offset-2 transition-colors hover:text-accent"
+              >
+                OpenAPI spec
+              </a>
+              . <span className="font-mono text-dim">npx @webmcp-stack/codegen dev</span> opens this
+              same dashboard for yours.
             </p>
           </div>
         </div>

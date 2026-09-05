@@ -24,7 +24,7 @@
  */
 
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { GeneratedFile, Output, ReviewedTool } from "../types.js";
 import {
   barrelSource,
@@ -54,7 +54,9 @@ export function tools(options: ToolsOutputOptions): Output {
     kind: "tools",
     outDir: options.outDir,
     async generate(tools, cwd) {
-      const outDir = join(cwd, options.outDir);
+      // resolve, not join: an absolute outDir must win over cwd, not nest
+      // under it.
+      const outDir = resolve(cwd, options.outDir);
       const files: GeneratedFile[] = [];
 
       // The runtime and the barrel are regenerated wholesale every run;

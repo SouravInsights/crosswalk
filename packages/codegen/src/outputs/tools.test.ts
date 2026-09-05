@@ -203,6 +203,71 @@ describe("js generator", () => {
     expect(tool?.contents).toContain("The user declined this action.");
   });
 
+  it("imports only the runtime helpers the file actually uses", async () => {
+    // Strict lint configs (Next.js builds fail on no-unused-vars errors)
+    // reject a generated file that imports helpers only its comments mention.
+    const files = await tools({ outDir: "src/webmcp" }).generate(
+      [
+        reviewedTool(), // enabled read with a route
+        reviewedTool({
+          name: "cancel-order",
+          inputTypeName: "CancelOrderInput",
+          httpMethod: "POST",
+          pathTemplate: "/orders/{orderId}/cancel",
+          sideEffect: "destructive",
+          enabledByDefault: false,
+          riskTier: "destructive-confirm",
+        }),
+        reviewedTool({
+          name: "create-trip",
+          inputTypeName: "CreateTripInput",
+          source: { kind: "schema", ref: "CreateTripInput" },
+          httpMethod: undefined,
+          pathTemplate: undefined,
+          paramLocations: undefined,
+          sideEffect: "write",
+          riskTier: "write-confirm",
+        }),
+      ],
+      cwd,
+    );
+    const enabledRead = files.find((file) => file.path.includes("get-order-status"));
+    expect(enabledRead?.contents).toContain(
+      'import { getModelContext, callApi, toolResult, asToolError } from "./runtime.webmcp";',
+    );
+
+    // The disabled tool's request is commented out, so its helpers stay out
+    // of the import line; the enable instructions name what to add back.
+    const disabledWrite = files.find((file) => file.path.includes("cancel-order"));
+    expect(disabledWrite?.contents).toContain(
+      'import { getModelContext, requestUserConfirmation, asToolError, toolDisabled } from "./runtime.webmcp";',
+    );
+    expect(disabledWrite?.contents).toContain("add callApi and toolResult to the import above");
+
+    // A standalone schema tool has no route to call: no callApi. It is a
+    // write, so the confirmation gate's helper is imported and used.
+    const standalone = files.find((file) => file.path.includes("create-trip"));
+    expect(standalone?.contents).toContain(
+      'import { getModelContext, requestUserConfirmation, toolResult, asToolError } from "./runtime.webmcp";',
+    );
+  });
+
+  it("respects an absolute outDir instead of nesting it under the project", async () => {
+    // path.join(cwd, "/abs/out") silently becomes cwd/abs/out; resolve does
+    // the right thing. An absolute --out must write exactly where it points.
+    const absoluteOut = await mkdtemp(join(tmpdir(), "webmcp-codegen-out-"));
+    try {
+      const files = await tools({ outDir: absoluteOut }).generate([reviewedTool()], cwd);
+      expect(files.length).toBeGreaterThan(0);
+      for (const file of files) {
+        expect(file.path.startsWith(absoluteOut)).toBe(true);
+        expect(file.path.startsWith(cwd)).toBe(false);
+      }
+    } finally {
+      await rm(absoluteOut, { recursive: true, force: true });
+    }
+  });
+
   it("builds query strings and JSON bodies from the param locations", async () => {
     const files = await tools({ outDir: "src/webmcp" }).generate(
       [

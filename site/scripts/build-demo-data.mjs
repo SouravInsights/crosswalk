@@ -5,7 +5,8 @@
 // Run after changing site/demo/immich-excerpt.openapi.yaml or the generator:
 //   node scripts/build-demo-data.mjs        (from site/)
 
-import { writeFile } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runGenerate } from "../../packages/codegen/dist/index.js";
@@ -14,12 +15,20 @@ import { openapi } from "../../packages/codegen/dist/sources/index.js";
 
 const site = join(dirname(fileURLToPath(import.meta.url)), "..");
 
+// Generate into a scratch directory. The pipeline preserves a file's owned
+// region when the file exists; correct for users, wrong here. The demo must
+// show a pristine fresh run, never a scaffold preserved from an old version.
+const scratch = await mkdtemp(join(tmpdir(), "webmcp-demo-"));
+
+// dryRun: the demo builds from report.files alone and must never write
+// into the site tree. This script is plain .mjs, so nothing type-checks
+// the option name; say it in a comment on purpose.
 const report = await runGenerate(
   {
     sources: [openapi({ spec: "demo/immich-excerpt.openapi.yaml" })],
-    outputs: [tools({ outDir: "src/webmcp" })],
+    outputs: [tools({ outDir: join(scratch, "src/webmcp") })],
   },
-  { cwd: site, write: false, skipAudit: false, force: true },
+  { cwd: site, dryRun: true, skipAudit: false, force: true },
 );
 
 // Tool files only. The barrel (index.ts) and runtime helper are noise here.
