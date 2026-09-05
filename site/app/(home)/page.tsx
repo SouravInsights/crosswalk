@@ -1,4 +1,3 @@
-import { ArrowDown } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CopyCommand } from "@/components/copy-command";
@@ -6,7 +5,6 @@ import { DashboardDemo } from "@/components/dashboard-demo";
 import { LogoWord } from "@/components/logo";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
-import { DEMO_SOURCE } from "@/lib/demo-data";
 
 const COMMAND = "npx @webmcp-stack/codegen generate";
 
@@ -126,27 +124,7 @@ export default function HomePage() {
           {/* The proof: the dashboard itself. The only WebMCP CLI that has one.
               The chip tells first-time visitors what they're looking at. */}
           <div className="mx-auto mt-10 max-w-5xl sm:mt-12">
-            <div className="mb-5 flex justify-center">
-              <span className="flex items-center gap-2 border border-line bg-panel px-3.5 py-1.5 font-mono text-[12px] text-dim">
-                <span className="size-1.5 rounded-full bg-accent" aria-hidden="true" />
-                the built-in playground
-                <ArrowDown className="size-3 text-faint" aria-hidden="true" />
-              </span>
-            </div>
             <DashboardDemo />
-            <p className="mx-auto mt-5 max-w-md text-center text-[13px] leading-relaxed text-faint">
-              Real tools, generated from the {DEMO_SOURCE.project} API&apos;s{" "}
-              <a
-                href={DEMO_SOURCE.specUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-dim underline decoration-line underline-offset-2 transition-colors hover:text-accent"
-              >
-                OpenAPI spec
-              </a>
-              . <span className="font-mono text-dim">npx @webmcp-stack/codegen dev</span> opens this
-              same dashboard for yours.
-            </p>
           </div>
         </div>
       </section>

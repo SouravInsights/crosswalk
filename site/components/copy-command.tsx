@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
  * The one interactive element on the page, and deliberately so:
  * the call to action is the command, so copying it should be effortless.
  */
-export function CopyCommand({ command }: { command: string }) {
+export function CopyCommand({ command, bare = false }: { command: string; bare?: boolean }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -40,6 +40,39 @@ export function CopyCommand({ command }: { command: string }) {
     timer.current = setTimeout(() => setCopied(false), 1600);
   }
 
+  const copyButton = (
+    <button
+      type="button"
+      onClick={copy}
+      aria-label={copied ? "Copied" : "Copy command"}
+      className={
+        bare
+          ? "flex size-6 shrink-0 items-center justify-center text-ghost transition-colors duration-150 hover:text-ink"
+          : "ml-auto flex size-7 shrink-0 items-center justify-center border border-line text-dim transition-colors duration-150 hover:border-faint hover:text-ink"
+      }
+      style={{ transitionTimingFunction: "var(--ease-reading)" }}
+    >
+      {copied ? <Check className="size-3.5 text-accent" /> : <Copy className="size-3.5" />}
+    </button>
+  );
+
+  // The bare variant: the command as plain terminal text with a quiet copy
+  // affordance. For secondary commands; the boxed form is the page's CTA.
+  if (bare) {
+    return (
+      <div className="flex max-w-full items-center gap-2.5 font-mono text-[13px]">
+        <span className="select-none text-ghost">$</span>
+        <span
+          id={`copy-command-${command.length}`}
+          className="min-w-0 overflow-x-auto whitespace-nowrap text-dim [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {command}
+        </span>
+        {copyButton}
+      </div>
+    );
+  }
+
   return (
     <div className="flex w-full max-w-full items-center gap-3 border border-line bg-panel py-2.5 pl-4 pr-2 font-mono text-[13px] sm:w-auto">
       <span className="select-none text-ghost">$</span>
@@ -49,15 +82,7 @@ export function CopyCommand({ command }: { command: string }) {
       >
         {command}
       </span>
-      <button
-        type="button"
-        onClick={copy}
-        aria-label={copied ? "Copied" : "Copy command"}
-        className="ml-auto flex size-7 shrink-0 items-center justify-center border border-line text-dim transition-colors duration-150 hover:border-faint hover:text-ink"
-        style={{ transitionTimingFunction: "var(--ease-reading)" }}
-      >
-        {copied ? <Check className="size-3.5 text-accent" /> : <Copy className="size-3.5" />}
-      </button>
+      {copyButton}
     </div>
   );
 }
