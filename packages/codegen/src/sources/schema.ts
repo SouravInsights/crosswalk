@@ -248,7 +248,11 @@ export function schemaExportsToJson(
   const schemas: { name: string; schemaText: string }[] = [];
   const skipped: { name: string; reason: string }[] = [];
   for (const [name, value] of Object.entries(moduleExports)) {
-    if (!isStandardSchema(value)) continue;
+    // Standard Schema (zod/valibot/arktype) carries a `~standard` marker;
+    // TypeBox is a bare JSON-Schema object. Both are valid — this loader was
+    // the one place that only accepted the marker, which is why TypeBox
+    // modules silently yielded nothing.
+    if (!isStandardSchema(value) && !isTypeBoxSchema(value)) continue;
     try {
       schemas.push({
         name,

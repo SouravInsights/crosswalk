@@ -201,8 +201,11 @@ export async function runLlmLayer(
   config: CodegenConfig,
   context: LlmContext,
   env?: NodeJS.ProcessEnv,
+  /** When the caller already resolved a provider (the interactive key
+   *  chooser), pass it so the layer does not re-resolve from config/env. */
+  explicitProvider?: LlmProvider,
 ): Promise<LlmSuggestion[]> {
-  const configured = resolveLlmProvider(config.llm, env);
+  const configured = explicitProvider ?? resolveLlmProvider(config.llm, env);
   if (!configured) return [];
   const provider = cached(configured);
   const prompts = { ...DEFAULT_PROMPTS, ...config.llm?.prompts };

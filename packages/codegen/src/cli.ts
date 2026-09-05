@@ -24,11 +24,24 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import * as clack from "@clack/prompts";
-import { dim, printBanner, renderSummary, renderVerbose } from "./cli-output.js";
+import { dim, printBanner, renderSummary } from "./cli-output.js";
 import { CONFIG_FILE_NAMES, loadConfig } from "./config.js";
 import { loadDataFile, saveDataFile } from "./data-file.js";
 import { findSpecs } from "./detect.js";
-import { findSchemaLibraries, findWebApps } from "./detect-app.js";
+import { findSchemaLibraries, findSchemaModules, findWebApps } from "./detect-app.js";
+
+// Node prints an ExperimentalWarning the first time it type-strips a .ts
+// module (which --suggest does to load user schemas). That warning is Node
+// talking about its own internals, not something the developer can act on,
+// so it never belongs in our output.
+const realEmitWarning = process.emitWarning.bind(process);
+process.emitWarning = ((warning: unknown, ...rest: unknown[]) => {
+  const type = typeof rest[0] === "string" ? rest[0] : (rest[0] as { type?: string })?.type;
+  const text = typeof warning === "string" ? warning : ((warning as Error)?.message ?? "");
+  if (type === "ExperimentalWarning" && /type stripping/i.test(text)) return;
+  return (realEmitWarning as (...a: unknown[]) => void)(warning, ...rest);
+}) as typeof process.emitWarning;
+
 import { startDevServer } from "./dev/server.js";
 import { hostedLlmProvider, resolveLlmProvider, runLlmLayer } from "./llm.js";
 import { debug, enableVerbose, error, info, success, warn } from "./logger.js";
@@ -58,7 +71,8 @@ Flags
   --verbose      Show every tool, not just the summary
   --force        Write files even when the audit reports errors
   --skip-audit   Skip the safety report
-  --suggest PATH Ask the LLM layer which schemas in PATH are worth declaring
+  --suggest     Ask the LLM layer which of your schemas are worth declaring
+  --llm         Polish this run's generated tool names and descriptions (LLM)
   --url URL      With verify: also check the deployed page is live for visitors
   --config PATH  Use a config file at PATH
   --port N       Dashboard port (default: 4700)
@@ -84,8 +98,10 @@ export interface CliFlags {
   spec?: string;
   out?: string;
   port?: number;
-  /** `generate --suggest <module>`: LLM proposals for undeclared schemas. */
-  suggest?: string;
+  /** `generate --llm`: polish the generated tools' descriptions and names. */
+  llm?: boolean;
+  /** `generate --suggest`: LLM proposals for undeclared schemas. */
+  suggest?: boolean;
   /** `verify --url <deployed-url>`: also check the page is live for visitors. */
   url?: string;
   help: boolean;
@@ -105,7 +121,8 @@ async function main(): Promise<number> {
       spec: { type: "string" },
       out: { type: "string" },
       port: { type: "string" },
-      suggest: { type: "string" },
+      suggest: { type: "boolean" },
+      llm: { type: "boolean" },
       url: { type: "string" },
       help: { type: "boolean", default: false },
     },
@@ -122,6 +139,7 @@ async function main(): Promise<number> {
     out: values.out,
     port: values.port ? Number.parseInt(values.port, 10) : undefined,
     suggest: values.suggest,
+    llm: values.llm,
     url: values.url,
     help: values.help,
   };
@@ -143,7 +161,7 @@ async function main(): Promise<number> {
     case "verify":
       return verify(flags);
     case "generate":
-      return flags.suggest !== undefined ? suggest(flags.suggest) : generate(flags);
+      return flags.suggest ? suggest() : generate(flags);
     default:
       error(`Unknown command: ${command}`);
       info(HELP);
@@ -301,11 +319,71 @@ async function dev(port: number): Promise<number> {
 }
 
 /**
- * `generate --suggest <module>`: the LLM layer's tool-worthiness proposals.
- * A proposal surface only: it reads a schema module, asks, and prints. Nothing
- * is declared, generated, or written; declaring is the developer's edit.
+ * Resolve the LLM provider for an explicit opt-in (--llm / --suggest). With a
+ * configured key this returns it silently; without one, an interactive
+ * terminal offers the hosted tier / own key / skip. Non-interactive runs
+ * (CI) get undefined, because a prompt can never block a pipeline. Both LLM
+ * flags share this so the chooser is identical everywhere.
  */
-async function suggest(modulePath: string): Promise<number> {
+async function resolveProviderForOptIn(
+  llm: CodegenConfig["llm"],
+): Promise<ReturnType<typeof resolveLlmProvider>> {
+  const configured = resolveLlmProvider(llm ?? {});
+  if (configured) return configured;
+  if (!process.stdout.isTTY) {
+    info(
+      "\n◦ The LLM layer is off: no provider configured and no WEBMCP_LLM_API_KEY / " +
+        "OPENAI_API_KEY in the environment. Nothing proposed.\n",
+    );
+    return undefined;
+  }
+  const choice = await clack.select({
+    message: "The LLM layer needs an API key. How do you want to proceed?",
+    options: [
+      {
+        value: "hosted",
+        label: "Use the free hosted tier",
+        hint: "webmcp-stack's shared key, rate-limited",
+      },
+      {
+        value: "own",
+        label: "Enter my own API key",
+        hint: "OpenRouter, OpenAI, or any OpenAI-compatible provider",
+      },
+      { value: "skip", label: "Skip", hint: "run without LLM features" },
+    ],
+  });
+  if (clack.isCancel(choice) || choice === "skip") {
+    info("\n◦ Skipped. Nothing proposed.\n");
+    return undefined;
+  }
+  if (choice === "hosted") return hostedLlmProvider();
+  const key = await clack.password({
+    message: "Paste your API key (input is hidden):",
+    validate: (value) =>
+      !value || value.trim().length === 0 ? "The key cannot be empty." : undefined,
+  });
+  if (clack.isCancel(key)) {
+    info("\n◦ Skipped. Nothing proposed.\n");
+    return undefined;
+  }
+  const provider = resolveLlmProvider({ ...llm, apiKey: key.trim() });
+  if (!provider) {
+    warn("\nThat key did not resolve to a provider. Nothing proposed.\n");
+    return undefined;
+  }
+  info(dim("  Key used for this run only. To save it: export WEBMCP_LLM_API_KEY=..."));
+  return provider;
+}
+
+/**
+ * `generate --suggest`: the LLM layer's tool-worthiness proposals. The tool
+ * finds the schema modules itself — nobody should have to pass a file path
+ * to get proposals. A proposal surface only: it reads the discovered schemas,
+ * asks, and prints. Nothing is declared, generated, or written; declaring is
+ * the developer's edit.
+ */
+async function suggest(): Promise<number> {
   printBanner();
   const cwd = process.cwd();
 
@@ -317,66 +395,36 @@ async function suggest(modulePath: string): Promise<number> {
   } catch {
     llm = undefined;
   }
-  let provider = resolveLlmProvider(llm ?? {});
-  if (!provider) {
-    // No key configured. --suggest is already the explicit opt-in, so in a
-    // real terminal we offer the free hosted tier; in CI we quietly run
-    // without, because a prompt can never block a pipeline.
-    if (!process.stdout.isTTY) {
-      info(
-        "\n◦ The LLM layer is off: no provider configured and no WEBMCP_LLM_API_KEY / " +
-          "OPENAI_API_KEY in the environment. Nothing proposed.\n",
-      );
-      return 0;
-    }
-    const choice = await clack.select({
-      message: "The LLM layer needs an API key. How do you want to proceed?",
-      options: [
-        {
-          value: "hosted",
-          label: "Use the free hosted tier",
-          hint: "webmcp-stack's shared key, rate-limited",
-        },
-        {
-          value: "own",
-          label: "Enter my own API key",
-          hint: "OpenRouter, OpenAI, or any OpenAI-compatible provider",
-        },
-        { value: "skip", label: "Skip", hint: "run without LLM features" },
-      ],
-    });
-    if (clack.isCancel(choice) || choice === "skip") {
-      info("\n◦ Skipped. Nothing proposed.\n");
-      return 0;
-    }
-    if (choice === "hosted") {
-      provider = hostedLlmProvider();
-    } else {
-      const key = await clack.password({
-        message: "Paste your API key (input is hidden):",
-        validate: (value) =>
-          !value || value.trim().length === 0 ? "The key cannot be empty." : undefined,
-      });
-      if (clack.isCancel(key)) {
-        info("\n◦ Skipped. Nothing proposed.\n");
-        return 0;
-      }
-      provider = resolveLlmProvider({ ...llm, apiKey: key.trim() });
-      if (!provider) {
-        warn("\nThat key did not resolve to a provider. Nothing proposed.\n");
-        return 0;
-      }
-      info(dim("  Key used for this run only. To save it: export WEBMCP_LLM_API_KEY=..."));
-    }
-  }
 
-  const moduleExports = await importSchemaModule(cwd, modulePath);
-  const { schemas, skipped } = schemaExportsToJson(moduleExports, cwd);
-  for (const entry of skipped) {
-    debug(`skipped ${entry.name}: ${entry.reason}`);
+  const modules = await findSchemaModules(cwd);
+  if (modules.length === 0) {
+    info(
+      "\n◦ No schema modules found. The tool looks for files named like " +
+        '"schemas.ts" or "models.ts" under packages/, src/, apps/, or lib/. ' +
+        "If yours live elsewhere, declare them directly in codegen.config.mjs.\n",
+    );
+    return 0;
   }
-  if (schemas.length === 0) {
-    info(`\n◦ No Standard Schema exports found in ${modulePath}. Nothing to propose on.\n`);
+  const provider = await resolveProviderForOptIn(llm);
+  if (!provider) return 0;
+
+  const allSchemas: { name: string; schemaText: string }[] = [];
+  for (const modulePath of modules) {
+    let moduleExports: Record<string, unknown>;
+    try {
+      moduleExports = await importSchemaModule(cwd, modulePath);
+    } catch (error) {
+      debug(`could not load ${modulePath}: ${error instanceof Error ? error.message : error}`);
+      continue;
+    }
+    const { schemas, skipped } = schemaExportsToJson(moduleExports, cwd);
+    for (const entry of skipped) {
+      debug(`skipped ${entry.name}: ${entry.reason}`);
+    }
+    allSchemas.push(...schemas);
+  }
+  if (allSchemas.length === 0) {
+    info("\n◦ Found schema modules but no loadable schemas in them. Nothing to propose on.\n");
     return 0;
   }
 
@@ -384,7 +432,7 @@ async function suggest(modulePath: string): Promise<number> {
   spinner.start("Asking the LLM which schemas are worth declaring");
   const suggestions = await runLlmLayer(
     { sources: [], outputs: [], llm: llm ?? {} },
-    { tools: [], findings: [], suggestExports: schemas },
+    { tools: [], findings: [], suggestExports: allSchemas },
   );
   spinner.stop("Done");
 
@@ -585,9 +633,32 @@ async function generate(flags: CliFlags): Promise<number> {
     });
   }
 
-  if (flags.verbose) {
-    renderVerbose(result, setup, cwd);
-  } else {
+  // The LLM layer, on explicit opt-in only: polish the tools this run
+  // generated. Proposals print as `◦` lines; nothing is auto-applied, exit
+  // codes never change, and a failing provider is a note, not a failure.
+  if (flags.llm) {
+    const provider = await resolveProviderForOptIn(setup.config.llm);
+    if (provider) {
+      const spinner = clack.spinner();
+      spinner.start("Improving names and descriptions");
+      const suggestions = await runLlmLayer(
+        setup.config,
+        { tools: result.tools, findings: result.findings },
+        undefined,
+        provider,
+      );
+      spinner.stop("Done");
+      if (suggestions.length === 0) {
+        info("  ◦ The provider had no proposals.");
+      }
+      for (const suggestion of suggestions) {
+        info(`  ◦ ${suggestion.message}`);
+      }
+      info("");
+    }
+  }
+
+  if (!flags.verbose) {
     renderSummary(result, setup, cwd, wiring);
   }
 
