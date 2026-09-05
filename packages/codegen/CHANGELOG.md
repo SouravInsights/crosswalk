@@ -1,5 +1,12 @@
 # webmcp-codegen
 
+## 0.6.1
+
+### Patch Changes
+
+- c8ad050: Absolute paths now win over the project directory. The `tools` output's `outDir` and the `--config` existence check used `path.join(cwd, path)`, which nests an absolute path under the project (`--out /tmp/out` became `<project>/tmp/out`). They now resolve correctly.
+- c8ad050: Generated files now import only the runtime helpers they actually use. Disabled tools (which keep their request commented out) no longer import `callApi`/`toolResult`, and standalone schema tools no longer import `callApi`, so generated output passes strict `no-unused-vars` lint configs — including Next.js production builds, which treat those warnings as errors. The disabled-tool scaffold comment now names the imports to add back when enabling the call by hand.
+
 ## 0.6.0
 
 ### Minor Changes
