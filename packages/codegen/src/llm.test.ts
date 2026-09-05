@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveLlmProvider, runLlmLayer } from "./llm.js";
+import { hostedLlmProvider, resolveLlmProvider, runLlmLayer } from "./llm.js";
 import type { LlmProvider, ReviewedTool } from "./types.js";
 
 /** A provider that records what it was asked and answers per task. */
@@ -63,6 +63,30 @@ describe("resolveLlmProvider", () => {
       "openai-compatible",
     );
     expect(resolveLlmProvider({}, {})).toBeUndefined();
+  });
+
+  it("the hosted tier points at our proxy, key never in the package", async () => {
+    const provider = hostedLlmProvider();
+    expect(provider.name).toContain("openai-compatible");
+    // The wire call goes to our site; the bearer is a placeholder the proxy ignores.
+    let seenUrl = "";
+    let seenAuth = "";
+    const fetchSpy = async (input: RequestInfo | URL, init?: RequestInit) => {
+      seenUrl = String(input);
+      seenAuth = String((init?.headers as Record<string, string>)?.authorization ?? "");
+      return new Response(JSON.stringify({ choices: [{ message: { content: "{}" } }] }), {
+        status: 200,
+      });
+    };
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = fetchSpy as typeof fetch;
+    try {
+      await provider.complete("describe", "prompt", "system");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+    expect(seenUrl).toBe("https://webmcp-stack.vercel.app/api/llm/chat/completions");
+    expect(seenAuth).toBe("Bearer hosted");
   });
 });
 

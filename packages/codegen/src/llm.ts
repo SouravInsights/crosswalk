@@ -91,6 +91,18 @@ export function resolveLlmProvider(
 }
 
 /**
+ * The free hosted tier: our own proxy holds the key server-side, so a
+ * developer with no provider account can still try the LLM layer. Rate
+ * limits live on the proxy; the CLI just points at it. The proxy ignores
+ * the bearer — the real key never leaves the server.
+ */
+export const HOSTED_LLM_URL = "https://webmcp-stack.vercel.app/api/llm";
+
+export function hostedLlmProvider(): LlmProvider {
+  return openAiCompatibleProvider("hosted", HOSTED_LLM_URL, "openai/gpt-4o-mini");
+}
+
+/**
  * The built-in provider: any OpenAI-compatible chat-completions endpoint,
  * via plain fetch. Zero dependencies is a feature of this package, so the
  * wire format is spelled out rather than imported.

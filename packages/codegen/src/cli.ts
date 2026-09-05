@@ -30,7 +30,7 @@ import { loadDataFile, saveDataFile } from "./data-file.js";
 import { findSpecs } from "./detect.js";
 import { findSchemaLibraries, findWebApps } from "./detect-app.js";
 import { startDevServer } from "./dev/server.js";
-import { resolveLlmProvider, runLlmLayer } from "./llm.js";
+import { hostedLlmProvider, resolveLlmProvider, runLlmLayer } from "./llm.js";
 import { debug, enableVerbose, error, info, success, warn } from "./logger.js";
 import { runGenerate } from "./pipeline.js";
 import { resolveSetup } from "./setup.js";
@@ -317,13 +317,57 @@ async function suggest(modulePath: string): Promise<number> {
   } catch {
     llm = undefined;
   }
-  const provider = resolveLlmProvider(llm ?? {});
+  let provider = resolveLlmProvider(llm ?? {});
   if (!provider) {
-    info(
-      "\n◦ The LLM layer is off: no provider configured and no WEBMCP_LLM_API_KEY / " +
-        "OPENAI_API_KEY in the environment. Nothing proposed.\n",
-    );
-    return 0;
+    // No key configured. --suggest is already the explicit opt-in, so in a
+    // real terminal we offer the free hosted tier; in CI we quietly run
+    // without, because a prompt can never block a pipeline.
+    if (!process.stdout.isTTY) {
+      info(
+        "\n◦ The LLM layer is off: no provider configured and no WEBMCP_LLM_API_KEY / " +
+          "OPENAI_API_KEY in the environment. Nothing proposed.\n",
+      );
+      return 0;
+    }
+    const choice = await clack.select({
+      message: "The LLM layer needs an API key. How do you want to proceed?",
+      options: [
+        {
+          value: "hosted",
+          label: "Use the free hosted tier",
+          hint: "webmcp-stack's shared key, rate-limited",
+        },
+        {
+          value: "own",
+          label: "Enter my own API key",
+          hint: "OpenRouter, OpenAI, or any OpenAI-compatible provider",
+        },
+        { value: "skip", label: "Skip", hint: "run without LLM features" },
+      ],
+    });
+    if (clack.isCancel(choice) || choice === "skip") {
+      info("\n◦ Skipped. Nothing proposed.\n");
+      return 0;
+    }
+    if (choice === "hosted") {
+      provider = hostedLlmProvider();
+    } else {
+      const key = await clack.password({
+        message: "Paste your API key (input is hidden):",
+        validate: (value) =>
+          !value || value.trim().length === 0 ? "The key cannot be empty." : undefined,
+      });
+      if (clack.isCancel(key)) {
+        info("\n◦ Skipped. Nothing proposed.\n");
+        return 0;
+      }
+      provider = resolveLlmProvider({ ...llm, apiKey: key.trim() });
+      if (!provider) {
+        warn("\nThat key did not resolve to a provider. Nothing proposed.\n");
+        return 0;
+      }
+      info(dim("  Key used for this run only. To save it: export WEBMCP_LLM_API_KEY=..."));
+    }
   }
 
   const moduleExports = await importSchemaModule(cwd, modulePath);
