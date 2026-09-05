@@ -205,6 +205,63 @@ body {
   color: var(--color-baseline);
 }
 
+/* The tool standard sheet: the clauses arrive as the reader reaches
+   them, one after another, like a checklist being worked through.
+   Scroll-driven, pure CSS: browsers without support (and readers who
+   prefer reduced motion) simply see the finished sheet. */
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes clause-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@supports (animation-timeline: view()) {
+  .sheet-reveal {
+    animation: sheet-in var(--ease-reading) both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 55%;
+  }
+
+  .clause-reveal {
+    animation: clause-in var(--ease-reading) both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 45%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-reveal,
+  .clause-reveal {
+    animation: none;
+  }
+}
+
+/* Clauses respond to the reader: a hairline highlight on hover, the
+   clause number warming to full accent. */
+.clause-row {
+  transition: background-color 0.3s var(--ease-reading);
+}
+
+.clause-row:hover {
+  background-color: rgb(233 236 242 / 0.02);
+}
+
 :focus-visible {
   outline: 1px solid var(--color-accent);
   outline-offset: 3px;

@@ -156,7 +156,7 @@ export default function HomePage() {
           {/* The standard as a physical sheet, in the page's own material:
               dark card stock, taped to the desk, punched for a binder,
               ruled clauses, a handwritten note, and the stamp it earns. */}
-          <div className="relative mx-auto max-w-3xl border border-line bg-panel text-left shadow-[0_10px_70px_rgba(0,0,0,0.7)]">
+          <div className="sheet-reveal relative mx-auto max-w-3xl border border-line bg-panel text-left shadow-[0_10px_70px_rgba(0,0,0,0.7)]">
             {/* Card-stock grain: SVG turbulence noise plus a soft edge
                 vignette, so the surface reads matte, not flat. */}
             <svg aria-hidden="true" className="pointer-events-none absolute inset-0 size-full">
@@ -177,20 +177,19 @@ export default function HomePage() {
             />
 
             {/* Binder holes punched down the left edge: true voids, the
-                desk's darkness shows through. Sized down slightly on
-                mobile to match the tighter margin. */}
+                desk's darkness shows through. Hidden on mobile, where the
+                margin they force is pure cost on a narrow screen. */}
             {["top-[23%]", "top-[48%]", "top-[73%]"].map((pos) => (
               <span
                 key={pos}
                 aria-hidden="true"
-                className={`absolute left-2.5 ${pos} size-3 rounded-full border border-line bg-black shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)] sm:left-3 sm:size-3.5`}
+                className={`absolute left-3 ${pos} hidden size-3.5 rounded-full border border-line bg-black shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)] sm:block`}
               />
             ))}
 
-            {/* Masthead. Padding tightens on mobile — the original desktop
-                margin left too little room for the clause text to breathe
-                on a phone. */}
-            <div className="pl-9 pr-5 pt-8 sm:pl-14 sm:pr-11 sm:pt-11">
+            {/* Masthead. On mobile the holes are gone, so the padding
+                drops to the page's own gutter; no width is wasted. */}
+            <div className="pl-5 pr-4 pt-7 sm:pl-14 sm:pr-11 sm:pt-11">
               <div className="flex items-baseline justify-between">
                 <p className="text-[19px] leading-none">
                   <LogoWord />
@@ -214,11 +213,11 @@ export default function HomePage() {
                 (a real numbered line, not a stray column); at sm the same
                 two elements drop into the grid as separate columns via
                 `contents`, so there's one markup shape for both layouts. */}
-            <div className="pl-9 pr-5 sm:pl-14 sm:pr-11">
+            <div className="pb-7 pl-5 pr-4 sm:pb-9 sm:pl-14 sm:pr-11">
               {TOOL_STANDARD.map(({ title, body }, i) => (
                 <div
                   key={title}
-                  className="border-b border-line py-3.5 last:border-b-0 sm:grid sm:grid-cols-[2rem_minmax(0,2fr)_minmax(0,3fr)] sm:items-baseline sm:gap-6 sm:py-4"
+                  className="clause-reveal clause-row border-b border-line py-3.5 last:border-b-0 sm:grid sm:grid-cols-[2rem_minmax(0,2fr)_minmax(0,3fr)] sm:items-baseline sm:gap-6 sm:py-4"
                 >
                   <div className="flex items-baseline gap-2.5 sm:contents">
                     <p className="font-mono text-[11px] font-medium text-accent">
@@ -232,59 +231,6 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
-
-            {/* Footer: the colophon, signed. Stacked on mobile so the
-                signature isn't forced right, under the stamp; side by
-                side once there's room for it. */}
-            <div className="flex flex-col gap-2 pb-8 pl-9 pr-5 pt-5 font-mono text-[10px] tracking-[0.2em] text-faint sm:flex-row sm:items-baseline sm:justify-between sm:gap-0 sm:pl-14 sm:pr-11">
-              <span>EVERY GENERATED TOOL, EVERY RUN</span>
-              <span className="rotate-[-3deg] font-[family-name:var(--font-caveat)] text-[18px] normal-case tracking-normal text-accent sm:mr-20">
-                webmcp-stack
-              </span>
-            </div>
-
-            {/* The stamp: the one flourish, earned by the run that checks
-                it. Smaller on mobile so it stays a corner detail instead
-                of crowding the sheet. */}
-            <svg
-              viewBox="0 0 96 96"
-              aria-hidden="true"
-              className="pointer-events-none absolute -bottom-6 -right-4 size-20 rotate-[-9deg] text-accent opacity-90 sm:-bottom-9 sm:-right-10 sm:size-28"
-            >
-              <defs>
-                <path id="stamp-ring" d="M48 15 a33 33 0 1 1 -0.01 0" fill="none" />
-              </defs>
-              <circle cx="48" cy="48" r="45" fill="none" stroke="currentColor" strokeWidth="1.4" />
-              <circle cx="48" cy="48" r="26" fill="none" stroke="currentColor" strokeWidth="1" />
-              <text
-                fontSize="7.2"
-                letterSpacing="1.6"
-                fill="currentColor"
-                fontFamily="monospace"
-                fontWeight="600"
-              >
-                <textPath href="#stamp-ring" textLength="205">
-                  CHECKED ON EVERY RUN ✕ WEBMCP-STACK
-                </textPath>
-              </text>
-              <g transform="translate(36.5,34.5)">
-                <path
-                  d="M3 19.5 L12 24 L21 19.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M3 13.5 L12 18 L21 13.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinejoin="round"
-                />
-                <path d="M12 5 L21 9.5 L12 14 L3 9.5 Z" fill="currentColor" />
-              </g>
-            </svg>
           </div>
         </div>
       </section>
