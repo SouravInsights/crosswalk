@@ -72,7 +72,7 @@ Flags
   --force        Write files even when the audit reports errors
   --skip-audit   Skip the safety report
   --suggest     Ask the LLM layer which of your schemas are worth declaring
-  --llm         Polish this run's generated tool names and descriptions (LLM)
+  --llm         Improve the names and descriptions of the tools being generated (LLM)
   --url URL      With verify: also check the deployed page is live for visitors
   --config PATH  Use a config file at PATH
   --port N       Dashboard port (default: 4700)
