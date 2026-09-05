@@ -8,3 +8,4 @@ coverage/
 .env
 .env.*
 *.tsbuildinfo
+.source/

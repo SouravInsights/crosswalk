@@ -45,15 +45,15 @@ function HeroMark() {
 const AUDIT_CATCHES: Array<[string, string]> = [
   [
     "webhook receivers",
-    "Endpoints that exist for other servers, not for users. An agent holding a tool that fires your payment-webhook route is a breach waiting for a curious prompt.",
+    "Endpoints that exist for other servers, not for users. Skipped, so an agent never holds a tool that fires your payment-webhook route.",
   ],
   [
     "admin operations",
-    "Anything under admin-only paths, role-gated actions, destructive-by-default routes. Flagged as errors: generation stops until a human decides.",
+    "Admin-only paths and role-gated actions. Flagged: generation stops until you decide.",
   ],
   [
     "auth boundaries",
-    "Login, signup, token refresh. An agent should never carry your user's credentials into an AI model. Blocked, always.",
+    "Login, signup, token refresh. Blocked, so an agent never carries your user's credentials into an AI model.",
   ],
 ];
 
@@ -63,6 +63,35 @@ const RULES: Array<[string, string]> = [
   ["the spec changed", "only the part generated from the spec updates"],
   ["nothing changed", "nothing gets rewritten, and your git history stays quiet"],
   ["you edited the generated part", "your version wins; the update waits in a separate file"],
+];
+
+/* What every generated tool carries, whatever it came from. The bar is the
+   WebMCP authoring standard the coding-agent playbooks teach. */
+const TOOL_STANDARD: Array<[string, string]> = [
+  [
+    "A name that says what it does",
+    "get-trip, generate-story, list-destination-candidates. Never the raw route.",
+  ],
+  [
+    "A description an agent can act on",
+    "What it does, when to use it, what it returns, in plain language.",
+  ],
+  [
+    "Inputs with their rules, in words",
+    "Required, optional, allowed values, limits: written into the schema, not left to guesswork.",
+  ],
+  [
+    "Its risk, declared up front",
+    "Read-only tools are marked read-only so agents treat them that way. Writes start disabled.",
+  ],
+  [
+    "Failures an agent can act on",
+    "A failure tells the agent what to try next, not a stack trace. An empty result says so, in words.",
+  ],
+  [
+    "A human between the agent and the action",
+    "Payments, deletes, and other irreversible steps stop at a confirmation, not at a warning sentence.",
+  ],
 ];
 
 /* "What's the catch?" — answered as a checklist of the usual ones
@@ -103,8 +132,8 @@ export default function HomePage() {
             </h1>
             <p className="mx-auto mb-10 max-w-xl text-[16px] leading-relaxed text-dim sm:text-[17px]">
               One command reads your OpenAPI spec or validation schemas and writes the WebMCP tools
-              AI agents call: typed, checked for safety, and committed to your repo as code you own.
-              It comes with a local playground to review and test them.
+              AI agents call: typed and checked for safety. Review and test them in the local
+              playground.
             </p>
             <div className="flex flex-col items-center gap-4">
               <CopyCommand command={COMMAND} />
@@ -133,6 +162,28 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* What a generated tool carries: the authoring standard, stated. */}
+      <section className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
+          <h2 className="mb-3 font-display text-[clamp(1.5rem,3vw,2.1rem)] font-medium tracking-[-0.015em]">
+            What a generated tool carries.
+          </h2>
+          <p className="mb-10 max-w-2xl text-[15px] leading-relaxed text-dim sm:mb-14">
+            Agents choose and call tools on the strength of their names, descriptions, and schemas,
+            so those are written to the WebMCP authoring standard: the same bar the coding-agent
+            playbooks teach. Every tool, whatever it was generated from.
+          </p>
+          <div className="grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+            {TOOL_STANDARD.map(([title, body]) => (
+              <div key={title} className="border-l-2 border-accent/40 pl-5">
+                <h3 className="mb-2 text-[13.5px] font-medium leading-snug text-ink">{title}</h3>
+                <p className="text-[13.5px] leading-relaxed text-dim">{body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Safety: what the audit refuses to ship. */}
       <section className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
@@ -140,11 +191,8 @@ export default function HomePage() {
             Not a dumb API-to-tool converter.
           </h2>
           <p className="mb-10 max-w-2xl text-[15px] leading-relaxed text-dim sm:mb-14">
-            Point a generator at an API without thinking and you ship every route as something an
-            agent can call. The interesting problem was never{" "}
-            <em className="not-italic text-ink">can</em> an agent call your app; it is what it
-            should be allowed to call. So every generation runs an audit, and the audit has
-            opinions.
+            Every run checks each tool before it is written. Admin routes, auth endpoints, and
+            destructive operations start disabled. An agent sees only what you choose to ship.
           </p>
           <div className="grid gap-10 sm:grid-cols-3 sm:gap-8">
             {AUDIT_CATCHES.map(([title, body]) => (
@@ -166,8 +214,7 @@ export default function HomePage() {
             Your API changes. Your tools keep up.
           </h2>
           <p className="mb-10 max-w-xl text-[15px] leading-relaxed text-dim sm:mb-14">
-            Re-run the command whenever the spec moves. Regeneration never touches code you wrote.
-            The exact behavior:
+            Re-run the command whenever the spec moves. What happens each time:
           </p>
 
           <div className="border-y border-line">
@@ -222,7 +269,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* The stack: codegen today, the rest of the loop next. */}
+      {/* The stack: codegen today, two more on the roadmap. */}
       <section className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
           <p className="mb-3 font-mono text-[12px] uppercase tracking-[0.2em] text-faint">
@@ -231,17 +278,37 @@ export default function HomePage() {
           <h2 className="mb-3 font-display text-[clamp(1.5rem,3vw,2.1rem)] font-medium tracking-[-0.015em]">
             One product of a stack.
           </h2>
-          <p className="max-w-2xl text-[15px] leading-relaxed text-dim">
+          <p className="mb-10 max-w-2xl text-[15px] leading-relaxed text-dim sm:mb-14">
             codegen is the first product of <LogoWord />: it reads your API spec and validation
-            schemas and writes the tools. The rest of the loop is on the roadmap:{" "}
-            <span className="font-mono text-[13px] text-dim">@webmcp-stack/telemetry</span> to see
-            how agents actually use your tools, and{" "}
-            <span className="font-mono text-[13px] text-dim">@webmcp-stack/audit</span> to check any
-            site&rsquo;s WebMCP surface with a URL.
+            schemas and writes the tools. Two more are on the roadmap:
           </p>
+
+          <div className="border-y border-line">
+            {[
+              [
+                "@webmcp-stack/telemetry",
+                "see how agents actually use your tools: which ones get called, which fail, which never get found",
+              ],
+              [
+                "@webmcp-stack/audit",
+                "check any site's WebMCP tools with a URL, before or after you ship",
+              ],
+            ].map(([pkg, what], i) => (
+              <div
+                key={pkg}
+                className={`grid gap-1.5 px-1 py-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:items-baseline sm:gap-6 sm:py-5 ${
+                  i > 0 ? "border-t border-line" : ""
+                }`}
+              >
+                <p className="font-mono text-[12.5px] leading-relaxed text-dim">{pkg}</p>
+                <p className="text-[14.5px] leading-relaxed text-ink">{what}</p>
+              </div>
+            ))}
+          </div>
+
           <Link
             href="/about"
-            className="mt-6 inline-block font-mono text-[13px] text-dim transition-colors duration-150 hover:text-ink"
+            className="mt-8 inline-block font-mono text-[13px] text-dim transition-colors duration-150 hover:text-ink"
             style={{ transitionTimingFunction: "var(--ease-reading)" }}
           >
             why the stack exists →
