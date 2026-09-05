@@ -23,6 +23,7 @@ function reviewedTool(overrides: Partial<ReviewedTool> = {}): ReviewedTool {
     sideEffect: "read",
     endpointRole: "endpoint",
     enabledByDefault: true,
+    withheld: false,
     requiresAuth: false,
     description: "Returns the current status and tracking info for an order by ID.",
     descriptionSource: "openapi-summary",
@@ -116,6 +117,44 @@ describe("js generator", () => {
     expect(tool?.contents).not.toContain("toolDisabled(");
   });
 
+  it("withheld tools do not register: the registration is a commented fence", async () => {
+    const files = await tools({ outDir: "src/webmcp" }).generate(
+      [
+        reviewedTool({
+          name: "cancel-order",
+          inputTypeName: "CancelOrderInput",
+          httpMethod: "POST",
+          pathTemplate: "/orders/{orderId}/cancel",
+          sideEffect: "destructive",
+          enabledByDefault: false,
+          withheld: true,
+          riskTier: "destructive-confirm",
+        }),
+      ],
+      cwd,
+    );
+    const tool = files.find((file) => file.path.includes("cancel-order"));
+    // No live registration: the agent never sees the tool.
+    // Line-anchored: the live call is gone; only the commented fence remains.
+    expect(tool?.contents).not.toContain("\n  await modelContext.registerTool(");
+    expect(tool?.contents).toContain("//   await modelContext.registerTool(");
+    // Commented like an editor's toggle-comment: fixed marker column, original
+    // indentation preserved, so uncommenting restores working code.
+    expect(tool?.contents).toContain("//       ...cancelOrderTool,");
+    // The import reflects it: getModelContext is part of the fence, not the file.
+    expect(tool?.contents).toContain('import { toolDisabled } from "./runtime.webmcp";');
+    // The execute scaffold still refuses politely if someone registers it by hand.
+    expect(tool?.contents).toContain('return toolDisabled("cancel-order.webmcp.ts");');
+    // And the header says what "withheld" means.
+    expect(tool?.contents).toContain("Starts withheld: not registered until you enable it");
+  });
+
+  it("enabled endpoint tools carry the co-browsing extension point", async () => {
+    const files = await tools({ outDir: "src/webmcp" }).generate([reviewedTool()], cwd);
+    const tool = files.find((file) => file.path.includes("get-order-status"));
+    expect(tool?.contents).toContain("Make the effect visible");
+  });
+
   it("emits the spec's annotations into the tool definition", async () => {
     const files = await tools({ outDir: "src/webmcp" }).generate(
       [
@@ -180,6 +219,7 @@ describe("js generator", () => {
           sideEffect: "destructive",
           endpointRole: "endpoint",
           enabledByDefault: false,
+          withheld: false,
           riskTier: "destructive-confirm",
           hints: {
             readOnlyHint: false,
@@ -216,6 +256,7 @@ describe("js generator", () => {
           pathTemplate: "/orders/{orderId}/cancel",
           sideEffect: "destructive",
           enabledByDefault: false,
+          withheld: false,
           riskTier: "destructive-confirm",
         }),
         reviewedTool({
@@ -346,5 +387,76 @@ describe("js generator", () => {
     const second = await output.generate([reviewedTool()], cwd);
     const toolFile = second.find((file) => file.path.includes("get-order-status"));
     expect(toolFile?.action).toBe("unchanged");
+  });
+
+  it("a rename between runs carries the owned execute() to the new filename", async () => {
+    const output = tools({ outDir: "src/webmcp" });
+    await writeAll(await output.generate([reviewedTool()], cwd));
+
+    // The developer edits their region.
+    const oldPath = join(cwd, "src/webmcp/get-order-status.webmcp.ts");
+    const before = await readFile(oldPath, "utf8");
+    await writeFile(
+      oldPath,
+      before.replace(
+        "export async function execute",
+        "// MY CUSTOM CODE\nexport async function execute",
+      ),
+    );
+
+    // Next run: the same endpoint now resolves to a different name.
+    const renamed = reviewedTool({ name: "get-order" });
+    const files = await output.generate([renamed], cwd);
+
+    const moved = files.find((file) => file.path.endsWith("get-order.webmcp.ts"));
+    expect(moved?.contents).toContain("MY CUSTOM CODE");
+    expect(moved?.notes?.some((note) => note.includes("Followed the rename"))).toBe(true);
+  });
+
+  it("a tool never inherits a stranger's execute() left at its filename", async () => {
+    const output = tools({ outDir: "src/webmcp" });
+
+    // Two endpoints whose files are on disk under their old names.
+    await writeAll(
+      await output.generate(
+        [
+          reviewedTool(), // get-order-status → GET /orders/{id}
+          reviewedTool({
+            id: "DELETE /admin/orders/{id}",
+            name: "delete-order",
+            source: { kind: "openapi", ref: "DELETE /admin/orders/{id}" },
+            httpMethod: "DELETE",
+            sideEffect: "destructive",
+            enabledByDefault: false,
+            withheld: true,
+            riskTier: "destructive-confirm",
+          }),
+        ],
+        cwd,
+      ),
+    );
+
+    // The spec changes: the read endpoint is deleted, and a NEW endpoint
+    // appears whose derived name lands on the old file's exact filename.
+    // The old file must move aside, not have its body inherited.
+    const usurper = reviewedTool({
+      id: "GET /shipping/orders/{id}",
+      name: "delete-order",
+      source: { kind: "openapi", ref: "GET /shipping/orders/{id}" },
+    });
+    const files = await output.generate([usurper], cwd);
+
+    const fresh = files.find((file) => file.path.endsWith("delete-order.webmcp.ts"));
+    // A fresh scaffold for the new endpoint, not the admin tool's body.
+    expect(fresh?.contents).toContain("GET /shipping/orders/{id}");
+    expect(fresh?.contents).not.toContain("DELETE /admin/orders/{id}");
+
+    // The stranger was set aside, not destroyed.
+    const aside = files.find((file) => file.path.endsWith("delete-order.webmcp.ts.orphaned"));
+    expect(aside?.contents).toContain("DELETE /admin/orders/{id}");
+
+    // And the endpoint that vanished entirely is reported as an orphan.
+    const barrel = files.find((file) => file.path.endsWith("index.ts"));
+    expect(barrel?.notes?.some((note) => note.includes("get-order-status.webmcp.ts"))).toBe(true);
   });
 });

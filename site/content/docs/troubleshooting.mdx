@@ -42,10 +42,10 @@ This avoids CORS entirely and is the standard pattern for web+API monorepos.
 
 **Fix:** This is expected. Use the dashboard to verify the request builds correctly; use DevTools to test with your real browser session. For auth'd endpoints, you'll only get real data in DevTools (where you're signed in).
 
-## "My tool is disabled and I don't know why"
+## "My tool was generated but agents can't see it"
 
-**Symptom:** A tool registers but returns "This tool is currently disabled by the app developer."
+**Symptom:** The tool file exists, but the tool never shows up in the agent's tool list.
 
-**Cause:** The safety layer classified it as a mutation (POST/PUT/PATCH/DELETE) or flagged it as auth/admin. Mutations start disabled by default; auth and admin endpoints are always disabled.
+**Cause:** The safety layer classified it as a mutation (POST/PUT/PATCH/DELETE) or flagged it as auth/admin, so it was generated withheld: not registered, because an unreviewed tool should not be something an agent can pick.
 
-**Fix:** Open the generated file and uncomment the implementation. The working code is there, commented out. Delete the `return toolDisabled(...)` line and uncomment the `callApi` block.
+**Fix:** Enable it in the dashboard (`webmcp-codegen dev`) and regenerate, or open the generated file and uncomment the registration fence and the implementation. The working code is all there, commented out. If you want disabled tools to stay visible to agents as gated capabilities, set `safety.registerDisabled: true`.

@@ -2,7 +2,7 @@ import { getModelContext, callApi, toolResult, asToolError } from "./runtime.web
 
 // ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
- * Get one pet, including its owner's contact details
+ * Get one pet, including its owner's contact details. Returns the pet.
  *
  * Source: GET /pets/{id} (openapi). Risk: safe-read.
  * Starts enabled (see executeGetPet below).
@@ -32,7 +32,7 @@ export const getPetHints = {"readOnlyHint":true,"destructiveHint":false,"idempot
 /** The tool definition, minus `execute` (which is yours, below the marker). */
 export const getPetTool = {
   name: "get-pet",
-  description: "Get one pet, including its owner's contact details",
+  description: "Get one pet, including its owner's contact details. Returns the pet.",
   inputSchema: getPetInputSchema,
   annotations: {
     readOnlyHint: true,

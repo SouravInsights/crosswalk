@@ -28,7 +28,8 @@ Each tool file has two regions, split by a marker comment:
 // ─── webmcp-codegen: end generated. Your code below survives regeneration. ───
 
 export async function executeDeletePet(input: DeletePetInput) {
-  // This tool starts disabled: it changes things. ...
+  // This tool is withheld: nothing registers it, so agents cannot see or call it.
+  // To enable it, uncomment the request below and the registration above. ...
   return toolDisabled("delete-pet.webmcp.ts");
 
   // const data = await callApi(`/pets/${input.id}`, { method: "DELETE" });

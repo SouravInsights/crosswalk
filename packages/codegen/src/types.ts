@@ -143,6 +143,12 @@ export interface ReviewedTool extends CandidateTool {
    */
   enabledByDefault: boolean;
   /**
+   * A withheld tool is not registered at all: agents never see it, so it
+   * cannot dilute selection. Disabled tools are withheld by default;
+   * `safety.registerDisabled` keeps the old visible-but-gated behavior.
+   */
+  withheld: boolean;
+  /**
    * Output field paths the PII heuristics flagged (e.g. "user.email").
    * These are fields that would leave the page and reach the agent.
    */
@@ -237,6 +243,12 @@ export interface SafetyOptions {
   piiFields?: string[];
   /** Tool names or source refs to skip entirely (substrings, case-insensitive). */
   exclude?: string[];
+  /**
+   * Register disabled tools anyway, so agents see them as gated capabilities
+   * instead of not seeing them at all. Off by default: visible dead ends
+   * measurably degrade tool selection.
+   */
+  registerDisabled?: boolean;
 }
 
 /** The config file shape. Create it with `defineConfig` for type checking. */

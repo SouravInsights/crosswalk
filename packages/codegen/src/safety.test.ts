@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditTools, findPiiFields, reviewTools } from "./safety.js";
+import { auditTools, findPiiFields, hintsFor, reviewTools } from "./safety.js";
 import type { CandidateTool } from "./types.js";
 
 /** A minimal candidate; tests override the two or three fields they care about. */
@@ -390,6 +390,7 @@ describe("set-level audit", () => {
       sideEffect: "read",
       riskTier: "safe-read",
       enabledByDefault: true,
+      withheld: false,
       endpointRole: "endpoint" as const,
       piiInOutput: [],
       source: { kind: "openapi", ref: `GET /${name}` },
@@ -403,16 +404,38 @@ describe("set-level audit", () => {
     };
   }
 
-  it("warns once when a run exceeds the tool-count soft limit", () => {
-    const tools = Array.from({ length: 41 }, (_, i) => fakeTool(`tool-${i}`));
+  it("warns once when a run exceeds the registered-tool soft limit", () => {
+    const tools = Array.from({ length: 26 }, (_, i) => fakeTool(`tool-${i}`));
     const findings = auditTools(tools);
-    const count = findings.filter((f) => f.message.includes("tools in one surface"));
+    const count = findings.filter((f) => f.message.includes("tools register"));
     expect(count).toHaveLength(1);
-    expect(count[0]?.message).toContain("41 tools");
+    expect(count[0]?.message).toContain("26 tools register");
   });
 
   it("stays quiet at or under the limit", () => {
-    const tools = Array.from({ length: 40 }, (_, i) => fakeTool(`tool-${i}`));
-    expect(auditTools(tools).filter((f) => f.message.includes("tools in one surface"))).toEqual([]);
+    const tools = Array.from({ length: 25 }, (_, i) => fakeTool(`tool-${i}`));
+    expect(auditTools(tools).filter((f) => f.message.includes("tools register"))).toEqual([]);
+  });
+
+  it("counts only registered tools: withheld ones relieve the warning", () => {
+    const tools = Array.from({ length: 30 }, (_, i) => ({
+      ...fakeTool(`tool-${i}`),
+      withheld: i >= 20,
+    }));
+    expect(auditTools(tools).filter((f) => f.message.includes("tools register"))).toEqual([]);
+  });
+
+  it("marks a nullable string in a union as untrusted content", () => {
+    const tool = fakeTool("get-comments");
+    tool.outputSchema = {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          body: { anyOf: [{ type: "string" }, { type: "null" }] },
+        },
+      },
+    } as never;
+    expect(hintsFor(tool, "read").untrustedContentHint).toBe(true);
   });
 });

@@ -9,7 +9,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { describeCandidateInputs } from "./describe.js";
+import { describeCandidateInputs, describeCandidateTool } from "./describe.js";
 import { pascalCase } from "./json-schema.js";
 import { runLlmLayer } from "./llm.js";
 import { mergeSchemaWithOperations } from "./merge.js";
@@ -40,6 +40,13 @@ export interface GenerateOptions {
    * regeneration.
    */
   overrides?: ToolOverrides;
+  /**
+   * The names the last run produced (name → route ref), from the same file.
+   * When a route's name changes between runs, the rename is reported and the
+   * tool's overrides move with it: a rename is a report line, never a silent
+   * break.
+   */
+  previousNames?: Record<string, string>;
   /** Progress narration: each pipeline step reports what it's doing. */
   progress?: (message: string) => void;
 }
@@ -57,6 +64,12 @@ export interface GenerateResult {
    * unless the layer is explicitly configured; never applied to files.
    */
   suggestions: LlmSuggestion[];
+  /** Names that changed since the last run (old → new), overrides re-keyed. */
+  crossRenames: { from: string; to: string }[];
+  /** The names this run produced (name → route ref), for the caller to save. */
+  namesLedger: Record<string, string>;
+  /** Overrides with renamed tools re-keyed, when a rename moved any. */
+  migratedOverrides?: ToolOverrides;
   /** True when audit errors stopped any file from being written. */
   blocked: boolean;
   /** True when this run actually wrote files (false for dry runs and blocks). */
@@ -90,7 +103,10 @@ export async function runGenerate(
   //    (constraints appended when missing); silent fields get a marked draft.
   //    Developer overrides (layer 5) run later, in step 6, so they always win.
   progress("Assembling field descriptions");
-  for (const candidate of merge.tools) describeCandidateInputs(candidate);
+  for (const candidate of merge.tools) {
+    describeCandidateTool(candidate);
+    describeCandidateInputs(candidate);
+  }
 
   // 4. Names. Declared names (schema entries, cleaned operationIds) are
   //    fixed. Route-derived names start minimal ("generate-story") and
@@ -115,6 +131,36 @@ export async function runGenerate(
     progress(`Renamed ${renames.length} tool${renames.length === 1 ? "" : "s"} for uniqueness`);
   }
 
+  // Cross-run renames. The route ref is the durable identity; the name is
+  // derived. When they drift apart (a better algorithm, a spec edit), the
+  // tool's dashboard overrides are keyed by the old name and would silently
+  // stop applying — so they are re-keyed here, before step 6 reads them.
+  const refOf = (tool: (typeof named)[number]): string => tool.endpointRef ?? tool.source.ref;
+  const crossRenames: { from: string; to: string }[] = [];
+  if (options.previousNames) {
+    const nameByRef = new Map(Object.entries(options.previousNames).map(([n, r]) => [r, n]));
+    for (const tool of named) {
+      const before = nameByRef.get(refOf(tool));
+      if (before && before !== tool.name) crossRenames.push({ from: before, to: tool.name });
+    }
+  }
+  let overrides = options.overrides;
+  let migratedOverrides: ToolOverrides | undefined;
+  if (overrides && crossRenames.length > 0) {
+    overrides = { ...overrides };
+    for (const { from, to } of crossRenames) {
+      if (overrides[from] && !overrides[to]) {
+        overrides[to] = overrides[from];
+        delete overrides[from];
+      }
+    }
+    migratedOverrides = overrides;
+    progress(
+      `${crossRenames.length} tool${crossRenames.length === 1 ? "" : "s"} renamed since the last run; their dashboard edits moved with them`,
+    );
+  }
+  const namesLedger = Object.fromEntries(named.map((tool) => [tool.name, refOf(tool)]));
+
   // 5. Safety review: classify side effects, compute hints, scan for PII,
   //    apply endpoint roles and config exclusions. Webhooks never come back.
   progress("Reviewing safety (classification, PII, auth)");
@@ -129,9 +175,9 @@ export async function runGenerate(
   //    layer, field text included: an override is the developer's final word,
   //    so nothing appends to it afterwards.
   const fieldOverrideTypos: { tool: string; field: string }[] = [];
-  if (options.overrides) {
+  if (overrides) {
     for (const tool of tools) {
-      const override = options.overrides[tool.name];
+      const override = overrides[tool.name];
       if (!override) continue;
       if (typeof override.description === "string" && override.description.trim()) {
         tool.description = override.description.trim();
@@ -175,6 +221,21 @@ export async function runGenerate(
     : [
         ...merge.findings,
         ...auditTools(tools, renames),
+        ...resolved.collisions.map((name) => ({
+          level: "error" as const,
+          tool: name,
+          message:
+            `"${name}" collided with an identical route and could only be numbered. ` +
+            "A numbered name is the algorithm giving up: rename one of them in the " +
+            "dashboard or .webmcp-codegen.json so an agent can tell them apart.",
+        })),
+        ...crossRenames.map((rename) => ({
+          level: "warning" as const,
+          tool: rename.to,
+          message:
+            `Renamed "${rename.from}" → "${rename.to}" since the last run. ` +
+            "Dashboard edits moved with it; update any code that imported the old name.",
+        })),
         ...formFindings,
         ...fieldOverrideTypos.map((typo) => ({
           level: "warning" as const,
@@ -188,7 +249,19 @@ export async function runGenerate(
   const blocked = errors.length > 0 && !options.force && !options.skipAudit;
 
   if (blocked) {
-    return { tools, skipped, findings, files: [], notes, suggestions: [], blocked, wrote: false };
+    return {
+      tools,
+      skipped,
+      findings,
+      files: [],
+      notes,
+      suggestions: [],
+      crossRenames,
+      namesLedger,
+      migratedOverrides,
+      blocked,
+      wrote: false,
+    };
   }
 
   // 7b. The advisory LLM layer runs after the audit so its relationship
@@ -237,7 +310,19 @@ export async function runGenerate(
     wrote = true;
   }
 
-  return { tools, skipped, findings, files, notes, suggestions, blocked, wrote };
+  return {
+    tools,
+    skipped,
+    findings,
+    files,
+    notes,
+    suggestions,
+    crossRenames,
+    namesLedger,
+    migratedOverrides,
+    blocked,
+    wrote,
+  };
 }
 
 /**

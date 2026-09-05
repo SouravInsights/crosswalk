@@ -1,11 +1,11 @@
-import { getModelContext, requestUserConfirmation, callApi, toolResult, asToolError, toolDisabled } from "./runtime.webmcp";
+import { toolDisabled } from "./runtime.webmcp";
 
 // ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
- * Add a new pet to the store
+ * Add a new pet to the store. Returns the pet.
  *
  * Source: POST /pets (openapi). Risk: write-confirm.
- * Starts disabled (see executeCreatePet below).
+ * Starts withheld: not registered until you enable it (see registerCreatePet below).
  * Regenerate with: npx @webmcp-stack/codegen generate
  */
 
@@ -36,7 +36,7 @@ export const createPetHints = {"readOnlyHint":false,"destructiveHint":false,"ide
 /** The tool definition, minus `execute` (which is yours, below the marker). */
 export const createPetTool = {
   name: "create-pet",
-  description: "Add a new pet to the store",
+  description: "Add a new pet to the store. Returns the pet.",
   inputSchema: createPetInputSchema,
   annotations: {
     readOnlyHint: false,
@@ -45,43 +45,43 @@ export const createPetTool = {
 };
 
 /**
- * Register this tool with WebMCP. Call it once on page load, or use
- * registerAllTools() from the generated index.ts. Skips quietly when the
- * browser has no WebMCP runtime.
- *
- * Pass an AbortSignal to unregister later: controller.abort().
+ * Withheld: this tool is not registered, so agents cannot see or pick
+ * it. The registration below stays commented until you enable the tool
+ * (uncomment it and the body of executeCreatePet, or flip it in the
+ * dashboard and regenerate).
  */
 export async function registerCreatePet(signal?: AbortSignal): Promise<void> {
-  const modelContext = getModelContext();
-  if (!modelContext) return;
-  await modelContext.registerTool(
-    {
-      ...createPetTool,
-      execute: async (input, context) => {
-        // Cancellation wins over everything, including the confirmation.
-        context?.signal?.throwIfAborted();
-        // This tool changes things, so the user is always asked first. The
-        // confirmation lives in the generated region: it cannot be edited away.
-        const confirmed = await requestUserConfirmation(
-          "Allow the agent to: Add a new pet to the store",
-        );
-        if (!confirmed) {
-          return {
-            content: [{ type: "text", text: "The user declined this action." }],
-            isError: true,
-          };
-        }
-        // The browser has already validated the agent's input against the schema.
-        // A failure returns a readable result; it never throws (see asToolError).
-        try {
-          return await executeCreatePet(input as CreatePetInput, context?.signal);
-        } catch (error) {
-          return asToolError(error);
-        }
-      },
-    },
-    { signal },
-  );
+  void signal;
+  // const modelContext = getModelContext();
+  // if (!modelContext) return;
+  //   await modelContext.registerTool(
+  //     {
+  //       ...createPetTool,
+  //       execute: async (input, context) => {
+  //         // Cancellation wins over everything, including the confirmation.
+  //         context?.signal?.throwIfAborted();
+  //         // This tool changes things, so the user is always asked first. The
+  //         // confirmation lives in the generated region: it cannot be edited away.
+  //         const confirmed = await requestUserConfirmation(
+  //           "Allow the agent to: Add a new pet to the store. Returns the pet.",
+  //         );
+  //         if (!confirmed) {
+  //           return {
+  //             content: [{ type: "text", text: "The user declined this action." }],
+  //             isError: true,
+  //           };
+  //         }
+  //         // The browser has already validated the agent's input against the schema.
+  //         // A failure returns a readable result; it never throws (see asToolError).
+  //         try {
+  //           return await executeCreatePet(input as CreatePetInput, context?.signal);
+  //         } catch (error) {
+  //           return asToolError(error);
+  //         }
+  //       },
+  //     },
+  //     { signal },
+  //   );
 }
 
 // ─── webmcp-codegen: end generated. Your code below survives regeneration. ───

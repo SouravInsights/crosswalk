@@ -65,8 +65,8 @@ const TOOL_STANDARD: Array<{ title: string; body: ReactNode }> = [
     body: "Required, optional, limits: written in, never guessed.",
   },
   {
-    title: "Dangerous tools start disabled",
-    body: "Auth, admin, and destructive ones stay off until you turn them on.",
+    title: "Unreviewed tools never reach agents",
+    body: "Auth, admin, and destructive ones stay unregistered until you turn them on.",
   },
   {
     title: "Failures that say what to try next",

@@ -218,18 +218,117 @@ export function describeField(
 /**
  * Run the describe layer over a candidate's input fields, in place. Fields
  * with author text keep it (constraints appended when missing); fields with
- * none get a marked draft. Records which fields were machine-drafted so the
- * audit can warn when a tool has nothing but.
+ * none get a marked draft. The walk covers array items and nested objects
+ * two levels down: an agent fills `photos[].capturedAt` from its description
+ * too, and a bare nested field fails the same way a bare top-level one does.
+ * Records which fields were machine-drafted (dotted paths for nested ones)
+ * so the audit can warn when a tool has nothing but.
  */
 export function describeCandidateInputs(candidate: CandidateTool): void {
-  const properties = candidate.inputSchema.properties;
-  if (!properties) return;
-
   const synthesized: string[] = [];
-  for (const [name, fieldSchema] of Object.entries(properties)) {
-    const { description, synthesized: wasSynthesized } = describeField(name, fieldSchema);
-    if (description) fieldSchema.description = description;
-    if (wasSynthesized) synthesized.push(name);
-  }
+
+  const walk = (
+    prefix: string,
+    properties: Record<string, JsonSchema> | undefined,
+    depth: number,
+  ): void => {
+    if (!properties || depth > 2) return;
+    for (const [name, fieldSchema] of Object.entries(properties)) {
+      const path = prefix ? `${prefix}.${name}` : name;
+      const { description, synthesized: wasSynthesized } = describeField(name, fieldSchema);
+      if (description) fieldSchema.description = description;
+      if (wasSynthesized) synthesized.push(path);
+      walk(path, fieldSchema.properties, depth + 1);
+      if (fieldSchema.items) walk(`${path}[]`, fieldSchema.items.properties, depth + 1);
+    }
+  };
+
+  walk("", candidate.inputSchema.properties, 0);
   candidate.synthesizedFields = synthesized;
+}
+
+/**
+ * A Title Case label with no sentence punctuation is a UI string that
+ * wandered into a description field ("Get My Unlocked Stamps"). Sentence
+ * case it; all-caps acronyms (OTP, API) survive.
+ */
+function normalizeLabel(text: string): string {
+  const words = text
+    .replace(/[.!?]+$/, "")
+    .split(/\s+/)
+    .filter(Boolean);
+  const isLabel =
+    words.length > 1 && words.every((word) => /^[A-Z]/.test(word) || /^[^a-zA-Z]/.test(word));
+  if (!isLabel) return text;
+  const lowered = words
+    .map((word, index) => (index === 0 || /^[A-Z0-9]+$/.test(word) ? word : word.toLowerCase()))
+    .join(" ");
+  return `${lowered}.`;
+}
+
+/** Words that mean the description already covers what comes back. */
+const RETURN_LANGUAGE =
+  /\b(returns?|response|responds?|yields?|gives? back|provides?|contains?)\b/i;
+
+/** Keys that conventionally wrap the real payload: "{ data: [...] }". */
+const WRAPPER_KEYS = new Set(["data", "items", "results", "records", "entries", "list"]);
+
+/**
+ * Build the "what it returns" sentence from the output schema, or "" when
+ * the shape says nothing useful. The noun comes from the tool's own name:
+ * "list-trips" returns an array of trips; "get-trip" returns the trip.
+ */
+/** Verb forms that occupy two words of the name: "sign-up", "log-out". */
+const PHRASAL_VERBS = new Set(["sign-up", "sign-in", "sign-out", "log-in", "log-out"]);
+
+function returnShapeSentence(toolName: string, output: JsonSchema): string {
+  const words = toolName.split("-");
+  // The noun is what the verb leaves behind — and a phrasal verb is two words.
+  const firstTwo = words.slice(0, 2).join("-");
+  const nounWords = PHRASAL_VERBS.has(firstTwo) ? words.slice(2) : words.slice(1);
+  const nounPhrase = nounWords.join(" ").replace(/ by \w+$/, "");
+  if (!nounPhrase) return "";
+  const type = Array.isArray(output.type) ? output.type[0] : output.type;
+  if (type === "array") return `Returns an array of ${nounPhrase}.`;
+  if (type === "object") {
+    // Only a conventional wrapper key makes this an envelope; an object that
+    // merely contains an array somewhere ("{ trip: { photos: [...] } }")
+    // still returns the thing itself.
+    const wrapper = Object.entries(output.properties ?? {}).find(
+      ([key, prop]) => WRAPPER_KEYS.has(key) && prop.type === "array",
+    );
+    if (wrapper) return `Returns an array of ${nounPhrase}.`;
+    return `Returns the ${nounPhrase}.`;
+  }
+  return "";
+}
+
+/**
+ * Assemble the tool-level description, in place. Author text wins verbatim
+ * except for label normalization; a description that never says what comes
+ * back gets the return-shape sentence appended from the output schema; a
+ * tool with no description at all gets a marked draft from its name.
+ */
+export function describeCandidateTool(candidate: CandidateTool): void {
+  const raw = typeof candidate.description === "string" ? candidate.description.trim() : "";
+
+  if (!raw) {
+    const words = candidate.name.split("-").join(" ");
+    const sentence = words ? `${words.charAt(0).toUpperCase()}${words.slice(1)}.` : "";
+    const returns = candidate.outputSchema
+      ? returnShapeSentence(candidate.name, candidate.outputSchema)
+      : "";
+    candidate.description = [sentence, returns].filter(Boolean).join(" ");
+    candidate.descriptionSource = "generated-template";
+    return;
+  }
+
+  const normalized = normalizeLabel(raw);
+  const returns =
+    candidate.outputSchema && !RETURN_LANGUAGE.test(normalized)
+      ? returnShapeSentence(candidate.name, candidate.outputSchema)
+      : "";
+  // The join is between sentences: the base earns its period first.
+  const base = returns && !/[.!?]$/.test(normalized) ? `${normalized}.` : normalized;
+  candidate.description = [base, returns].filter(Boolean).join(" ");
 }

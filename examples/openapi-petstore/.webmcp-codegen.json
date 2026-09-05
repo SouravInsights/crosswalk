@@ -1,0 +1,9 @@
+{
+  "names": {
+    "list-pets": "GET /pets",
+    "create-pet": "POST /pets",
+    "get-pet": "GET /pets/{id}",
+    "delete-pet": "DELETE /pets/{id}",
+    "adopt-pet": "POST /pets/{id}/adopt"
+  }
+}

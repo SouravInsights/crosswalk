@@ -73,7 +73,17 @@ describe("analyzeRoute", () => {
     ["get", "/v1/auth/session", "get-session"],
     // Action endpoints: the last segment's verb carries the intent.
     ["post", "/v1/trips/{trip_id}/story/generate", "generate-story"],
-    ["post", "/v1/trips/{trip_id}/blocks/batch", "batch-blocks"],
+    // "batch" is a modifier, never the verb: the name says what is written.
+    ["post", "/v1/trips/{trip_id}/blocks/batch", "update-blocks-batch"],
+    ["post", "/v1/media/batch-delete", "delete-media-batch"],
+    // POST on a member path attaches to it: verb "add", parent absorbed.
+    ["post", "/v1/bucket-list/destinations/{slug}", "add-bucket-list-destination"],
+    ["post", "/v1/bucket-list/destinations/{slug}/trips/{trip_id}", "add-destination-trip"],
+    // Auth one-word actions read as verb phrases.
+    ["post", "/v1/auth/signup", "sign-up"],
+    ["post", "/v1/auth/signin", "sign-in"],
+    // A trailing "all" scopes the parent collection.
+    ["get", "/v1/pricing/all", "list-all-pricing"],
     ["post", "/v1/auth/verify-otp", "verify-otp"],
     ["post", "/v1/auth/login", "login"],
     ["post", "/v1/search", "search"],
@@ -144,6 +154,53 @@ describe("resolveNames", () => {
       { name: "a", declared: false, httpMethod: "GET", pathTemplate: "/v1/trips" },
     ]);
     expect(notes.some((n) => n.includes("version"))).toBe(true);
+  });
+
+  it("spends grouping words in reserve before ever numbering a name", () => {
+    const { names, collisions } = resolveNames([
+      { name: "a", declared: false, httpMethod: "GET", pathTemplate: "/v1/pricing/" },
+      { name: "b", declared: false, httpMethod: "GET", pathTemplate: "/v1/admin/pricing/" },
+    ]);
+    expect(names).toContain("get-pricing");
+    expect(names).toContain("get-admin-pricing");
+    expect(collisions).toHaveLength(0);
+  });
+
+  it("reports a numeric suffix as a collision, never silently", () => {
+    // Identical routes with a method-equal verb skip the method suffix
+    // ("get-trip-get" says nothing) and land on the counter.
+    const { names, collisions } = resolveNames([
+      { name: "a", declared: false, httpMethod: "GET", pathTemplate: "/v1/trips/{trip_id}" },
+      { name: "b", declared: false, httpMethod: "GET", pathTemplate: "/v1/trips/{trip_id}" },
+    ]);
+    expect(names[1]).toBe("get-trip-2");
+    expect(collisions).toEqual(["get-trip"]);
+  });
+
+  it("keeps names under 30 characters by spending less context", () => {
+    const { names, notes } = resolveNames([
+      {
+        name: "a",
+        declared: false,
+        httpMethod: "GET",
+        pathTemplate: "/v1/users/me/featured-trips",
+      },
+    ]);
+    expect(names[0]).toBe("list-featured-trips");
+    expect((names[0] as string).length).toBeLessThanOrEqual(30);
+    expect(notes.some((n) => n.includes("30 characters"))).toBe(true);
+  });
+
+  it("adds the parent for member-POST association names", () => {
+    const { names } = resolveNames([
+      {
+        name: "a",
+        declared: false,
+        httpMethod: "POST",
+        pathTemplate: "/v1/bucket-list/destinations/{slug}",
+      },
+    ]);
+    expect(names[0]).toBe("add-bucket-list-destination");
   });
 
   it("never produces duplicate or invalid names", () => {

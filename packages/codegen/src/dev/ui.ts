@@ -895,7 +895,11 @@ var EMBEDDED_STATE = ${embeddedState ? JSON.stringify(embeddedState) : "null"};
     // The verb chip carries read/write/destructive (color-coded). Badges
     // only surface what changes what you do: disabled state, role, PII.
     var badges = [
-      !tool.enabled ? '<span class="badge disabled">starts disabled</span>' : "",
+      !tool.enabled
+        ? tool.withheld
+          ? '<span class="badge disabled">withheld from agents</span>'
+          : '<span class="badge disabled">starts disabled</span>'
+        : "",
       tool.endpointRole && tool.endpointRole !== "endpoint" ? '<span class="badge auth">' + tool.endpointRole + "</span>" : "",
       tool.piiInOutput && tool.piiInOutput.length > 0 ? '<span class="badge write">pii: ' + esc(tool.piiInOutput.join(", ")) + "</span>" : "",
     ].filter(Boolean).join("");

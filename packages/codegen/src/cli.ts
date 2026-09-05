@@ -26,7 +26,7 @@ import { parseArgs } from "node:util";
 import * as clack from "@clack/prompts";
 import { dim, printBanner, renderSummary, renderVerbose } from "./cli-output.js";
 import { CONFIG_FILE_NAMES, loadConfig } from "./config.js";
-import { saveDataFile } from "./data-file.js";
+import { loadDataFile, saveDataFile } from "./data-file.js";
 import { findSpecs } from "./detect.js";
 import { findSchemaLibraries, findWebApps } from "./detect-app.js";
 import { startDevServer } from "./dev/server.js";
@@ -36,6 +36,7 @@ import { runGenerate } from "./pipeline.js";
 import { resolveSetup } from "./setup.js";
 import { schemaExportsToJson } from "./sources/schema.js";
 import type { CodegenConfig } from "./types.js";
+import { verifyTools, verifyUrl } from "./verify.js";
 import { applyWiring, planWiring, type WirePlan } from "./wire.js";
 
 const HELP = `
@@ -46,6 +47,7 @@ Usage
 
 Commands
   generate    Generate tool files from your spec (default when no command given)
+  verify      Measure your tools against the standard, before you ship
   dev         Open the tools dashboard (list, describe, toggle, test)
   init        Write a codegen.config.mjs for full control
 
@@ -57,6 +59,7 @@ Flags
   --force        Write files even when the audit reports errors
   --skip-audit   Skip the safety report
   --suggest PATH Ask the LLM layer which schemas in PATH are worth declaring
+  --url URL      With verify: also check the deployed page is live for visitors
   --config PATH  Use a config file at PATH
   --port N       Dashboard port (default: 4700)
   --help         Show this help
@@ -83,6 +86,8 @@ export interface CliFlags {
   port?: number;
   /** `generate --suggest <module>`: LLM proposals for undeclared schemas. */
   suggest?: string;
+  /** `verify --url <deployed-url>`: also check the page is live for visitors. */
+  url?: string;
   help: boolean;
 }
 
@@ -101,6 +106,7 @@ async function main(): Promise<number> {
       out: { type: "string" },
       port: { type: "string" },
       suggest: { type: "string" },
+      url: { type: "string" },
       help: { type: "boolean", default: false },
     },
   });
@@ -116,6 +122,7 @@ async function main(): Promise<number> {
     out: values.out,
     port: values.port ? Number.parseInt(values.port, 10) : undefined,
     suggest: values.suggest,
+    url: values.url,
     help: values.help,
   };
 
@@ -133,6 +140,8 @@ async function main(): Promise<number> {
       return init();
     case "dev":
       return dev(flags.port ?? 4700);
+    case "verify":
+      return verify(flags);
     case "generate":
       return flags.suggest !== undefined ? suggest(flags.suggest) : generate(flags);
     default:
@@ -372,6 +381,77 @@ async function importSchemaModule(
   }
 }
 
+/**
+ * The tool standard, measured locally: runs the pipeline exactly as generate
+ * would (nothing written), then reports how the registered surface holds up
+ * — names, descriptions, field text, annotations, surface size. Exits 1 on
+ * error-level findings so CI can gate on it.
+ */
+async function verify(flags: CliFlags): Promise<number> {
+  printBanner();
+  const cwd = process.cwd();
+  const setup = await resolveSetup(cwd, {
+    dryRun: true,
+    skipAudit: true,
+    force: false,
+    watch: false,
+    spec: flags.spec,
+    out: flags.out,
+    configPath: flags.config,
+  });
+  const data = await loadDataFile(cwd);
+  const result = await runGenerate(setup.config, {
+    cwd,
+    dryRun: true,
+    skipAudit: true,
+    overrides: data.overrides,
+    previousNames: data.names,
+    progress: flags.verbose ? (msg) => debug(msg) : undefined,
+  });
+
+  const registered = result.tools.filter((tool) => !tool.withheld);
+  const checks = verifyTools(result.tools);
+
+  info("");
+  info(`  ${setup.label}: ${result.tools.length} tools, ${registered.length} registered`);
+  info("");
+  for (const check of checks) {
+    const mark = check.level === "ok" ? "✓" : check.level === "error" ? "✖" : "!";
+    info(`  ${mark} ${check.area}: ${check.summary}`);
+    for (const finding of check.findings.slice(0, 8)) {
+      info(`      ${finding}`);
+    }
+    if (check.findings.length > 8) {
+      info(dim(`      …and ${check.findings.length - 8} more`));
+    }
+  }
+
+  if (flags.url) {
+    info("");
+    info(`  Checking ${flags.url}`);
+    const pageFindings = await verifyUrl(flags.url);
+    for (const finding of pageFindings) {
+      info(`  ! ${finding.message}`);
+    }
+    if (pageFindings.length === 0) {
+      info("  ✓ Page checks passed");
+    }
+  }
+
+  const errors = checks.filter((check) => check.level === "error").length;
+  const warnings = checks.filter((check) => check.level === "warning").length;
+  info("");
+  info(
+    errors > 0
+      ? `  ${errors} error${errors === 1 ? "" : "s"}, ${warnings} warning${warnings === 1 ? "" : "s"}. Fix the errors to pass.`
+      : warnings > 0
+        ? `  Passed with ${warnings} warning${warnings === 1 ? "" : "s"}.`
+        : "  Passed. The surface meets the standard.",
+  );
+  info("");
+  return errors > 0 ? 1 : 0;
+}
+
 async function generate(flags: CliFlags): Promise<number> {
   printBanner();
   const cwd = process.cwd();
@@ -390,11 +470,19 @@ async function generate(flags: CliFlags): Promise<number> {
   // know what the CLI consumed.
   const progress = flags.verbose ? (msg: string) => debug(msg) : undefined;
 
+  // The data file carries the developer's dashboard edits and the last run's
+  // names. Both must reach the pipeline here — the dashboard is where edits
+  // are made, but this command is where files are written, and an edit that
+  // only one of them reads does not survive.
+  const data = await loadDataFile(cwd);
+
   const result = await runGenerate(setup.config, {
     cwd,
     dryRun: flags.dryRun,
     force: flags.force,
     skipAudit: flags.skipAudit,
+    overrides: data.overrides,
+    previousNames: data.names,
     progress,
   });
 
@@ -414,7 +502,13 @@ async function generate(flags: CliFlags): Promise<number> {
       return 1;
     }
     // Re-run with force to actually write.
-    const forced = await runGenerate(setup.config, { cwd, dryRun: false, force: true });
+    const forced = await runGenerate(setup.config, {
+      cwd,
+      dryRun: false,
+      force: true,
+      overrides: data.overrides,
+      previousNames: data.names,
+    });
     result.tools = forced.tools;
     result.files = forced.files;
     result.wrote = forced.wrote;
@@ -436,6 +530,15 @@ async function generate(flags: CliFlags): Promise<number> {
   // Remember the choices detection made, so the next run never re-asks.
   if (!setup.fromConfigFile && !flags.dryRun && result.wrote) {
     await saveDataFile(cwd, setup.remember);
+  }
+
+  // Record the names this run produced (and any overrides that followed a
+  // rename), so the next run can report renames instead of breaking silently.
+  if (!flags.dryRun && result.wrote) {
+    await saveDataFile(cwd, {
+      names: result.namesLedger,
+      ...(result.migratedOverrides ? { overrides: result.migratedOverrides } : {}),
+    });
   }
 
   if (flags.verbose) {

@@ -26,6 +26,7 @@ function tool(overrides: Partial<ReviewedTool> = {}): ReviewedTool {
     sideEffect: "read",
     endpointRole: "endpoint",
     enabledByDefault: true,
+    withheld: false,
     requiresAuth: false,
     riskTier: "safe-read",
     hints: {

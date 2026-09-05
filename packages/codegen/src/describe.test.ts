@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { describeCandidateInputs, describeConstraints, describeField } from "./describe.js";
+import {
+  describeCandidateInputs,
+  describeCandidateTool,
+  describeConstraints,
+  describeField,
+} from "./describe.js";
 import type { CandidateTool } from "./types.js";
 
 describe("describeConstraints", () => {
@@ -149,5 +154,131 @@ describe("stub descriptions and format-aware drafts", () => {
     const result = describeField("tripId", { type: "string", format: "uuid" });
     expect(result.description).toBe("Trip id. A UUID.");
     expect(result.synthesized).toBe(true);
+  });
+});
+
+describe("describeCandidateTool", () => {
+  const base = { name: "list-trips", inputSchema: { type: "object" as const } };
+
+  it("appends the return shape when the description never says it", () => {
+    const candidate = {
+      ...base,
+      description: "List all trips for the authenticated user",
+      descriptionSource: "openapi-summary" as const,
+      outputSchema: { type: "array" as const, items: { type: "object" as const } },
+    };
+    describeCandidateTool(candidate as never);
+    expect(candidate.description).toBe(
+      "List all trips for the authenticated user. Returns an array of trips.",
+    );
+  });
+
+  it("leaves descriptions that already say what comes back alone", () => {
+    const candidate = {
+      ...base,
+      description: "List all trips. Returns the user's trips.",
+      descriptionSource: "openapi-summary" as const,
+      outputSchema: { type: "array" as const, items: { type: "object" as const } },
+    };
+    describeCandidateTool(candidate as never);
+    expect(candidate.description).toBe("List all trips. Returns the user's trips.");
+  });
+
+  it("normalizes Title Case UI labels into sentences", () => {
+    const candidate = {
+      ...base,
+      description: "Get My Unlocked Stamps",
+      descriptionSource: "openapi-summary" as const,
+    };
+    describeCandidateTool(candidate as never);
+    expect(candidate.description).toBe("Get my unlocked stamps.");
+  });
+
+  it("keeps acronyms capitalized in labels", () => {
+    const candidate = {
+      ...base,
+      description: "Verify OTP Code",
+      descriptionSource: "openapi-summary" as const,
+    };
+    describeCandidateTool(candidate as never);
+    expect(candidate.description).toBe("Verify OTP code.");
+  });
+
+  it("drafts a marked description for a tool with none", () => {
+    const candidate = {
+      ...base,
+      description: "",
+      descriptionSource: "generated-template" as const,
+      outputSchema: { type: "object" as const },
+    };
+    describeCandidateTool(candidate as never);
+    expect(candidate.description).toBe("List trips. Returns the trips.");
+    expect(candidate.descriptionSource).toBe("generated-template");
+  });
+
+  it("a member with a nested array is not an envelope", () => {
+    const candidate = {
+      ...base,
+      name: "get-trip",
+      description: "Get a single trip by ID.",
+      descriptionSource: "openapi-summary" as const,
+      outputSchema: {
+        type: "object" as const,
+        properties: { photos: { type: "array" as const, items: { type: "object" as const } } },
+      },
+    };
+    describeCandidateTool(candidate as never);
+    expect(candidate.description).toBe("Get a single trip by ID. Returns the trip.");
+  });
+
+  it("a conventional wrapper key is an envelope", () => {
+    const candidate = {
+      ...base,
+      description: "List all trips.",
+      descriptionSource: "openapi-summary" as const,
+      outputSchema: {
+        type: "object" as const,
+        properties: { items: { type: "array" as const, items: { type: "object" as const } } },
+      },
+    };
+    describeCandidateTool(candidate as never);
+    expect(candidate.description).toBe("List all trips. Returns an array of trips.");
+  });
+});
+
+describe("describeCandidateInputs nested walk", () => {
+  it("describes array item fields and nested object fields", () => {
+    const candidate = {
+      name: "generate-story",
+      inputSchema: {
+        type: "object",
+        properties: {
+          photos: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                capturedAt: { type: "string", format: "date-time" },
+                location: {
+                  type: "object",
+                  properties: { lat: { type: "number", minimum: -90, maximum: 90 } },
+                },
+              },
+            },
+          },
+        },
+      },
+    } as unknown as CandidateTool;
+    describeCandidateInputs(candidate);
+    const photos = candidate.inputSchema.properties?.photos;
+    const items = photos?.items;
+    expect(items?.properties?.capturedAt?.description).toBe(
+      "Captured at. A date-time in ISO 8601 format.",
+    );
+    expect(items?.properties?.location?.properties?.lat?.description).toBe(
+      "Lat. A number from -90 to 90.",
+    );
+    expect(candidate.synthesizedFields).toContain("photos[].capturedAt");
+    expect(candidate.synthesizedFields).toContain("photos[].location.lat");
   });
 });

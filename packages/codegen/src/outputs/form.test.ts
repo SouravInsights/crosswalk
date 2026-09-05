@@ -23,6 +23,7 @@ function reviewedTool(overrides: Partial<ReviewedTool> = {}): ReviewedTool {
     sideEffect: "write",
     endpointRole: "endpoint",
     enabledByDefault: false,
+    withheld: false,
     requiresAuth: true,
     description: "Save the profile details.",
     descriptionSource: "declared",

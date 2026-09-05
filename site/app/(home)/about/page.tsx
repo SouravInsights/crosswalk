@@ -74,7 +74,7 @@ const PRINCIPLES = [
   {
     n: "02",
     title: "Safety first",
-    body: "Giving agents access to application actions is a new security surface. The stack treats it that way: every tool is classified, risky tools start disabled, and the audit blocks what should never be an agent tool at all. You decide what to expose; the tools enforce the decision.",
+    body: "Giving agents access to application actions is a new security surface. The stack treats it that way: every tool is classified, risky tools stay unregistered until you enable them, and the audit blocks what should never be an agent tool at all. You decide what to expose; the tools enforce the decision.",
   },
   {
     n: "03",

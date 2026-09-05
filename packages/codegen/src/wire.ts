@@ -14,7 +14,7 @@
  *      we print the two lines and where they go, and leave it to the human.
  */
 
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import type { WebApp } from "./detect-app.js";
 
@@ -59,6 +59,10 @@ export async function planWiring(
 /** Apply a plan. Kept trivial on purpose: the plan already did the thinking. */
 export async function applyWiring(plan: WirePlan): Promise<void> {
   for (const edit of plan.edits) {
+    // The outDir may not exist yet when wiring runs on its own (tests, a
+    // layout wired before the first generate). writeFile does not create
+    // parents, so we do.
+    await mkdir(dirname(edit.path), { recursive: true });
     await writeFile(edit.path, edit.contents, "utf8");
   }
 }
@@ -87,7 +91,27 @@ async function planNextWiring(cwd: string, app: WebApp, outDir: string): Promise
 
   const registerPath = join(cwd, outDir, "register.tsx");
   const layout = await readFile(layoutPath, "utf8");
-  if (layout.includes("WebMCPRegister")) return { edits: [], alreadyWired: true };
+  if (layout.includes("WebMCPRegister")) {
+    // The layout mounts the component — but "wired" also means the file it
+    // points at exists. A deleted register.tsx (or a fresh clone where it
+    // was never committed) must not leave the app broken.
+    try {
+      await readFile(registerPath, "utf8");
+      return { edits: [], alreadyWired: true };
+    } catch {
+      return {
+        edits: [
+          {
+            path: registerPath,
+            action: "create",
+            contents: nextRegisterComponent(),
+            summary: `recreated ${relative(cwd, registerPath)} (the layout already mounts it, but the file was missing)`,
+          },
+        ],
+        alreadyWired: false,
+      };
+    }
+  }
 
   // Import path from the layout's directory to the register component.
   const importPath = withoutExtension(relative(dirname(layoutPath), registerPath));

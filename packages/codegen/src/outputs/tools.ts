@@ -17,14 +17,20 @@
  *   ── end generated ── everything below survives regeneration
  *   your region        execute(), scaffolded once, then owned by you
  *
+ * A tool's identity is its source ref (the endpoint, or the declared schema
+ * entry), not its filename. Every file's generated header records that ref,
+ * and we read it back before splicing: a rename between runs carries the
+ * owned execute() to the new filename, and a tool that lands on a renamed
+ * endpoint's old file never inherits a stranger's body.
+ *
  * This file contains only the *file mechanics*: which files exist, and how to
  * update them without destroying hand-written code. The text of the generated
  * code itself lives in tools-templates.ts, keeping "what the output looks like"
  * separate from "how files get written" is what keeps both readable.
  */
 
-import { readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { readdir, readFile } from "node:fs/promises";
+import { basename, join, resolve } from "node:path";
 import type { GeneratedFile, Output, ReviewedTool } from "../types.js";
 import {
   barrelSource,
@@ -41,8 +47,8 @@ export interface ToolsOutputOptions {
 /**
  * The marker lines that split a per-tool file in two. They are the merge
  * contract: we may rewrite everything up to and including GENERATED_END,
- * and we must never touch anything after it. js-templates.ts imports these
- * so the marker text is defined in exactly one place.
+ * and we must never touch anything after it. tools-templates.ts imports
+ * these so the marker text is defined in exactly one place.
  */
 export const GENERATED_START = "// ─── webmcp-codegen: generated. Do not edit this region. ───";
 export const GENERATED_END =
@@ -57,16 +63,101 @@ export function tools(options: ToolsOutputOptions): Output {
       // resolve, not join: an absolute outDir must win over cwd, not nest
       // under it.
       const outDir = resolve(cwd, options.outDir);
-      const files: GeneratedFile[] = [];
 
-      // The runtime and the barrel are regenerated wholesale every run;
-      // their headers say "do not edit", and we mean it.
-      files.push(await plainFile(join(outDir, "runtime.webmcp.ts"), runtimeSource()));
-      files.push(await plainFile(join(outDir, "index.ts"), barrelSource(tools)));
+      // Read every existing tool file up front. All reads happen before any
+      // write, so two tools swapping filenames each still read the other's
+      // original contents.
+      const existing = new Map<string, string>();
+      try {
+        for (const entry of await readdir(outDir)) {
+          if (!entry.endsWith(".webmcp.ts") || entry === "runtime.webmcp.ts") continue;
+          const path = join(outDir, entry);
+          existing.set(path, await readFile(path, "utf8"));
+        }
+      } catch {
+        // First run: the directory does not exist yet.
+      }
+
+      // Endpoint ref → the file currently holding it.
+      const pathByRef = new Map<string, string>();
+      for (const [path, contents] of existing) {
+        const ref = sourceRefOf(contents);
+        if (ref !== undefined) pathByRef.set(ref, path);
+      }
+
+      const files: GeneratedFile[] = [];
+      const consumedPaths = new Set<string>();
 
       for (const tool of tools) {
-        files.push(await toolFile(tool, outDir));
+        const ownPath = join(outDir, `${tool.name}.webmcp.ts`);
+        const atOwnPath = existing.get(ownPath);
+        const notes: string[] = [];
+
+        // Find the file that belongs to this tool. In order: the file at
+        // its own filename when the ref matches (or a legacy file with no
+        // Source header to check), then any file holding its ref (a rename).
+        let sourcePath: string | undefined;
+        if (atOwnPath !== undefined && sourceRefOf(atOwnPath) === undefined) {
+          sourcePath = ownPath;
+        } else if (atOwnPath !== undefined && sourceRefOf(atOwnPath) === tool.source.ref) {
+          sourcePath = ownPath;
+        } else if (pathByRef.get(tool.source.ref) !== undefined) {
+          sourcePath = pathByRef.get(tool.source.ref);
+          if (sourcePath !== undefined && sourcePath !== ownPath) {
+            notes.push(
+              `Followed the rename from ${basename(sourcePath)}; your execute() came with it.`,
+            );
+          }
+        }
+
+        if (sourcePath !== undefined) {
+          consumedPaths.add(sourcePath);
+          files.push(
+            toolFile(
+              tool,
+              ownPath,
+              existing.get(sourcePath),
+              atOwnPath !== undefined && sourcePath !== ownPath,
+              notes,
+            ),
+          );
+        } else if (atOwnPath !== undefined) {
+          // A stranger sits at our path: its ref belongs to no live tool, so
+          // nothing else will carry its contents away. Set it aside rather
+          // than destroy a possibly hand-edited execute().
+          const strangerRef = sourceRefOf(atOwnPath);
+          const aside = await plainFile(`${ownPath}.orphaned`, atOwnPath);
+          aside.notes = [
+            `${basename(ownPath)} held a different endpoint's code` +
+              (strangerRef ? ` (${strangerRef})` : "") +
+              `. Set aside at ${basename(ownPath)}.orphaned; review it, then delete both.`,
+          ];
+          files.push(aside);
+          consumedPaths.add(ownPath);
+          files.push(toolFile(tool, ownPath, undefined, true, notes));
+        } else {
+          // Brand new tool: lay down the execute() scaffold with it.
+          files.push(toolFile(tool, ownPath, undefined, false, notes));
+        }
       }
+
+      // Orphans: files sitting at a path no live tool owns. We never delete;
+      // we report, and the developer deletes when ready.
+      const orphanNotes: string[] = [];
+      for (const path of existing.keys()) {
+        if (consumedPaths.has(path)) continue;
+        if (tools.some((tool) => join(outDir, `${tool.name}.webmcp.ts`) === path)) continue;
+        orphanNotes.push(
+          `${basename(path)} is no longer generated. Delete it once you have moved out anything you wrote.`,
+        );
+      }
+
+      // The runtime and the barrel are regenerated wholesale every run;
+      // their headers say "do not edit", and we mean it. Orphan reports ride
+      // on the barrel so they surface even when nothing else changed.
+      const barrel = await plainFile(join(outDir, "index.ts"), barrelSource(tools));
+      barrel.notes = [...orphanNotes, ...(barrel.notes ?? [])];
+      files.unshift(await plainFile(join(outDir, "runtime.webmcp.ts"), runtimeSource()), barrel);
       return files;
     },
   };
@@ -83,19 +174,36 @@ async function plainFile(path: string, contents: string): Promise<GeneratedFile>
 }
 
 /**
- * Build (or merge) one per-tool file. The only I/O here is reading the
- * existing file to check for a hand-written region worth keeping.
+ * The source ref a generated file belongs to, read back from its header
+ * ("Source: <ref> (<kind>)."). Files from before the header carried a Source
+ * line return undefined; their filename is trusted instead.
  */
-async function toolFile(tool: ReviewedTool, outDir: string): Promise<GeneratedFile> {
-  const path = join(outDir, `${tool.name}.webmcp.ts`);
+function sourceRefOf(contents: string): string | undefined {
+  return /^\s*\* Source: (.+) \((\w+)\)\./m.exec(contents)?.[1];
+}
+
+/**
+ * Build (or merge) one per-tool file from already-read contents.
+ * `existing` is the file that belongs to this tool (by ref, wherever it
+ * sits); `targetOccupied` only decides between "create" and "update" in the
+ * report, so a rename reads as "create the new name", not "overwrite".
+ */
+function toolFile(
+  tool: ReviewedTool,
+  path: string,
+  existing: string | undefined,
+  targetOccupied: boolean,
+  notes: string[],
+): GeneratedFile {
   const head = generatedRegion(tool);
 
-  let existing: string | undefined;
-  try {
-    existing = await readFile(path, "utf8");
-  } catch {
-    // No file yet: brand new tool, so we also lay down the execute() scaffold.
-    return { path, contents: `${head}\n${ownedRegionScaffold(tool)}`, action: "create" };
+  if (existing === undefined) {
+    return {
+      path,
+      contents: `${head}\n${ownedRegionScaffold(tool)}`,
+      action: targetOccupied ? "update" : "create",
+      notes,
+    };
   }
 
   const markerIndex = existing.indexOf(GENERATED_END);
@@ -103,11 +211,16 @@ async function toolFile(tool: ReviewedTool, outDir: string): Promise<GeneratedFi
     // Someone removed the markers or hand-wrote this path from scratch.
     // Never clobber their work: report a conflict and let the pipeline put
     // our version in a `.new` sibling for a human to merge.
-    return { path, contents: existing, action: "unchanged", conflict: `${path}.new` };
+    return { path, contents: existing, action: "unchanged", conflict: `${path}.new`, notes };
   }
 
   // Keep everything the developer wrote below the marker, word for word.
   const preservedTail = existing.slice(markerIndex + GENERATED_END.length);
   const contents = head + preservedTail;
-  return { path, contents, action: contents === existing ? "unchanged" : "update" };
+  return {
+    path,
+    contents,
+    action: contents === existing && !targetOccupied ? "unchanged" : "update",
+    notes,
+  };
 }

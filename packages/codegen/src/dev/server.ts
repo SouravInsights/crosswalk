@@ -51,6 +51,7 @@ interface DashboardState {
     sideEffect: string;
     riskTier: string;
     enabled: boolean;
+    withheld: boolean;
     endpointRole: string;
     piiInOutput: string[];
     inputSchema: JsonSchema;
@@ -85,6 +86,9 @@ export async function startDevServer(options: DevServerOptions): Promise<Server>
       cwd: options.cwd,
       dryRun: true,
       overrides: data.overrides,
+      // So the dashboard shows a rename the next CLI run would make, and its
+      // edits follow the renamed tool instead of vanishing from the UI.
+      previousNames: data.names,
     });
     return {
       label: setup.label,
@@ -206,6 +210,7 @@ function toUiTool(
     sideEffect: tool.sideEffect,
     riskTier: tool.riskTier,
     enabled: tool.enabledByDefault,
+    withheld: tool.withheld,
     endpointRole: tool.endpointRole,
     piiInOutput: tool.piiInOutput,
     inputSchema: tool.inputSchema,

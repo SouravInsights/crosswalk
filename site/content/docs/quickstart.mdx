@@ -20,10 +20,11 @@ What you get, per endpoint:
 
 - **Read tools work immediately.** `GET /trips` becomes a tool whose `execute()` calls your
   API from the page, with the signed-in user's session. No homework.
-- **Mutations start disabled.** `DELETE /trips/{id}` gets the same working code, commented
-  out, behind a generated user-confirmation step. Enable it by uncommenting.
+- **Mutations start withheld.** `DELETE /trips/{id}` gets the same working code, commented
+  out, behind a generated user-confirmation step, and the tool is not registered until you
+  enable it: agents never see a tool you have not reviewed.
 - **Webhooks, auth, and admin endpoints are handled on purpose:** webhooks are skipped,
-  auth and admin are generated disabled with a warning.
+  auth and admin are generated withheld with a warning.
 
 Preview without writing anything first:
 

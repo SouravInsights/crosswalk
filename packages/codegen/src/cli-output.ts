@@ -77,11 +77,11 @@ export function groupFindings(findings: GenerateResult["findings"]): FindingGrou
   > = {
     auth: {
       heading: (n) =>
-        `${n} auth endpoint${n === 1 ? "" : "s"} disabled; agents should never sign in`,
+        `${n} auth endpoint${n === 1 ? "" : "s"} withheld; agents should never sign in`,
       items: [],
     },
     admin: {
-      heading: (n) => `${n} admin endpoint${n === 1 ? "" : "s"} disabled; review before enabling`,
+      heading: (n) => `${n} admin endpoint${n === 1 ? "" : "s"} withheld; review before enabling`,
       items: [],
     },
     pii: {
@@ -162,6 +162,8 @@ export function renderSummary(
 ): void {
   const { tools, findings, skipped } = result;
   const enabled = tools.filter((t) => t.enabledByDefault).length;
+  const withheld = tools.filter((t) => t.withheld && !t.enabledByDefault).length;
+  const gated = tools.length - enabled - withheld;
   const groups = groupFindings(findings);
 
   // Header: the banner already led the command; here just the source.
@@ -170,7 +172,10 @@ export function renderSummary(
 
   // What happened
   console.log(`  ${c.green("✓")} ${bold(`${tools.length} tools generated`)}`);
-  console.log(dim(`    ${enabled} ready to use, ${tools.length - enabled} start disabled`));
+  const parts = [`${enabled} ready to use`];
+  if (withheld > 0) parts.push(`${withheld} withheld until you enable them`);
+  if (gated > 0) parts.push(`${gated} visible but disabled`);
+  console.log(dim(`    ${parts.join(", ")}`));
   if (skipped.length > 0) {
     console.log(dim(`    ${skipped.length} skipped (webhooks and excluded endpoints)`));
   }
@@ -300,7 +305,11 @@ export function renderVerbose(result: GenerateResult, setup: Setup, _cwd: string
       const description = tool.description || "(no description)";
       table.push([
         tool.name.length > nameWidth ? `${tool.name.slice(0, nameWidth - 1)}…` : tool.name,
-        tool.enabledByDefault ? c.green("enabled") : dim("disabled"),
+        tool.enabledByDefault
+          ? c.green("enabled")
+          : tool.withheld
+            ? dim("withheld")
+            : dim("disabled"),
         description.length > descWidth - 2
           ? `${description.slice(0, descWidth - 3)}…`
           : description,

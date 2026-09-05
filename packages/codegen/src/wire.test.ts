@@ -95,6 +95,28 @@ describe("planWiring", () => {
     expect(onDisk).toContain("registerAllTools");
   });
 
+  it("Next.js: a layout that mounts WebMCPRegister but a missing register.tsx is not wired", async () => {
+    // The layout surviving while the component file is gone (a deleted
+    // directory, a fresh clone before commit) must not be read as wired:
+    // the app would fail to build on a dangling import.
+    await mkdir(join(cwd, "src/app"), { recursive: true });
+    await writeFile(
+      join(cwd, "src/app/layout.tsx"),
+      `import { WebMCPRegister } from "../webmcp/register";\n\nexport default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang="en">\n      <body>\n        <WebMCPRegister />\n        {children}\n      </body>\n    </html>\n  );\n}\n`,
+    );
+
+    const plan = await planWiring(cwd, { dir: ".", framework: "next" }, "./src/webmcp");
+    expect(plan?.alreadyWired).toBe(false);
+    expect(plan?.edits).toHaveLength(1);
+    expect(plan?.edits[0]?.path).toContain("register.tsx");
+
+    // After applying it, the same check is truly idempotent.
+    await applyWiring(plan as never);
+    const second = await planWiring(cwd, { dir: ".", framework: "next" }, "./src/webmcp");
+    expect(second?.alreadyWired).toBe(true);
+    expect(second?.edits).toHaveLength(0);
+  });
+
   it("returns null instead of guessing when no entry file exists", async () => {
     const plan = await planWiring(cwd, { dir: ".", framework: "next" }, "./src/webmcp");
     expect(plan).toBeNull();

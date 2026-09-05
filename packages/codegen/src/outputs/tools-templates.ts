@@ -45,15 +45,21 @@ export function generatedRegion(tool: ReviewedTool): string {
   // A disabled tool's request is commented out, so callApi/toolResult stay
   // out of its imports; a standalone schema tool has no route to call.
   const enabled = tool.enabledByDefault;
+  // A withheld tool is not registered at all: its registration is a commented
+  // fence, so the only runtime helper its live code uses is toolDisabled in
+  // the execute scaffold (a defensive refusal if someone registers it by hand).
+  const withheld = tool.withheld && !enabled;
   const hasRoute = Boolean(tool.httpMethod && tool.pathTemplate && tool.paramLocations);
-  const runtimeImports = [
-    "getModelContext",
-    ...(mutates ? ["requestUserConfirmation"] : []),
-    ...(enabled && hasRoute ? ["callApi"] : []),
-    ...(enabled ? ["toolResult"] : []),
-    "asToolError",
-    ...(enabled ? [] : ["toolDisabled"]),
-  ].join(", ");
+  const runtimeImports = withheld
+    ? "toolDisabled"
+    : [
+        "getModelContext",
+        ...(mutates ? ["requestUserConfirmation"] : []),
+        ...(enabled && hasRoute ? ["callApi"] : []),
+        ...(enabled ? ["toolResult"] : []),
+        "asToolError",
+        ...(enabled ? [] : ["toolDisabled"]),
+      ].join(", ");
 
   const registerBody = mutates
     ? [
@@ -112,7 +118,14 @@ export function generatedRegion(tool: ReviewedTool): string {
     ` * ${tool.description}`,
     ` *`,
     ` * Source: ${tool.source.ref} (${tool.source.kind}). Risk: ${tool.riskTier}.`,
-    ` * Starts ${tool.enabledByDefault ? "enabled" : "disabled"} (see execute${pascal} below).`,
+    ` * ${
+      tool.enabledByDefault
+        ? `Starts enabled (see execute${pascal} below).`
+        : tool.withheld
+          ? "Starts withheld: not registered until you enable it (see register" +
+            `${pascal} below).`
+          : `Starts disabled (see execute${pascal} below).`
+    }`,
     ` * Regenerate with: npx @webmcp-stack/codegen generate`,
     ` */`,
     ``,
@@ -136,18 +149,38 @@ export function generatedRegion(tool: ReviewedTool): string {
     `  },`,
     `};`,
     ``,
-    `/**`,
-    ` * Register this tool with WebMCP. Call it once on page load, or use`,
-    ` * registerAllTools() from the generated index.ts. Skips quietly when the`,
-    ` * browser has no WebMCP runtime.`,
-    ` *`,
-    ` * Pass an AbortSignal to unregister later: controller.abort().`,
-    ` */`,
-    `export async function register${pascal}(signal?: AbortSignal): Promise<void> {`,
-    `  const modelContext = getModelContext();`,
-    `  if (!modelContext) return;`,
-    ...registerBody,
-    `}`,
+    ...(withheld
+      ? [
+          `/**`,
+          ` * Withheld: this tool is not registered, so agents cannot see or pick`,
+          ` * it. The registration below stays commented until you enable the tool`,
+          ` * (uncomment it and the body of execute${pascal}, or flip it in the`,
+          ` * dashboard and regenerate).`,
+          ` */`,
+          `export async function register${pascal}(signal?: AbortSignal): Promise<void> {`,
+          `  void signal;`,
+          `  // const modelContext = getModelContext();`,
+          `  // if (!modelContext) return;`,
+          // Comment out the body the way an editor's toggle-comment does:
+          // the marker goes at a fixed column and the line keeps its own
+          // indentation, so uncommenting restores working code, not mush.
+          ...registerBody.map((line) => `  //${line ? ` ${line}` : ""}`),
+          `}`,
+        ]
+      : [
+          `/**`,
+          ` * Register this tool with WebMCP. Call it once on page load, or use`,
+          ` * registerAllTools() from the generated index.ts. Skips quietly when the`,
+          ` * browser has no WebMCP runtime.`,
+          ` *`,
+          ` * Pass an AbortSignal to unregister later: controller.abort().`,
+          ` */`,
+          `export async function register${pascal}(signal?: AbortSignal): Promise<void> {`,
+          `  const modelContext = getModelContext();`,
+          `  if (!modelContext) return;`,
+          ...registerBody,
+          `}`,
+        ]),
     ``,
     GENERATED_END,
   ].join("\n");
@@ -219,19 +252,36 @@ export function ownedRegionScaffold(tool: ReviewedTool): string {
     lines.push(
       `export async function execute${pascal}(input: ${tool.inputTypeName}, signal?: AbortSignal) {`,
       `  ${call}`,
+      // The co-browsing affordance: a call that changes what the human sees
+      // should change it on screen, not just in the response.
+      ...(endpointBacked
+        ? [
+            `  // Make the effect visible: an agent acts while a human watches this`,
+            `  // page. If this call changes what is on screen, update the UI here`,
+            `  // (navigate, invalidate a query, dispatch an event).`,
+          ]
+        : []),
       `  return toolResult(data);`,
       `}`,
     );
   } else {
     lines.push(
       `export async function execute${pascal}(input: ${tool.inputTypeName}, signal?: AbortSignal) {`,
-      `  // This tool starts disabled: it ${
-        tool.endpointRole === "endpoint"
-          ? "changes things"
-          : `wraps an ${tool.endpointRole} endpoint`
-      }. Agents can see it, and calling it tells`,
-      `  // them it is disabled. To enable it, delete the line below, uncomment`,
-      `  // the code, and add callApi and toolResult to the import above.`,
+      ...(tool.withheld
+        ? [
+            `  // This tool is withheld: nothing registers it, so agents cannot see`,
+            `  // or call it. To enable it, uncomment the request below and the`,
+            `  // registration above, and add callApi and toolResult to the import.`,
+          ]
+        : [
+            `  // This tool starts disabled: it ${
+              tool.endpointRole === "endpoint"
+                ? "changes things"
+                : `wraps an ${tool.endpointRole} endpoint`
+            }. Agents can see it, and calling it tells`,
+            `  // them it is disabled. To enable it, delete the line below, uncomment`,
+            `  // the code, and add callApi and toolResult to the import above.`,
+          ]),
       `  void signal; // passed to fetch once you enable the call below`,
       `  return toolDisabled("${tool.name}.webmcp.ts");`,
       ``,

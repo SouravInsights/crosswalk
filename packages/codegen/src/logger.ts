@@ -1,7 +1,9 @@
 /**
- * Logging via pino: structured when piped (JSON for CI), pretty when TTY
- * (the person running the command). Levels control verbosity; --verbose
- * enables debug.
+ * Logging via pino, pretty-printed through one in-process stream in both
+ * TTY and CI: the report is the product's output, and a human reads CI logs
+ * too — piped output is the same text with the colors stripped, never JSON
+ * envelopes. (If a machine-readable mode is ever needed, it is a --json
+ * flag, not a silent format change on pipe.)
  *
  * pino-pretty is passed as a direct in-process stream, not a `transport`.
  * Transports run in a worker thread, which is right for servers but wrong
@@ -13,24 +15,18 @@
 import pino from "pino";
 import pretty from "pino-pretty";
 
-// TTY detection: undefined or false means piped/CI, so use JSON.
-// True means a real terminal, so use pretty printing.
-const isTTY = process.stdout.isTTY === true;
-
 const logger = pino(
   {
     level: process.env.WEBMCP_LOG_LEVEL ?? (process.argv.includes("--verbose") ? "debug" : "info"),
   },
-  isTTY
-    ? pretty({
-        colorize: true,
-        ignore: "pid,hostname,time,level",
-        messageFormat: "{msg}",
-        translateTime: false,
-        hideObject: true,
-        sync: true,
-      })
-    : undefined,
+  pretty({
+    colorize: process.stdout.isTTY === true,
+    ignore: "pid,hostname,time,level",
+    messageFormat: "{msg}",
+    translateTime: false,
+    hideObject: true,
+    sync: true,
+  }),
 );
 
 export const debug = (msg: string): void => logger.debug(msg);

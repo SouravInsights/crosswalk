@@ -29,6 +29,13 @@ export interface DataFile {
   app?: string;
   /** Per-tool tweaks, keyed by tool name. */
   overrides?: ToolOverrides;
+  /**
+   * The tool names the last generate run produced, mapped to each tool's
+   * route ref. The ref is the durable identity; the name is derived. This
+   * ledger is how a rename between runs is reported and how overrides move
+   * with the renamed tool instead of being orphaned.
+   */
+  names?: Record<string, string>;
 }
 
 export async function loadDataFile(cwd: string): Promise<DataFile> {

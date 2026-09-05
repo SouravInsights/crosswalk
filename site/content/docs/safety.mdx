@@ -32,10 +32,13 @@ Classification also decides whether a tool works out of the box:
 
 - **Reads start enabled.** The generated `execute()` calls your API from the page, with
   the signed-in user's session. It works immediately.
-- **Writes and destructive tools start disabled.** The same working code is generated but
-  commented out. The tool still registers, so agents can see it; calling it returns a clear
-  "this tool is disabled" message that tells the agent to ask the human. Enabling one is
-  deleting the return line and uncommenting the code.
+- **Writes and destructive tools start withheld.** The same working code is generated but
+  commented out, and the tool is not registered: agents never see it, so it cannot dilute
+  their choices or be picked by mistake. Enabling one is uncommenting the code and the
+  registration fence, or flipping it on in the dashboard and regenerating.
+  Set `safety.registerDisabled: true` if you want disabled tools to stay visible to agents
+  as gated capabilities instead (calling one then returns a "this tool is disabled"
+  message that points the agent at the human).
 
 **User confirmation for mutations is generated, not remembered.** The register wrapper for
 write and destructive tools asks the user to confirm before every call, and that step lives

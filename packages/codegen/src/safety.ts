@@ -76,7 +76,7 @@ const ADMIN_PATTERN = /\badmin\b/i;
 
 /** Past this many tools the surface is a catalog, not a toolkit (the audit
  *  warns once per run). Roughly double what an agent holds comfortably. */
-const TOOL_COUNT_SOFT_LIMIT = 40;
+const TOOL_COUNT_SOFT_LIMIT = 25;
 
 /**
  * Field names that usually hold personal data or secrets. Matched against
@@ -190,6 +190,11 @@ function hasFreeTextOutput(schema: JsonSchema | undefined): boolean {
   }
   const items = schema.items;
   if (items && !Array.isArray(items) && hasFreeTextOutput(items)) return true;
+  // Unions are how validators spell nullable and optional fields
+  // ("anyOf: [string, null]"); the content hides one branch down.
+  for (const union of [schema.anyOf, schema.oneOf, schema.allOf]) {
+    if (Array.isArray(union) && union.some((branch) => hasFreeTextOutput(branch))) return true;
+  }
   return false;
 }
 
@@ -279,6 +284,10 @@ export function reviewTools(
       // disabled: the working code is generated but commented out, so enabling
       // one is a deliberate edit, never an accident.
       enabledByDefault: sideEffect === "read" && endpointRole === "endpoint",
+      // Withheld means not registered: a gated tool in the registry is a
+      // dead end an agent can still pick. registerDisabled opts back into
+      // visibility for those who want agents to know the capability exists.
+      withheld: !(sideEffect === "read" && endpointRole === "endpoint") && !safety.registerDisabled,
       piiInOutput: findPiiFields(tool.outputSchema, safety.piiFields),
     });
   }
@@ -426,15 +435,15 @@ export function auditTools(
   // Set-level: every tool competes for the agent's context window, and past
   // a point the surface is a catalog, not a toolkit. This fires once per run,
   // not per tool; the fix is fewer tools, and the person running it knows which.
-  const enabledCount = tools.filter((tool) => tool.enabledByDefault).length;
-  if (tools.length > TOOL_COUNT_SOFT_LIMIT) {
+  const registeredCount = tools.filter((tool) => !tool.withheld).length;
+  if (registeredCount > TOOL_COUNT_SOFT_LIMIT) {
     findings.push({
       level: "warning",
       message:
-        `${tools.length} tools in one surface (${enabledCount} enabled). Agents hold a handful ` +
+        `${registeredCount} tools register on this surface. Agents hold a handful ` +
         "well; a catalog this size degrades tool selection. Narrow with `safety.exclude`, " +
-        "split per page, or declare the goal-shaped actions with the schema source instead of " +
-        "exposing every operation.",
+        "withhold tools you have not reviewed, split per page, or declare the goal-shaped " +
+        "actions with the schema source instead of exposing every operation.",
     });
   }
 

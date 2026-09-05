@@ -111,6 +111,7 @@ const ACTION_VERBS = new Set([
   "copy",
   "create",
   "decline",
+  "delete",
   "deploy",
   "disable",
   "download",
@@ -149,6 +150,8 @@ const ACTION_VERBS = new Set([
   "search",
   "send",
   "share",
+  "signin",
+  "signout",
   "signup",
   "split",
   "start",
@@ -167,6 +170,16 @@ const ACTION_VERBS = new Set([
   "validate",
   "verify",
 ]);
+
+/**
+ * Auth actions the dictionary knows as one word but agents read better as
+ * verb phrases. "signup" starts with a noun; "sign-up" starts with the act.
+ */
+const ACTION_VERB_FORMS: Record<string, string> = {
+  signin: "sign-in",
+  signout: "sign-out",
+  signup: "sign-up",
+};
 
 /**
  * Actions that operate on a collection at once. "batch-block" would imply
@@ -200,6 +213,12 @@ export interface RouteAnalysis {
   noun?: string;
   /** Ancestor resources, nearest first. minDepth of them are in the base. */
   context?: string[];
+  /**
+   * Grouping segments ("admin", "auth") dropped from the name for reading,
+   * kept nearest-first as the last resort before a numeric suffix: spending
+   * "admin" beats shipping "get-pricing-2".
+   */
+  reserve?: string[];
   /** How many context words the base already consumes (nested REST names). */
   minDepth?: number;
   /** True when a version segment was dropped from the path. */
@@ -220,11 +239,17 @@ function isParam(segment: string): boolean {
 /** The intent verbs each HTTP method implies when the path is plain REST. */
 const METHOD_VERBS: Record<string, { member: string; collection: string }> = {
   get: { member: "get", collection: "list" },
-  post: { member: "post", collection: "create" },
+  // POST on a member path attaches something to it (an association), so the
+  // verb is "add" and the name carries the parent; "post" is a transport
+  // word and names nothing.
+  post: { member: "add", collection: "create" },
   put: { member: "update", collection: "update" },
   patch: { member: "update", collection: "update" },
   delete: { member: "delete", collection: "delete" },
 };
+
+/** Chrome's published guidance: tool names stay within 30 characters. */
+const TOOL_NAME_MAX_LENGTH = 30;
 
 function intentName(
   verb: string,
@@ -232,12 +257,13 @@ function intentName(
   context: string[],
   minDepth: number,
   droppedVersion: boolean,
+  reserve: string[] = [],
 ): RouteAnalysis {
   // Context is stored nearest-first, but names read outermost-first:
   // "list-explore-destination-candidates", not "list-destination-explore-…".
   const used = context.slice(0, minDepth).reverse();
   const base = [verb, ...used, noun].filter(Boolean).join("-");
-  return { base, tier: "intent", verb, noun, context, minDepth, droppedVersion };
+  return { base, tier: "intent", verb, noun, context, minDepth, droppedVersion, reserve };
 }
 
 /**
@@ -306,34 +332,64 @@ export function analyzeRoute(method: string, path: string): RouteAnalysis {
 
   const last = resources[resources.length - 1] as (typeof resources)[number];
   const firstWord = last.phrase.split("-")[0] as string;
-  // Ancestors, nearest first, with grouping words removed: "auth" in a
-  // deepened name ("generate-auth-story") only restates the obvious.
-  const ancestors = resources
+  // Ancestors, nearest first. Grouping words leave the name ("auth" in a
+  // deepened name only restates the obvious) but stay in reserve: when a
+  // collision has nothing else left, "admin" beats a numeric suffix.
+  const rawAncestors = resources
     .slice(0, -1)
-    .map((r) => (GROUPING_SEGMENTS.has(r.phrase) ? null : singularPhrase(r.phrase)))
-    .filter((a): a is string => a !== null)
+    .map((r) => singularPhrase(r.phrase))
     .reverse();
+  const ancestors = rawAncestors.filter((a) => !GROUPING_SEGMENTS.has(a));
+  const reserve = rawAncestors.filter((a) => GROUPING_SEGMENTS.has(a));
+
+  // "batch" is a modifier, never the verb: "batch-trip-blocks" reads as a
+  // tool about batching, not as blocks being written. The verb comes from
+  // the rest of the segment ("batch-delete" → "delete-media-batch") or from
+  // the method ("…/blocks/batch" → "update-trip-blocks-batch").
+  if (firstWord === "batch" && resources.length > 1) {
+    const prev = resources[resources.length - 2] as (typeof resources)[number];
+    const rest = last.phrase.split("-").slice(1).join("-");
+    const verb = ACTION_VERBS.has(rest) ? (ACTION_VERB_FORMS[rest] ?? rest) : "update";
+    const noun = prev.phrase;
+    return intentName(verb, `${noun}-batch`, ancestors.slice(1), 0, droppedVersion, reserve);
+  }
 
   // Action endpoint: the last segment starts with a known verb.
   if (ACTION_VERBS.has(firstWord)) {
+    const verb = ACTION_VERB_FORMS[firstWord] ?? firstWord;
     if (last.phrase.includes("-")) {
       // "verify-otp" already carries its object; the object is the noun, so
       // deepening reads "verify-trip-otp", not "verify-trip-verify-otp".
       const noun = last.phrase.split("-").slice(1).join("-");
-      return intentName(firstWord, noun, ancestors, 0, droppedVersion);
+      return intentName(verb, noun, ancestors, 0, droppedVersion, reserve);
     }
     const prev = resources.length > 1 ? resources[resources.length - 2] : undefined;
     if (!prev || GROUPING_SEGMENTS.has(prev.phrase)) {
       // "POST /auth/login" is just "login"; "POST /search" is just "search".
-      return intentName(firstWord, "", [], 0, droppedVersion);
+      return intentName(verb, "", [], 0, droppedVersion, reserve);
     }
     const noun = PLURAL_ACTIONS.has(firstWord) ? prev.phrase : singularPhrase(prev.phrase);
-    return intentName(firstWord, noun, ancestors.slice(1), 0, droppedVersion);
+    return intentName(verb, noun, ancestors.slice(1), 0, droppedVersion, reserve);
   }
 
   // Plain REST: the method supplies the verb, the path shape the noun.
   const verbs = METHOD_VERBS[method.toLowerCase()];
   if (!verbs) return fallback; // HEAD, OPTIONS, WebDAV — honest concat.
+
+  // A trailing "all" scopes the parent collection rather than naming one:
+  // "GET /pricing/all" is "list-all-pricing", never "get-all".
+  if (method.toLowerCase() === "get" && last.phrase === "all" && resources.length > 1) {
+    const prev = resources[resources.length - 2] as (typeof resources)[number];
+    const noun = prev.phrase;
+    return intentName(
+      verbs.collection,
+      noun,
+      ["all", ...ancestors.slice(1)],
+      1,
+      droppedVersion,
+      reserve,
+    );
+  }
 
   if (lastIsParam) {
     // GET /trips/{id} → the member named by the last resource segment. Two
@@ -342,12 +398,15 @@ export function analyzeRoute(method: string, path: string): RouteAnalysis {
     const noun = lastParam
       ? `${singularPhrase(last.phrase)}-by-${lastParam}`
       : singularPhrase(last.phrase);
-    return intentName(verbs.member, noun, ancestors, 0, droppedVersion);
+    // An association write ("add") is ambiguous without its parent:
+    // "add-destination" to what? Member-POST names carry the parent.
+    const minDepth = verbs.member === "add" && ancestors.length > 0 && !lastParam ? 1 : 0;
+    return intentName(verbs.member, noun, ancestors, minDepth, droppedVersion, reserve);
   }
 
   if (MEMBER_WORDS.has(last.phrase)) {
     // A bare trailing member word with no parent ("/me"): no noun to build.
-    return intentName(verbs.member, last.phrase, [], 0, droppedVersion);
+    return intentName(verbs.member, last.phrase, [], 0, droppedVersion, reserve);
   }
 
   // A trailing resource word that reads plural is a collection; a singular
@@ -364,10 +423,10 @@ export function analyzeRoute(method: string, path: string): RouteAnalysis {
   // into the base name, because parentless nested names collide constantly.
   const parent = resources.length > 1 ? resources[resources.length - 2] : undefined;
   if (last.nestedUnderMember && parent && !GROUPING_SEGMENTS.has(parent.phrase)) {
-    return intentName(verb, noun, ancestors, 1, droppedVersion);
+    return intentName(verb, noun, ancestors, 1, droppedVersion, reserve);
   }
 
-  return intentName(verb, noun, ancestors, 0, droppedVersion);
+  return intentName(verb, noun, ancestors, 0, droppedVersion, reserve);
 }
 
 // --- The set-level pass ----------------------------------------------------
@@ -388,6 +447,13 @@ export interface ResolvedNames {
   names: string[];
   renames: { from: string; to: string }[];
   notes: string[];
+  /**
+   * Names that took a numeric suffix because no context, grouping word, or
+   * method could distinguish them. The pipeline reports these as errors:
+   * a "-2" name is the algorithm giving up, and the fix is a chosen name,
+   * not a shipped number.
+   */
+  collisions: string[];
 }
 
 /**
@@ -396,9 +462,12 @@ export interface ResolvedNames {
  * Route-derived names start minimal ("generate-story") and absorb parent
  * context on collision ("generate-trip-story") — minimal first because the
  * short name is usually unique, deepening because a bare noun stops saying
- * which resource once a second API has one. When no context remains, the
- * HTTP method and then a counter break the tie. Declared names always win a
- * collision. Every rename is returned for the report.
+ * which resource once a second API has one. Ties break in order: parent
+ * context, grouping words kept in reserve ("admin" beats a number), the
+ * HTTP method, and only then a numeric suffix, which is always reported as
+ * an error. Declared names always win a collision. Names never exceed
+ * Chrome's 30-character guidance: context is spent to stay under it, not
+ * to exceed it. Every rename is returned for the report.
  */
 export function resolveNames(inputs: NameInput[]): ResolvedNames {
   const analyses = inputs.map((input) =>
@@ -412,6 +481,36 @@ export function resolveNames(inputs: NameInput[]): ResolvedNames {
     notes.push("Dropped the API version prefix from route-derived tool names.");
   }
 
+  // The deepening pool: real context first, grouping words last.
+  const pools = analyses.map((a) => [...(a?.context ?? []), ...(a?.reserve ?? [])]);
+
+  const buildName = (index: number, depth: number): string => {
+    const analysis = analyses[index];
+    if (analysis?.tier !== "intent") return analysis?.base ?? inputs[index]?.name ?? "";
+    const used = pools[index]?.slice(0, depth).reverse() ?? [];
+    return [analysis.verb, ...used, analysis.noun].filter(Boolean).join("-");
+  };
+
+  // The ceiling: spend less context before spending more. A base over 30
+  // characters shrinks toward its minimum; one still over at depth 0 is
+  // noted, not mangled.
+  const minDepths = analyses.map((a) => a?.minDepth ?? 0);
+  analyses.forEach((analysis, index) => {
+    if (analysis?.tier !== "intent") return;
+    let floor = minDepths[index] as number;
+    while (floor > 0 && buildName(index, floor).length > TOOL_NAME_MAX_LENGTH) floor--;
+    if (floor !== minDepths[index]) {
+      analysis.minDepth = floor;
+      analysis.base = buildName(index, floor);
+      notes.push(`Kept "${analysis.base}" under 30 characters by spending less context.`);
+    }
+    if (analysis.base.length > TOOL_NAME_MAX_LENGTH) {
+      notes.push(
+        `"${analysis.base}" is over 30 characters at its shortest; consider a declared name.`,
+      );
+    }
+  });
+
   // The name each candidate started with, so renames can be reported.
   const bases = inputs.map((input, index) => analyses[index]?.base ?? input.name);
   const depth = analyses.map((a) => a?.minDepth ?? 0);
@@ -423,9 +522,10 @@ export function resolveNames(inputs: NameInput[]): ResolvedNames {
     if (pinned) return pinned;
     const analysis = analyses[index];
     if (analysis?.tier !== "intent") return bases[index] as string;
-    const used = (analysis.context ?? []).slice(0, depth[index] as number).reverse();
-    return [analysis.verb, ...used, analysis.noun].filter(Boolean).join("-");
+    return buildName(index, depth[index] as number);
   };
+
+  const collisions: string[] = [];
 
   for (let guard = 0; guard < 32; guard++) {
     const current = inputs.map((_, index) => nameAt(index));
@@ -433,18 +533,21 @@ export function resolveNames(inputs: NameInput[]): ResolvedNames {
     current.forEach((name, index) => {
       byName.set(name, [...(byName.get(name) ?? []), index]);
     });
-    const collisions = [...byName.values()].filter((group) => group.length > 1);
-    if (collisions.length === 0) break;
+    const colliding = [...byName.values()].filter((group) => group.length > 1);
+    if (colliding.length === 0) break;
 
     let deepened = false;
-    for (const group of collisions) {
+    for (const group of colliding) {
       for (const index of group) {
         const analysis = analyses[index];
         if (fixed[index] || !analysis || analysis.tier !== "intent") continue;
-        if ((depth[index] as number) < (analysis.context?.length ?? 0)) {
-          depth[index] = (depth[index] as number) + 1;
-          deepened = true;
-        }
+        const nextDepth = (depth[index] as number) + 1;
+        if (nextDepth > (pools[index]?.length ?? 0)) continue;
+        // Deepening past 30 characters trades one failure for another; the
+        // method suffix says more than a 34-character name does.
+        if (buildName(index, nextDepth).length > TOOL_NAME_MAX_LENGTH) continue;
+        depth[index] = nextDepth;
+        deepened = true;
       }
     }
     if (deepened) continue;
@@ -452,8 +555,9 @@ export function resolveNames(inputs: NameInput[]): ResolvedNames {
     // Nobody can deepen. The declared name (or the first arrival) keeps the
     // spot; the rest take a method suffix, then a counter. A method suffix
     // that repeats the verb says nothing ("get-trip-get"), so those go
-    // straight to the counter.
-    for (const group of collisions) {
+    // straight to the counter — and the counter is always an error, because
+    // a numbered name means the spec needs a human's word, not our digit.
+    for (const group of colliding) {
       const ordered = [...group].sort(
         (a, b) => Number(!inputs[a]?.declared) - Number(!inputs[b]?.declared),
       );
@@ -463,6 +567,7 @@ export function resolveNames(inputs: NameInput[]): ResolvedNames {
         const method = inputs[index]?.httpMethod?.toLowerCase();
         let candidate =
           method && !base.startsWith(`${method}-`) ? `${base}-${method}` : `${base}-2`;
+        if (candidate === `${base}-2`) collisions.push(base);
         let counter = 2;
         while (inputs.some((_, j) => j !== index && nameAt(j) === candidate)) {
           candidate = `${base}-${counter}`;
@@ -478,5 +583,5 @@ export function resolveNames(inputs: NameInput[]): ResolvedNames {
     .map((to, index) => ({ from: bases[index] as string, to }))
     .filter((rename) => rename.from !== rename.to);
 
-  return { names, renames, notes };
+  return { names, renames, notes, collisions };
 }

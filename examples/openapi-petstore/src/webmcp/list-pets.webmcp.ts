@@ -2,7 +2,7 @@ import { getModelContext, callApi, toolResult, asToolError } from "./runtime.web
 
 // ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
- * List all pets in the store
+ * List all pets in the store. Returns an array of pets.
  *
  * Source: GET /pets (openapi). Risk: safe-read.
  * Starts enabled (see executeListPets below).
@@ -34,7 +34,7 @@ export const listPetsHints = {"readOnlyHint":true,"destructiveHint":false,"idemp
 /** The tool definition, minus `execute` (which is yours, below the marker). */
 export const listPetsTool = {
   name: "list-pets",
-  description: "List all pets in the store",
+  description: "List all pets in the store. Returns an array of pets.",
   inputSchema: listPetsInputSchema,
   annotations: {
     readOnlyHint: true,

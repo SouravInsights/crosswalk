@@ -40,6 +40,27 @@ Re-runs on every relevant file change. Regeneration is cheap and merge-safe, so 
 keeps tools in sync while you edit the spec. The watcher ignores its own outputs
 (`src/webmcp`, `.webmcp-codegen.json`), so it never loops.
 
+## `npx @webmcp-stack/codegen verify`
+
+Measures your generated tools against the quality standard they are supposed to meet, before
+anything ships. Runs the same pipeline as `generate` (writing nothing) and reports a
+scorecard:
+
+```
+✓ Names: all 35 names within 30 characters, verb-first
+! Descriptions: 2 problems
+✓ Fields: every input field described, nested ones included
+✓ Annotations: reads declare readOnlyHint; content declares its trust
+! Surface: 35 registered
+```
+
+Each finding names the tool and what to do about it. Exits 1 on error-level findings (a tool
+with no description), so CI can gate on it.
+
+`verify --url https://your-app.com` adds one check against the deployed page: whether it
+serves an origin trial token, because tools being generated and tools being live in a
+visitor's browser are different facts.
+
 ## `npx @webmcp-stack/codegen dev`
 
 Opens the tools dashboard on `http://localhost:4700` (override with `--port N`). A local

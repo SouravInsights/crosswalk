@@ -9,3 +9,5 @@ coverage/
 .env.*
 *.tsbuildinfo
 .source/
+
+docs/research/.notes/
