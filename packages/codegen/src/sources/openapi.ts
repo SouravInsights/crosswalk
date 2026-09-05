@@ -118,16 +118,33 @@ function operationsFromSpec(spec: unknown): CandidateTool[] {
 }
 
 /**
- * The spec's preferred base URL (the first entry in `servers`), when absolute.
- * Generated code calls the API relative to the page by default; this goes in
- * a comment so developers with a separate API host know the intended base.
+ * The spec's preferred base URL: the first non-local entry in `servers`
+ * (specs commonly list localhost first, production after). Generated code
+ * calls this absolute URL so a deployed app reaches its real API host.
  */
 function pickServerUrl(root: Record<string, unknown>): string | undefined {
   const servers = root.servers;
   if (!Array.isArray(servers) || servers.length === 0) return undefined;
-  const first = servers[0] as Record<string, unknown> | undefined;
-  const url = first?.url;
-  return typeof url === "string" && url.length > 0 ? url : undefined;
+  // Real specs list several servers, local dev first (localhost) and the
+  // public API after. Picking the first blindly bakes localhost into every
+  // deployed tool's fetch. Pick the first absolute, non-local URL instead;
+  // fall back to the first absolute one if all are local (a genuinely
+  // local-only API).
+  let firstAbsolute: string | undefined;
+  for (const entry of servers) {
+    const url = (entry as Record<string, unknown> | undefined)?.url;
+    if (typeof url !== "string" || url.length === 0) continue;
+    if (!firstAbsolute) firstAbsolute = url;
+    try {
+      const { hostname } = new URL(url);
+      if (hostname !== "localhost" && hostname !== "127.0.0.1" && hostname !== "::1") {
+        return url;
+      }
+    } catch {
+      // Not an absolute URL; skip.
+    }
+  }
+  return firstAbsolute;
 }
 
 /**

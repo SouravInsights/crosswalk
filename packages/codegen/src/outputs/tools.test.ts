@@ -328,16 +328,28 @@ describe("js generator", () => {
     );
   });
 
-  it("uses the spec's server URL when one is declared", async () => {
-    const files = await tools({ outDir: "src/webmcp" }).generate(
+  it("keeps a non-local server URL, but a local one falls back to same-origin", async () => {
+    // A spec's servers[0] is often a dev URL. Baking localhost into the
+    // generated fetch makes every deployed tool call the visitor's own
+    // machine, so a local base must fall back to a relative (same-origin)
+    // path. A real public API host is kept as-is.
+    const local = await tools({ outDir: "src/webmcp" }).generate(
       [reviewedTool({ serverUrl: "http://localhost:3001" })],
       cwd,
     );
-    const tool = files.find((file) => file.path.includes("get-order-status"));
-    // The generated call goes to the API's absolute URL, not a relative path.
-    expect(tool?.contents).toContain(
+    const localTool = local.find((file) => file.path.includes("get-order-status"));
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: asserting on generated source
+    expect(localTool?.contents).toContain("await callApi(`/orders/${input.orderId}`");
+    expect(localTool?.contents).not.toContain("localhost");
+
+    const publicApi = await tools({ outDir: "src/webmcp" }).generate(
+      [reviewedTool({ serverUrl: "https://api.example.com" })],
+      cwd,
+    );
+    const publicTool = publicApi.find((file) => file.path.includes("get-order-status"));
+    expect(publicTool?.contents).toContain(
       // biome-ignore lint/suspicious/noTemplateCurlyInString: asserting on generated source
-      "await callApi(`http://localhost:3001${`/orders/${input.orderId}`}`",
+      "await callApi(`https://api.example.com${`/orders/${input.orderId}`}`",
     );
   });
 

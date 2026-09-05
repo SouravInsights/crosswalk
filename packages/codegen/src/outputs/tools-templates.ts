@@ -224,8 +224,13 @@ export function ownedRegionScaffold(tool: ReviewedTool): string {
         ]),
   ];
 
-  if (endpointBacked && tool.serverUrl) {
-    lines.push(` *`, ` * Calls the API at ${tool.serverUrl} (from your spec's servers list).`);
+  if (endpointBacked && resolveApiBase(tool.serverUrl)) {
+    lines.push(
+      ` *`,
+      ` * Calls the API at ${resolveApiBase(tool.serverUrl)} (from your spec's servers list).`,
+    );
+  } else if (endpointBacked) {
+    lines.push(` *`, ` * Calls the API on this page's own origin (same-origin by default).`);
   }
 
   if (tool.riskTier !== "safe-read") {
@@ -304,6 +309,27 @@ export function ownedRegionScaffold(tool: ReviewedTool): string {
  * When the source carries no route information, we fall back to an honest
  * TODO instead of inventing a URL.
  */
+/**
+ * Decide the API base URL a generated tool should call. A spec's servers[0]
+ * is frequently a local dev URL (http://localhost:3001); baking that into the
+ * generated fetch makes every deployed tool call the visitor's own machine.
+ * So: a non-local absolute URL is kept (the API genuinely lives elsewhere),
+ * a local one returns undefined so the tool falls back to same-origin —
+ * which is where a deployed app's API actually is.
+ */
+export function resolveApiBase(serverUrl: string | undefined): string | undefined {
+  if (!serverUrl) return undefined;
+  try {
+    const { hostname } = new URL(serverUrl);
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+      return undefined;
+    }
+    return serverUrl;
+  } catch {
+    return undefined;
+  }
+}
+
 function requestCall(tool: ReviewedTool): string {
   if (!tool.httpMethod || !tool.pathTemplate || !tool.paramLocations) {
     return `const data = null; // TODO: call your app's existing code here.`;
@@ -315,11 +341,15 @@ function requestCall(tool: ReviewedTool): string {
   let pathExpr = `\`${tool.pathTemplate.replace(/\{([^}]+)\}/g, (_m, param: string) => `\${${inputRef(param)}}`)}\``;
   if (pathParams.length === 0) pathExpr = JSON.stringify(tool.pathTemplate);
 
-  // When the spec declares an absolute server URL, use it so the call goes
-  // to the API even when the app and API are on different origins.
-  if (tool.serverUrl) {
-    const base = tool.serverUrl.endsWith("/") ? tool.serverUrl.slice(0, -1) : tool.serverUrl;
-    pathExpr = `\`${base}\${${pathExpr}}\``;
+  // Base URL: default to the page's own origin so a deployed app calls its
+  // own API. Baking the spec's servers[0] (often http://localhost:3001) into
+  // the generated fetch would make every deployed tool call the visitor's
+  // own machine. A non-local public server URL is kept as the default base;
+  // a local one is not.
+  const base = resolveApiBase(tool.serverUrl);
+  if (base) {
+    const b = base.endsWith("/") ? base.slice(0, -1) : base;
+    pathExpr = `\`${b}\${${pathExpr}}\``;
   }
 
   const options: string[] = [`method: ${JSON.stringify(tool.httpMethod)}`];
