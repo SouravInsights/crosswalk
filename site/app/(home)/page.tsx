@@ -1,7 +1,9 @@
 import { ArrowDown } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { CopyCommand } from "@/components/copy-command";
 import { DashboardDemo } from "@/components/dashboard-demo";
+import { LogoWord } from "@/components/logo";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
 
@@ -40,35 +42,49 @@ function HeroMark() {
   );
 }
 
-/* The whole product story in one scannable grid: what every generated
-   tool carries, whatever it was generated from. */
-const TOOL_STANDARD: Array<[string, string]> = [
-  ["A name that says what it does", "generate-story, not post-trips-trip-id-story-generate."],
-  [
-    "A description an agent can act on",
-    "What it does, when to use it, what it returns. In plain language.",
-  ],
-  [
-    "Inputs spelled out in words",
-    "Required, optional, allowed values, limits. Written in, never guessed.",
-  ],
-  [
-    "Danger never ships by default",
-    "Auth, admin, and destructive endpoints start blocked. Writes start disabled. An agent sees only what you choose.",
-  ],
-  ["Failures an agent can act on", "A reason and what to try next, never a stack trace."],
-  [
-    "A human keeps the final click",
-    "Payments and deletes stop at a confirmation, not a warning sentence.",
-  ],
-  [
-    "Re-runs never touch your code",
-    "The spec moves, the tools update, your edits and git history survive.",
-  ],
-  [
-    "No account, no telemetry, no runtime",
-    "Plain TypeScript in your repo. The files never import this package.",
-  ],
+/* The whole product story as one sheet of guaranteed properties, numbered
+   like clauses in a standard. The naming claim leads the list, not the page. */
+const TOOL_STANDARD: Array<{ title: string; body: ReactNode }> = [
+  {
+    title: "A name that says what it does",
+    body: (
+      <span className="flex flex-col gap-1">
+        <s className="font-mono text-faint">post-trips-trip-id-story-generate</s>
+        <span className="font-mono">
+          <span className="text-ghost">→ </span>
+          <span className="font-medium text-accent">generate-story</span>
+        </span>
+      </span>
+    ),
+  },
+  {
+    title: "A description an agent can act on",
+    body: "What it does, when to use it, what it returns.",
+  },
+  {
+    title: "Inputs spelled out in words",
+    body: "Required, optional, limits: written in, never guessed.",
+  },
+  {
+    title: "Dangerous tools start disabled",
+    body: "Auth, admin, and destructive ones stay off until you turn them on.",
+  },
+  {
+    title: "Failures that say what to try next",
+    body: "A readable reason, never a stack trace.",
+  },
+  {
+    title: "A human keeps the final click",
+    body: "Payments and deletes stop at a confirmation.",
+  },
+  {
+    title: "Re-runs never touch your code",
+    body: "The spec moves, the tools update, your edits survive.",
+  },
+  {
+    title: "No account, no telemetry, no runtime",
+    body: "Plain TypeScript in your repo, nothing imported back.",
+  },
 ];
 
 export default function HomePage() {
@@ -91,9 +107,8 @@ export default function HomePage() {
               Turn your API into tools AI agents can call.
             </h1>
             <p className="mx-auto mb-10 max-w-xl text-[16px] leading-relaxed text-dim sm:text-[17px]">
-              One command reads your OpenAPI spec or validation schemas and writes the WebMCP tools
-              AI agents call: typed and checked for safety. Review and test them in the local
-              playground.
+              One command reads your OpenAPI spec or validation schemas and writes them: typed,
+              checked for safety, ready to test in the local playground.
             </p>
             <div className="flex flex-col items-center gap-4">
               <CopyCommand command={COMMAND} />
@@ -126,23 +141,150 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* The standard: the one section a scanner needs. */}
+      {/* The standard: the one section a scanner needs, rendered as the
+          thing it claims to be — a spec sheet. */}
       <section className="border-t border-line">
-        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24">
+        <div className="mx-auto max-w-6xl px-5 py-16 text-center sm:px-6 sm:py-24">
           <h2 className="mb-3 font-display text-[clamp(1.5rem,3vw,2.1rem)] font-medium tracking-[-0.015em]">
-            What a generated tool carries.
+            What every generated tool ships with.
           </h2>
-          <p className="mb-10 max-w-2xl text-[15px] leading-relaxed text-dim sm:mb-14">
-            Agents choose and call tools from names, descriptions, and schemas alone, so every
-            generated tool meets the WebMCP authoring standard:
+          <p className="mx-auto mb-12 max-w-xl text-[15px] leading-relaxed text-dim sm:mb-16">
+            An agent never sees your API. It sees each tool's name, description, and schema, and
+            nothing else. So each one meets every line of the same standard:
           </p>
-          <div className="grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-            {TOOL_STANDARD.map(([title, body]) => (
-              <div key={title} className="border-l-2 border-accent/40 pl-5">
-                <h3 className="mb-2 text-[13.5px] font-medium leading-snug text-ink">{title}</h3>
-                <p className="text-[13.5px] leading-relaxed text-dim">{body}</p>
-              </div>
+
+          {/* The standard as a physical sheet, in the page's own material:
+              dark card stock, taped to the desk, punched for a binder,
+              ruled clauses, a handwritten note, and the stamp it earns. */}
+          <div className="relative mx-auto max-w-3xl border border-line bg-panel text-left shadow-[0_10px_70px_rgba(0,0,0,0.7)]">
+            {/* Card-stock grain: SVG turbulence noise plus a soft edge
+                vignette, so the surface reads matte, not flat. */}
+            <svg aria-hidden="true" className="pointer-events-none absolute inset-0 size-full">
+              <filter id="sheet-grain">
+                <feTurbulence
+                  type="fractalNoise"
+                  baseFrequency="0.9"
+                  numOctaves="2"
+                  stitchTiles="stitch"
+                />
+                <feColorMatrix type="saturate" values="0" />
+              </filter>
+              <rect width="100%" height="100%" filter="url(#sheet-grain)" opacity="0.05" />
+            </svg>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 shadow-[inset_0_0_90px_rgba(0,0,0,0.35)]"
+            />
+
+            {/* Binder holes punched down the left edge: true voids, the
+                desk's darkness shows through. Sized down slightly on
+                mobile to match the tighter margin. */}
+            {["top-[23%]", "top-[48%]", "top-[73%]"].map((pos) => (
+              <span
+                key={pos}
+                aria-hidden="true"
+                className={`absolute left-2.5 ${pos} size-3 rounded-full border border-line bg-black shadow-[inset_0_2px_4px_rgba(0,0,0,0.9)] sm:left-3 sm:size-3.5`}
+              />
             ))}
+
+            {/* Masthead. Padding tightens on mobile — the original desktop
+                margin left too little room for the clause text to breathe
+                on a phone. */}
+            <div className="pl-9 pr-5 pt-8 sm:pl-14 sm:pr-11 sm:pt-11">
+              <div className="flex items-baseline justify-between">
+                <p className="text-[19px] leading-none">
+                  <LogoWord />
+                  <span className="ml-2.5 font-mono text-[10px] tracking-[0.2em] text-faint">
+                    / CODEGEN
+                  </span>
+                </p>
+                <span className="font-mono text-[10px] tracking-[0.2em] text-faint">NO. 001</span>
+              </div>
+              <p className="mt-6 font-display text-[clamp(1.7rem,3.6vw,2.5rem)] font-medium leading-none tracking-[-0.015em] text-ink">
+                The tool standard.
+              </p>
+              <p className="mt-3 max-w-md rotate-[0.4deg] font-[family-name:var(--font-caveat)] text-[19px] leading-snug text-dim">
+                every generated tool, checked against all eight on every run
+              </p>
+              <div className="mt-7 border-b border-ink/25" />
+              <div className="mt-[3px] border-b border-line" />
+            </div>
+
+            {/* The clauses. On mobile the number sits inline with the title
+                (a real numbered line, not a stray column); at sm the same
+                two elements drop into the grid as separate columns via
+                `contents`, so there's one markup shape for both layouts. */}
+            <div className="pl-9 pr-5 sm:pl-14 sm:pr-11">
+              {TOOL_STANDARD.map(({ title, body }, i) => (
+                <div
+                  key={title}
+                  className="border-b border-line py-3.5 last:border-b-0 sm:grid sm:grid-cols-[2rem_minmax(0,2fr)_minmax(0,3fr)] sm:items-baseline sm:gap-6 sm:py-4"
+                >
+                  <div className="flex items-baseline gap-2.5 sm:contents">
+                    <p className="font-mono text-[11px] font-medium text-accent">
+                      {String(i + 1).padStart(2, "0")}
+                    </p>
+                    <p className="text-[13.5px] font-medium leading-snug text-ink">{title}</p>
+                  </div>
+                  <p className="mt-1.5 pl-6 text-[13.5px] leading-relaxed text-dim sm:mt-0 sm:pl-0">
+                    {body}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer: the colophon, signed. Stacked on mobile so the
+                signature isn't forced right, under the stamp; side by
+                side once there's room for it. */}
+            <div className="flex flex-col gap-2 pb-8 pl-9 pr-5 pt-5 font-mono text-[10px] tracking-[0.2em] text-faint sm:flex-row sm:items-baseline sm:justify-between sm:gap-0 sm:pl-14 sm:pr-11">
+              <span>EVERY GENERATED TOOL, EVERY RUN</span>
+              <span className="rotate-[-3deg] font-[family-name:var(--font-caveat)] text-[18px] normal-case tracking-normal text-accent sm:mr-20">
+                webmcp-stack
+              </span>
+            </div>
+
+            {/* The stamp: the one flourish, earned by the run that checks
+                it. Smaller on mobile so it stays a corner detail instead
+                of crowding the sheet. */}
+            <svg
+              viewBox="0 0 96 96"
+              aria-hidden="true"
+              className="pointer-events-none absolute -bottom-6 -right-4 size-20 rotate-[-9deg] text-accent opacity-90 sm:-bottom-9 sm:-right-10 sm:size-28"
+            >
+              <defs>
+                <path id="stamp-ring" d="M48 15 a33 33 0 1 1 -0.01 0" fill="none" />
+              </defs>
+              <circle cx="48" cy="48" r="45" fill="none" stroke="currentColor" strokeWidth="1.4" />
+              <circle cx="48" cy="48" r="26" fill="none" stroke="currentColor" strokeWidth="1" />
+              <text
+                fontSize="7.2"
+                letterSpacing="1.6"
+                fill="currentColor"
+                fontFamily="monospace"
+                fontWeight="600"
+              >
+                <textPath href="#stamp-ring" textLength="205">
+                  CHECKED ON EVERY RUN ✕ WEBMCP-STACK
+                </textPath>
+              </text>
+              <g transform="translate(36.5,34.5)">
+                <path
+                  d="M3 19.5 L12 24 L21 19.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M3 13.5 L12 18 L21 13.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+                <path d="M12 5 L21 9.5 L12 14 L3 9.5 Z" fill="currentColor" />
+              </g>
+            </svg>
           </div>
         </div>
       </section>

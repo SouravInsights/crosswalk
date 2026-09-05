@@ -1,12 +1,13 @@
 import "./global.css";
 import { RootProvider } from "fumadocs-ui/provider";
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { Caveat, Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono" });
+const caveat = Caveat({ subsets: ["latin"], variable: "--font-caveat" });
 
 const DESCRIPTION =
   "Turn an OpenAPI spec into safe, typed, human-reviewed WebMCP tools. Real files in your repo: contracts regenerate, your code survives, safety audit built in.";
@@ -57,7 +58,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
+      className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} ${caveat.variable}`}
     >
       <body className="flex flex-col min-h-screen">
         <RootProvider>{children}</RootProvider>
