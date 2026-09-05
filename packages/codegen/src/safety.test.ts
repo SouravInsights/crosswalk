@@ -114,13 +114,48 @@ describe("reviewTools classification", () => {
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: true,
+      untrustedContentHint: false,
     });
     expect(tools[1]?.hints).toEqual({
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false, // POST is never idempotent
+      untrustedContentHint: false,
     });
     expect(tools[2]?.hints.idempotentHint).toBe(true);
+  });
+
+  it("marks free-text output as untrusted content", () => {
+    const withText = reviewTools([
+      candidate({
+        name: "get-trip",
+        httpMethod: "GET",
+        outputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", format: "uuid" },
+            title: { type: "string" }, // user-written: no enum, no format
+          },
+        },
+      }),
+    ]);
+    expect(withText.tools[0]?.hints.untrustedContentHint).toBe(true);
+
+    const structured = reviewTools([
+      candidate({
+        name: "get-status",
+        httpMethod: "GET",
+        outputSchema: {
+          type: "object",
+          properties: {
+            status: { type: "string", enum: ["draft", "published"] },
+            createdAt: { type: "string", format: "date-time" },
+            count: { type: "integer" },
+          },
+        },
+      }),
+    ]);
+    expect(structured.tools[0]?.hints.untrustedContentHint).toBe(false);
   });
 
   it("reads start enabled; mutations start disabled", () => {
@@ -358,7 +393,12 @@ describe("set-level audit", () => {
       endpointRole: "endpoint" as const,
       piiInOutput: [],
       source: { kind: "openapi", ref: `GET /${name}` },
-      hints: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+      hints: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        untrustedContentHint: false,
+      },
       synthesizedFields: [],
     };
   }

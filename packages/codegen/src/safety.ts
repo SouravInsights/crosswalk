@@ -172,7 +172,25 @@ export function hintsFor(tool: CandidateTool, sideEffect: SideEffect): ToolHints
     // PUT/PATCH/DELETE can be safely retried with the same input; POST cannot.
     idempotentHint:
       sideEffect === "read" || method === "PUT" || method === "PATCH" || method === "DELETE",
+    untrustedContentHint: hasFreeTextOutput(tool.outputSchema),
   };
+}
+
+/**
+ * True when the output schema contains a free-text field: a string with no
+ * enum and no format. Structured values (ids, dates, enums) are the site's
+ * own words; an unconstrained string can be user-written (titles, comments,
+ * stories), and agents should treat it as untrusted content.
+ */
+function hasFreeTextOutput(schema: JsonSchema | undefined): boolean {
+  if (!schema) return false;
+  if (schema.type === "string" && !schema.enum && !schema.format) return true;
+  for (const value of Object.values(schema.properties ?? {})) {
+    if (hasFreeTextOutput(value)) return true;
+  }
+  const items = schema.items;
+  if (items && !Array.isArray(items) && hasFreeTextOutput(items)) return true;
+  return false;
 }
 
 export function riskTierFor(sideEffect: SideEffect): RiskTier {

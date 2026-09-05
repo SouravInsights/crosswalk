@@ -34,3 +34,20 @@ Edit the `throw new Error("Not implemented…")` in any tool's `execute()` to
 return something real, then change a description in `openapi.yaml` and re-run
 `generate`. The description updates; your `execute()` is untouched. That split
 is the point of the tool.
+
+## What good looks like
+
+Running `generate` here should produce exactly this. If yours differs, the
+difference is a bug or a deliberate spec edit, not noise:
+
+- **Five tools**, two enabled and three disabled by default: `list-pets` and
+  `get-pet` (reads, born working), plus `create-pet`, `delete-pet`, and
+  `adopt-pet` (writes, disabled, with the confirmation gate in the generated
+  region).
+- **Safety notes** flag the endpoints whose responses carry personal data
+  (`owner.email`), each with a next step.
+- **Every tool file** declares `annotations` (`list-pets` is read-only and
+  marked untrusted-content, because pet names are user-written), skips
+  registration quietly on browsers without WebMCP, and returns readable
+  error results instead of throwing.
+- **A second run with no spec changes** writes nothing.

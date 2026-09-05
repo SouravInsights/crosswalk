@@ -28,7 +28,12 @@ function tool(overrides: Partial<ReviewedTool> = {}): ReviewedTool {
     enabledByDefault: true,
     requiresAuth: false,
     riskTier: "safe-read",
-    hints: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    hints: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      untrustedContentHint: false,
+    },
     piiInOutput: [],
     description: "A fine description",
     descriptionSource: "openapi-summary",

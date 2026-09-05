@@ -112,6 +112,12 @@ export interface ToolHints {
   readOnlyHint: boolean;
   destructiveHint: boolean;
   idempotentHint: boolean;
+  /**
+   * True when the tool's output can carry user-written words (free-text
+   * fields with no enum or format). Agents use it to decide how much to
+   * trust what a tool returns.
+   */
+  untrustedContentHint: boolean;
 }
 
 /**

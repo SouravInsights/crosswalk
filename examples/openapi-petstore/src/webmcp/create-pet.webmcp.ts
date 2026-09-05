@@ -1,4 +1,4 @@
-import { getModelContext, requestUserConfirmation, callApi, toolResult, toolDisabled } from "./runtime.webmcp";
+import { getModelContext, requestUserConfirmation, callApi, toolResult, asToolError, toolDisabled } from "./runtime.webmcp";
 
 // ─── webmcp-codegen: generated. Do not edit this region. ───
 /**
@@ -14,10 +14,12 @@ export const createPetInputSchema = {
   "type": "object",
   "properties": {
     "name": {
-      "type": "string"
+      "type": "string",
+      "description": "Name."
     },
     "tag": {
-      "type": "string"
+      "type": "string",
+      "description": "Tag."
     }
   },
   "required": [
@@ -29,27 +31,35 @@ export const createPetInputSchema = {
 export type CreatePetInput = { "name": string; "tag"?: string };
 
 /** Safety hints computed by webmcp-codegen. Informational metadata for hosts and UIs. */
-export const createPetHints = {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false} as const;
+export const createPetHints = {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"untrustedContentHint":true} as const;
 
 /** The tool definition, minus `execute` (which is yours, below the marker). */
 export const createPetTool = {
   name: "create-pet",
   description: "Add a new pet to the store",
   inputSchema: createPetInputSchema,
+  annotations: {
+    readOnlyHint: false,
+    untrustedContentHint: true,
+  },
 };
 
 /**
  * Register this tool with WebMCP. Call it once on page load, or use
- * registerAllTools() from the generated index.ts.
+ * registerAllTools() from the generated index.ts. Skips quietly when the
+ * browser has no WebMCP runtime.
  *
  * Pass an AbortSignal to unregister later: controller.abort().
  */
 export async function registerCreatePet(signal?: AbortSignal): Promise<void> {
   const modelContext = getModelContext();
+  if (!modelContext) return;
   await modelContext.registerTool(
     {
       ...createPetTool,
-      execute: async (input) => {
+      execute: async (input, context) => {
+        // Cancellation wins over everything, including the confirmation.
+        context?.signal?.throwIfAborted();
         // This tool changes things, so the user is always asked first. The
         // confirmation lives in the generated region: it cannot be edited away.
         const confirmed = await requestUserConfirmation(
@@ -62,7 +72,12 @@ export async function registerCreatePet(signal?: AbortSignal): Promise<void> {
           };
         }
         // The browser has already validated the agent's input against the schema.
-        return executeCreatePet(input as CreatePetInput);
+        // A failure returns a readable result; it never throws (see asToolError).
+        try {
+          return await executeCreatePet(input as CreatePetInput, context?.signal);
+        } catch (error) {
+          return asToolError(error);
+        }
       },
     },
     { signal },

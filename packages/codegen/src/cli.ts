@@ -445,15 +445,19 @@ async function generate(flags: CliFlags): Promise<number> {
   }
 
   if (flags.watch && !flags.dryRun) {
-    // TODO: implement watch mode
     warn("--watch is not implemented yet. Run generate again after changes.\n");
   }
 
   return result.blocked ? 1 : 0;
 }
 
+// exitCode, not exit(): the logger writes through a worker transport, and a
+// hard exit can drop its buffered lines. Every async handle has been awaited
+// by this point, so the process ends naturally.
 main().then(
-  (code) => process.exit(code),
+  (code) => {
+    process.exitCode = code;
+  },
   (err) => {
     const message = err instanceof Error ? err.message : String(err);
     // Multi-line messages are composed, actionable guidance written for the
@@ -465,6 +469,6 @@ main().then(
       error(`Unexpected error: ${message}`);
       error("\nPlease report this: https://github.com/SouravInsights/webmcp-stack/issues\n");
     }
-    process.exit(1);
+    process.exitCode = 1;
   },
 );

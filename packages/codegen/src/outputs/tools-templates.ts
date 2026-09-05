@@ -17,6 +17,11 @@
  * request to the endpoint), mutation tools start disabled with the working
  * code generated but commented out, and the user-confirmation step for
  * mutations lives in the generated region so it cannot be edited away.
+ * Registration skips quietly on browsers without WebMCP, the execute
+ * context's signal reaches fetch, and failures return readable error
+ * results. That error contract is load-bearing: the browser maps a
+ * rejected execute to a bare UnknownError with the message discarded,
+ * so a thrown failure would teach the agent nothing.
  */
 
 import { jsonSchemaToTs, pascalCase } from "../json-schema.js";
@@ -43,6 +48,7 @@ export function generatedRegion(tool: ReviewedTool): string {
     ...(mutates ? ["requestUserConfirmation"] : []),
     "callApi",
     "toolResult",
+    "asToolError",
     ...(tool.enabledByDefault ? [] : ["toolDisabled"]),
   ].join(", ");
 
@@ -51,7 +57,9 @@ export function generatedRegion(tool: ReviewedTool): string {
         `  await modelContext.registerTool(`,
         `    {`,
         `      ...${camel}Tool,`,
-        `      execute: async (input) => {`,
+        `      execute: async (input, context) => {`,
+        `        // Cancellation wins over everything, including the confirmation.`,
+        `        context?.signal?.throwIfAborted();`,
         `        // This tool changes things, so the user is always asked first. The`,
         `        // confirmation lives in the generated region: it cannot be edited away.`,
         `        const confirmed = await requestUserConfirmation(`,
@@ -64,7 +72,12 @@ export function generatedRegion(tool: ReviewedTool): string {
         `          };`,
         `        }`,
         `        // The browser has already validated the agent's input against the schema.`,
-        `        return execute${pascal}(input as ${tool.inputTypeName});`,
+        `        // A failure returns a readable result; it never throws (see asToolError).`,
+        `        try {`,
+        `          return await execute${pascal}(input as ${tool.inputTypeName}, context?.signal);`,
+        `        } catch (error) {`,
+        `          return asToolError(error);`,
+        `        }`,
         `      },`,
         `    },`,
         `    { signal },`,
@@ -75,7 +88,14 @@ export function generatedRegion(tool: ReviewedTool): string {
         `    {`,
         `      ...${camel}Tool,`,
         `      // The browser has already validated the agent's input against the schema.`,
-        `      execute: (input) => execute${pascal}(input as ${tool.inputTypeName}),`,
+        `      // A failure returns a readable result; it never throws (see asToolError).`,
+        `      execute: async (input, context) => {`,
+        `        try {`,
+        `          return await execute${pascal}(input as ${tool.inputTypeName}, context?.signal);`,
+        `        } catch (error) {`,
+        `          return asToolError(error);`,
+        `        }`,
+        `      },`,
         `    },`,
         `    { signal },`,
         `  );`,
@@ -107,16 +127,22 @@ export function generatedRegion(tool: ReviewedTool): string {
     `  name: ${JSON.stringify(tool.name)},`,
     `  description: ${JSON.stringify(tool.description)},`,
     `  inputSchema: ${camel}InputSchema,`,
+    `  annotations: {`,
+    `    readOnlyHint: ${tool.hints.readOnlyHint},`,
+    `    untrustedContentHint: ${tool.hints.untrustedContentHint},`,
+    `  },`,
     `};`,
     ``,
     `/**`,
     ` * Register this tool with WebMCP. Call it once on page load, or use`,
-    ` * registerAllTools() from the generated index.ts.`,
+    ` * registerAllTools() from the generated index.ts. Skips quietly when the`,
+    ` * browser has no WebMCP runtime.`,
     ` *`,
     ` * Pass an AbortSignal to unregister later: controller.abort().`,
     ` */`,
     `export async function register${pascal}(signal?: AbortSignal): Promise<void> {`,
     `  const modelContext = getModelContext();`,
+    `  if (!modelContext) return;`,
     ...registerBody,
     `}`,
     ``,
@@ -188,20 +214,21 @@ export function ownedRegionScaffold(tool: ReviewedTool): string {
 
   if (tool.enabledByDefault) {
     lines.push(
-      `export async function execute${pascal}(input: ${tool.inputTypeName}) {`,
+      `export async function execute${pascal}(input: ${tool.inputTypeName}, signal?: AbortSignal) {`,
       `  ${call}`,
       `  return toolResult(data);`,
       `}`,
     );
   } else {
     lines.push(
-      `export async function execute${pascal}(input: ${tool.inputTypeName}) {`,
+      `export async function execute${pascal}(input: ${tool.inputTypeName}, signal?: AbortSignal) {`,
       `  // This tool starts disabled: it ${
         tool.endpointRole === "endpoint"
           ? "changes things"
           : `wraps an ${tool.endpointRole} endpoint`
       }. Agents can see it, and calling it tells`,
       `  // them it is disabled. To enable it, delete the line below and uncomment the code.`,
+      `  void signal; // passed to fetch once you enable the call below`,
       `  return toolDisabled("${tool.name}.webmcp.ts");`,
       ``,
       `  // ${call}`,
@@ -255,6 +282,8 @@ function requestCall(tool: ReviewedTool): string {
       options.push(`body: { ${entries} }`);
     }
   }
+  // The execute context's signal reaches fetch, so a cancelled call stops.
+  options.push("signal");
 
   return `const data = await callApi(${pathExpr}, { ${options.join(", ")} });`;
 }
@@ -297,7 +326,12 @@ export interface WebMcpToolDefinition {
   name: string;
   description: string;
   inputSchema?: Record<string, unknown>;
-  execute: (input: Record<string, unknown>) => unknown | Promise<unknown>;
+  /** Hints the agent reads to decide how careful to be with this tool. */
+  annotations?: { readOnlyHint?: boolean; untrustedContentHint?: boolean };
+  execute: (
+    input: Record<string, unknown>,
+    context?: { signal?: AbortSignal },
+  ) => unknown | Promise<unknown>;
 }
 
 /** The slice of the WebMCP draft spec the generated code uses. */
@@ -308,31 +342,42 @@ export interface ModelContext {
   ): Promise<void>;
 }
 
+/* Most browsers do not have WebMCP yet, so a missing model context is a
+ * normal page load, not an error. It gets one quiet log line per load,
+ * never one per tool. */
+let announcedUnavailable = false;
+
 /**
- * Access the page's WebMCP model context, with a helpful error when the
- * browser doesn't have one (rather than an undefined-callsite mystery).
+ * The page's WebMCP model context, or null when the browser has none.
+ * Registration callers skip quietly on null; a missing runtime must never
+ * surface in the human-facing page (no throws, no console spam).
  */
-export function getModelContext(): ModelContext {
+export function getModelContext(): ModelContext | null {
   const modelContext = (document as unknown as { modelContext?: ModelContext }).modelContext;
-  if (!modelContext) {
-    throw new Error(
-      "WebMCP is not available in this browser. " +
-        "Enable chrome://flags/#enable-webmcp-testing (Chrome 146+), " +
-        "or add the WebMCP polyfill to your app.",
+  if (!modelContext && !announcedUnavailable) {
+    announcedUnavailable = true;
+    console.info(
+      "[webmcp-codegen] WebMCP is not available in this browser; tools were not registered.",
     );
   }
-  return modelContext;
+  return modelContext ?? null;
 }
 
 /**
  * Call your API from the page. Same origin by default (pass a full URL when
  * the API lives on another host), always with the signed-in user's session
  * cookies. Throws on HTTP errors; returns the parsed JSON body, or raw text
- * when the response is not JSON.
+ * when the response is not JSON. Pass the signal from execute's context so
+ * a cancelled tool call stops the request.
  */
 export async function callApi(
   path: string,
-  options: { method?: string; query?: Record<string, unknown>; body?: unknown } = {},
+  options: {
+    method?: string;
+    query?: Record<string, unknown>;
+    body?: unknown;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<unknown> {
   const url = new URL(path, window.location.origin);
   for (const [key, value] of Object.entries(options.query ?? {})) {
@@ -343,6 +388,7 @@ export async function callApi(
     credentials: "include",
     headers: options.body !== undefined ? { "content-type": "application/json" } : undefined,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    signal: options.signal,
   });
   if (!response.ok) {
     throw new Error("Request failed: " + response.status + " " + response.statusText);
@@ -363,6 +409,23 @@ export function toolResult(data: unknown): WebMcpToolResult {
       { type: "text", text: typeof data === "string" ? data : JSON.stringify(data, null, 2) },
     ],
   };
+}
+
+/**
+ * A failure the agent can read and act on. The one hard rule of the execute
+ * contract: never throw for failure. The browser maps a rejected execute to
+ * a bare UnknownError and discards the message, so a thrown failure teaches
+ * the agent nothing. Cancellation is the only exception, which is why
+ * asToolError re-throws AbortError.
+ */
+export function toolError(message: string): WebMcpToolResult {
+  return { content: [{ type: "text", text: message }], isError: true };
+}
+
+/** Convert any thrown failure into a readable error result. */
+export function asToolError(error: unknown): WebMcpToolResult {
+  if (error instanceof DOMException && error.name === "AbortError") throw error;
+  return toolError(error instanceof Error ? error.message : "The tool failed.");
 }
 
 /**

@@ -27,7 +27,12 @@ function reviewedTool(overrides: Partial<ReviewedTool> = {}): ReviewedTool {
     description: "Returns the current status and tracking info for an order by ID.",
     descriptionSource: "openapi-summary",
     riskTier: "safe-read",
-    hints: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    hints: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      untrustedContentHint: false,
+    },
     piiInOutput: [],
     ...overrides,
   };
@@ -111,6 +116,59 @@ describe("js generator", () => {
     expect(tool?.contents).not.toContain("toolDisabled(");
   });
 
+  it("emits the spec's annotations into the tool definition", async () => {
+    const files = await tools({ outDir: "src/webmcp" }).generate(
+      [
+        reviewedTool({
+          hints: {
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            untrustedContentHint: true,
+          },
+        }),
+      ],
+      cwd,
+    );
+    const tool = files.find((file) => file.path.includes("get-order-status"));
+    expect(tool?.contents).toContain("annotations: {");
+    expect(tool?.contents).toContain("readOnlyHint: true");
+    expect(tool?.contents).toContain("untrustedContentHint: true");
+  });
+
+  it("registration skips quietly when the browser has no WebMCP", async () => {
+    const files = await tools({ outDir: "src/webmcp" }).generate([reviewedTool()], cwd);
+    const tool = files.find((file) => file.path.includes("get-order-status"));
+    expect(tool?.contents).toContain("if (!modelContext) return;");
+    const runtime = files.find((file) => file.path.includes("runtime.webmcp"));
+    // A missing runtime is a normal page load: null and one quiet log line,
+    // never a throw per tool.
+    expect(runtime?.contents).toContain("getModelContext(): ModelContext | null");
+    expect(runtime?.contents).toContain("console.info(");
+    expect(runtime?.contents).not.toContain('WebMCP is not available in this browser. " +');
+  });
+
+  it("execute failures become readable error results, never throws", async () => {
+    const files = await tools({ outDir: "src/webmcp" }).generate([reviewedTool()], cwd);
+    const tool = files.find((file) => file.path.includes("get-order-status"));
+    // The generated wrapper converts any throw into an error the agent can
+    // read; a rejected execute would arrive as a message-less UnknownError.
+    expect(tool?.contents).toContain("return asToolError(error);");
+    const runtime = files.find((file) => file.path.includes("runtime.webmcp"));
+    expect(runtime?.contents).toContain('error.name === "AbortError"');
+  });
+
+  it("threads the execute context's signal through to fetch", async () => {
+    const files = await tools({ outDir: "src/webmcp" }).generate([reviewedTool()], cwd);
+    const tool = files.find((file) => file.path.includes("get-order-status"));
+    expect(tool?.contents).toContain(
+      "executeGetOrderStatus(input as GetOrderStatusInput, context?.signal)",
+    );
+    expect(tool?.contents).toContain("signal?: AbortSignal");
+    const runtime = files.find((file) => file.path.includes("runtime.webmcp"));
+    expect(runtime?.contents).toContain("signal: options.signal");
+  });
+
   it("mutations start disabled, with working code one uncomment away", async () => {
     const files = await tools({ outDir: "src/webmcp" }).generate(
       [
@@ -123,7 +181,12 @@ describe("js generator", () => {
           endpointRole: "endpoint",
           enabledByDefault: false,
           riskTier: "destructive-confirm",
-          hints: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+          hints: {
+            readOnlyHint: false,
+            destructiveHint: true,
+            idempotentHint: false,
+            untrustedContentHint: false,
+          },
         }),
       ],
       cwd,
@@ -155,7 +218,7 @@ describe("js generator", () => {
     );
     const tool = files.find((file) => file.path.includes("search-assets"));
     expect(tool?.contents).toContain(
-      'callApi("/search", { method: "POST", query: { limit: input.limit }, body: { query: input.query, tags: input.tags } })',
+      'callApi("/search", { method: "POST", query: { limit: input.limit }, body: { query: input.query, tags: input.tags }, signal })',
     );
   });
 

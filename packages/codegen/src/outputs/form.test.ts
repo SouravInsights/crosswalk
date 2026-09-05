@@ -27,7 +27,12 @@ function reviewedTool(overrides: Partial<ReviewedTool> = {}): ReviewedTool {
     description: "Save the profile details.",
     descriptionSource: "declared",
     riskTier: "write-confirm",
-    hints: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    hints: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      untrustedContentHint: false,
+    },
     piiInOutput: [],
     form: { path: "src/ProfileForm.tsx" },
     ...overrides,
