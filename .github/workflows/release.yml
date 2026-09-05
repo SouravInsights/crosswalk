@@ -7,6 +7,11 @@ name: Release
 # to main. Never runs on its own.
 on:
   workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Build and inspect the npm tarball without publishing"
+        type: boolean
+        default: false
 
 jobs:
   release:
@@ -29,13 +34,22 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - name: Version packages
+        # Dry runs never commit a version bump; they inspect what the real
+        # run would publish.
+        if: ${{ !inputs.dry-run }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           pnpm changeset version
           git add -A
           git commit -m "chore: release packages" || echo "no pending changesets"
+      - name: Inspect the tarball (dry run)
+        if: ${{ inputs.dry-run }}
+        run: |
+          cd packages/codegen
+          npm publish --dry-run
       - name: Publish to npm
+        if: ${{ !inputs.dry-run }}
         # pnpm publish mis-sends the package name as a header for scoped
         # packages and npm rejects it (E404). npm publish does not.
         run: npx changeset publish --no-git-tag
@@ -43,4 +57,5 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Push the release commit and tags
+        if: ${{ !inputs.dry-run }}
         run: git push origin HEAD:main --follow-tags

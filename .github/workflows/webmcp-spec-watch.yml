@@ -1,0 +1,60 @@
+name: WebMCP spec watch
+
+# The browser API our generated code targets is a draft and moves without
+# warning. Once a week, compare the spec repo's main branch against the
+# pinned commit in docs/references/webmcp-spec-pin.txt and open an issue
+# when it moves, so template drift is a task, not a surprise bug report.
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Mondays, 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare the pinned spec commit against upstream
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pin=$(grep -E '^[0-9a-f]{40}$' docs/references/webmcp-spec-pin.txt)
+          latest=$(git ls-remote https://github.com/webmachinelearning/webmcp HEAD | cut -f1)
+          echo "pinned:  $pin"
+          echo "latest:  $latest"
+          if [ "$pin" = "$latest" ]; then
+            echo "moved=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "moved=true" >> "$GITHUB_OUTPUT"
+          echo "pin=$pin" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Open an issue when the spec moved
+        if: steps.check.outputs.moved == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PIN: ${{ steps.check.outputs.pin }}
+          LATEST: ${{ steps.check.outputs.latest }}
+        run: |
+          # One open issue at a time: if an unresolved drift issue exists,
+          # comment on it instead of filing a duplicate.
+          existing=$(gh issue list --search "WebMCP spec moved" --state open --limit 1 --json number --jq '.[0].number // empty')
+          body="The WebMCP spec repo moved past our pin.
+
+          Pinned:  $PIN
+          Latest:  $LATEST
+          Diff:    https://github.com/webmachinelearning/webmcp/compare/$PIN...$LATEST
+
+          Review the diff against the surfaces listed in docs/references/webmcp-spec-pin.txt,
+          update packages/codegen/src/outputs/tools-templates.ts if needed, then bump the pin."
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "WebMCP spec moved: review the diff against our pin" --body "$body"
+          fi

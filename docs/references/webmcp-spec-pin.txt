@@ -1,0 +1,13 @@
+# The webmachinelearning/webmcp commit our generated templates are
+# written for. Pinned 2026-09-05.
+#
+# The .github/workflows/webmcp-spec-watch.yml workflow compares this SHA
+# against the spec repo weekly and opens an issue when it moves. When you
+# resolve that issue: review the diff, update the templates, bump this pin.
+#
+# The surfaces our runtime template depends on:
+#   - document.modelContext.registerTool (async)
+#   - execute receives (input, context) with context.signal
+#   - annotations: readOnlyHint, untrustedContentHint
+#   - a rejected execute reaches the agent as a bare UnknownError
+50c4b7fd6c4402731271649bc544b662b061ed44
