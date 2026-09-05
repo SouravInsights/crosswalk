@@ -1,9 +1,13 @@
 name: CI
 
-# Pull requests only. Day-to-day pushes to main do not run CI; open a PR
-# when a change should be verified before it lands.
+# Runs on PRs, on every push to main, and on manual dispatch. Same checks as
+# the pre-push hook (lint, typecheck, test), so a locally bypassed hook still
+# gets caught here.
 on:
   pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   verify:
@@ -16,6 +20,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm test
       - run: pnpm typecheck
